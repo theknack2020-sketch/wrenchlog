@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>NSCameraUsageDescription</key>
+    <string>WrenchLog uses the camera to photograph receipts and parts for your service records.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>WrenchLog accesses your photo library to attach receipt images to service records.</string>
+</dict>
+</plist>
