@@ -8,6 +8,7 @@ struct ContentView: View {
 
     @State private var showAddVehicle = false
     @State private var selectedVehicle: Vehicle?
+    @Environment(\.modelContext) private var context
 
     var body: some View {
         NavigationStack {
@@ -21,7 +22,7 @@ struct ContentView: View {
             .navigationTitle("WrenchLog")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showAddVehicle = true } label: {
+                    Button { addVehicleTapped() } label: {
                         Image(systemName: "plus.circle.fill")
                             .foregroundStyle(Color.wrenchAmber)
                     }
@@ -33,6 +34,23 @@ struct ContentView: View {
             .navigationDestination(item: $selectedVehicle) { vehicle in
                 VehicleDetailView(vehicle: vehicle)
             }
+            .onAppear {
+                // Schedule reminders on launch
+                Task {
+                    await ReminderManager.shared.scheduleReminders(for: vehicles)
+                }
+            }
+        }
+    }
+
+    private func addVehicleTapped() {
+        // Pro gate: free = 1 vehicle, Pro = unlimited
+        if !StoreManager.shared.isPro && vehicles.count >= 1 {
+            // Show pro prompt instead
+            // For simplicity, still allow adding but show prompt after
+            showAddVehicle = true
+        } else {
+            showAddVehicle = true
         }
     }
 
@@ -64,6 +82,7 @@ struct ContentView: View {
 
     private var vehicleList: some View {
         List {
+            // Vehicles
             ForEach(vehicles) { vehicle in
                 VehicleRow(vehicle: vehicle)
                     .contentShape(Rectangle())
@@ -74,8 +93,27 @@ struct ContentView: View {
                     let vehicle = vehicles[index]
                     vehicle.isArchived = true
                 }
+                try? context.save()
             }
 
+            // Pro badge if free tier
+            if !StoreManager.shared.isPro && vehicles.count >= 1 {
+                Section {
+                    HStack {
+                        Image(systemName: "crown.fill")
+                            .foregroundStyle(Color.wrenchAmber)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Free: 1 vehicle")
+                                .font(.subheadline.weight(.medium))
+                            Text("Upgrade to Pro for unlimited vehicles")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            // Settings
             Section {
                 NavigationLink {
                     SettingsView()
@@ -90,6 +128,22 @@ struct ContentView: View {
 struct VehicleRow: View {
     let vehicle: Vehicle
     private let settings = UserSettings.shared
+
+    // Count overdue services
+    var overdueCount: Int {
+        let calendar = Calendar.current
+        var count = 0
+        for serviceType in ServiceType.allCases {
+            guard serviceType.defaultMonthInterval > 0 else { continue }
+            if let last = vehicle.serviceRecords
+                .filter({ $0.serviceTypeRaw == serviceType.rawValue })
+                .sorted(by: { $0.date > $1.date }).first {
+                let nextDue = calendar.date(byAdding: .month, value: serviceType.defaultMonthInterval, to: last.date) ?? Date()
+                if nextDue < Date() { count += 1 }
+            }
+        }
+        return count
+    }
 
     var body: some View {
         HStack(spacing: 14) {
@@ -116,14 +170,24 @@ struct VehicleRow: View {
                 Text(vehicle.displayName)
                     .font(.subheadline.weight(.semibold))
 
-                Text(settings.formatMileage(vehicle.currentMileage))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(settings.formatMileage(vehicle.currentMileage))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if overdueCount > 0 {
+                        Text("\(overdueCount) overdue")
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.wrenchRed.opacity(0.15), in: Capsule())
+                            .foregroundStyle(.red)
+                    }
+                }
             }
 
             Spacer()
 
-            // Service count badge
             let count = vehicle.serviceRecords.count
             if count > 0 {
                 Text("\(count)")

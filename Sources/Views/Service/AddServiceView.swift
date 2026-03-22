@@ -1,4 +1,6 @@
 import SwiftUI
+import SwiftData
+import PhotosUI
 
 struct AddServiceView: View {
     let vehicle: Vehicle
@@ -12,6 +14,12 @@ struct AddServiceView: View {
     @State private var mileage = ""
     @State private var cost = ""
     @State private var notes = ""
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var photoDataItems: [Data] = []
+    @State private var showProPrompt = false
+
+    private let store = StoreManager.shared
+    private let photoManager = ServicePhotoManager.shared
 
     var body: some View {
         NavigationStack {
@@ -70,15 +78,67 @@ struct AddServiceView: View {
                         .lineLimit(3...6)
                 }
 
+                // Photos (Pro feature)
+                Section("Receipt Photos") {
+                    if store.isPro {
+                        PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 5, matching: .images) {
+                            Label("Add Photos", systemImage: "camera.fill")
+                                .foregroundStyle(Color.wrenchAmber)
+                        }
+
+                        if !photoDataItems.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(photoDataItems.indices, id: \.self) { index in
+                                        if let img = UIImage(data: photoDataItems[index]) {
+                                            Image(uiImage: img)
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 80, height: 80)
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                .overlay(alignment: .topTrailing) {
+                                                    Button {
+                                                        photoDataItems.remove(at: index)
+                                                    } label: {
+                                                        Image(systemName: "xmark.circle.fill")
+                                                            .font(.caption)
+                                                            .foregroundStyle(.white, .red)
+                                                    }
+                                                    .offset(x: 4, y: -4)
+                                                }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Button {
+                            showProPrompt = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "lock.fill")
+                                    .foregroundStyle(.secondary)
+                                Text("Pro feature — attach receipt photos")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
                 // Reminder hint
                 if !isCustom && selectedType.defaultMileageInterval > 0 {
                     Section {
                         HStack {
                             Image(systemName: "bell.fill")
                                 .foregroundStyle(Color.wrenchAmber)
-                            Text("Next reminder: \(selectedType.defaultMileageInterval.formatted()) \(UserSettings.shared.distanceUnit.label)")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Reminder will be set")
+                                    .font(.subheadline.weight(.medium))
+                                Text("Next: \(selectedType.defaultMileageInterval.formatted()) \(UserSettings.shared.distanceUnit.label) or \(selectedType.defaultMonthInterval) months")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -97,6 +157,19 @@ struct AddServiceView: View {
             }
             .onAppear {
                 mileage = vehicle.currentMileage > 0 ? "\(vehicle.currentMileage)" : ""
+            }
+            .onChange(of: selectedPhotos) { _, items in
+                Task {
+                    photoDataItems = []
+                    for item in items {
+                        if let data = try? await item.loadTransferable(type: Data.self) {
+                            photoDataItems.append(data)
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showProPrompt) {
+                ProUpgradeView()
             }
         }
     }
@@ -121,6 +194,14 @@ struct AddServiceView: View {
             )
         }
 
+        // Save photos
+        if store.isPro {
+            for photoData in photoDataItems {
+                let fileName = photoManager.savePhoto(photoData, for: record.id)
+                record.photoFileNames.append(fileName)
+            }
+        }
+
         record.vehicle = vehicle
 
         // Update vehicle mileage if higher
@@ -130,6 +211,13 @@ struct AddServiceView: View {
 
         context.insert(record)
         try? context.save()
+
+        // Reschedule reminders
+        Task {
+            if let vehicles = try? context.fetch(FetchDescriptor<Vehicle>()) {
+                await ReminderManager.shared.scheduleReminders(for: vehicles)
+            }
+        }
 
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         dismiss()

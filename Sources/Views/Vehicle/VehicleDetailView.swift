@@ -1,12 +1,20 @@
 import SwiftUI
+import SwiftData
 
 struct VehicleDetailView: View {
     @Bindable var vehicle: Vehicle
     @State private var showAddService = false
+    @State private var showEditVehicle = false
     @State private var showEditMileage = false
+    @State private var showCostAnalytics = false
+    @State private var showPDFShare = false
+    @State private var showProPrompt = false
     @State private var newMileage = ""
+    @State private var pdfData: Data?
     @Environment(\.modelContext) private var context
     private let settings = UserSettings.shared
+    private let store = StoreManager.shared
+    private let photoManager = ServicePhotoManager.shared
 
     var sortedRecords: [ServiceRecord] {
         vehicle.serviceRecords.sorted { $0.date > $1.date }
@@ -16,35 +24,93 @@ struct VehicleDetailView: View {
         vehicle.serviceRecords.reduce(0) { $0 + $1.cost }
     }
 
+    var upcomingReminders: [(type: String, dueText: String, isOverdue: Bool)] {
+        var reminders: [(String, String, Bool)] = []
+        let calendar = Calendar.current
+
+        for serviceType in ServiceType.allCases {
+            guard serviceType.defaultMonthInterval > 0 else { continue }
+
+            let lastRecord = vehicle.serviceRecords
+                .filter { $0.serviceTypeRaw == serviceType.rawValue }
+                .sorted { $0.date > $1.date }
+                .first
+
+            if let last = lastRecord {
+                let nextDue = calendar.date(byAdding: .month, value: serviceType.defaultMonthInterval, to: last.date) ?? Date()
+                let isOverdue = nextDue < Date()
+                let formatter = RelativeDateTimeFormatter()
+                formatter.unitsStyle = .abbreviated
+                let dueText = isOverdue ? "Overdue" : formatter.localizedString(for: nextDue, relativeTo: Date())
+                reminders.append((serviceType.rawValue, dueText, isOverdue))
+            }
+        }
+        return reminders.sorted { $0.2 && !$1.2 } // overdue first
+    }
+
     var body: some View {
         List {
             // Vehicle header
             Section {
                 VStack(spacing: 12) {
                     HStack {
+                        if let data = vehicle.photoData, let img = UIImage(data: data) {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 50, height: 50)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text(vehicle.displayName)
                                 .font(.title3.weight(.bold))
-                            if !vehicle.licensePlate.isEmpty {
-                                Text(vehicle.licensePlate)
+                            HStack(spacing: 8) {
+                                if !vehicle.licensePlate.isEmpty {
+                                    Text(vehicle.licensePlate)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text(settings.formatMileage(vehicle.currentMileage))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                         Spacer()
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text(settings.formatMileage(vehicle.currentMileage))
-                                .font(.subheadline.weight(.semibold))
-                            Text("\(vehicle.serviceRecords.count) services")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        Button { showEditVehicle = true } label: {
+                            Image(systemName: "pencil.circle")
+                                .font(.title3)
+                                .foregroundStyle(Color.wrenchAmber)
                         }
                     }
 
                     // Quick stats
-                    HStack(spacing: 16) {
+                    HStack(spacing: 12) {
                         statCard(title: "Total Spent", value: settings.formatCost(totalCost), icon: "dollarsign.circle.fill", color: .wrenchAmber)
                         statCard(title: "Services", value: "\(vehicle.serviceRecords.count)", icon: "wrench.fill", color: .catEngine)
+
+                        Button { showEditMileage = true } label: {
+                            statCard(title: "Update", value: settings.formatMileage(vehicle.currentMileage), icon: "gauge.open.with.needle.33percent", color: .catTires)
+                        }
+                    }
+                }
+            }
+
+            // Upcoming reminders
+            if !upcomingReminders.isEmpty {
+                Section("Upcoming Service") {
+                    ForEach(upcomingReminders.prefix(5), id: \.type) { reminder in
+                        HStack {
+                            Circle()
+                                .fill(reminder.isOverdue ? Color.wrenchRed : Color.wrenchGreen)
+                                .frame(width: 8, height: 8)
+                            Text(reminder.type)
+                                .font(.subheadline)
+                            Spacer()
+                            Text(reminder.dueText)
+                                .font(.caption)
+                                .foregroundStyle(reminder.isOverdue ? .red : .secondary)
+                        }
                     }
                 }
             }
@@ -72,6 +138,7 @@ struct VehicleDetailView: View {
                     .onDelete { indexSet in
                         for index in indexSet {
                             let record = sortedRecords[index]
+                            photoManager.deletePhotos(for: record.photoFileNames)
                             context.delete(record)
                         }
                         try? context.save()
@@ -79,14 +146,33 @@ struct VehicleDetailView: View {
                 }
             }
 
-            // Update mileage
+            // Actions
             Section {
-                Button {
-                    newMileage = "\(vehicle.currentMileage)"
-                    showEditMileage = true
+                // Cost analytics
+                NavigationLink {
+                    CostAnalyticsView(vehicle: vehicle)
                 } label: {
-                    Label("Update Mileage", systemImage: "gauge.open.with.needle.33percent.and.arrowtriangle")
+                    Label("Cost Analytics", systemImage: "chart.bar.fill")
                         .foregroundStyle(Color.wrenchAmber)
+                }
+
+                // PDF export (Pro)
+                Button {
+                    if store.isPro {
+                        exportPDF()
+                    } else {
+                        showProPrompt = true
+                    }
+                } label: {
+                    HStack {
+                        Label("Export PDF Report", systemImage: "doc.text.fill")
+                        if !store.isPro {
+                            Spacer()
+                            Image(systemName: "crown.fill")
+                                .font(.caption)
+                                .foregroundStyle(Color.wrenchAmber)
+                        }
+                    }
                 }
             }
         }
@@ -103,12 +189,28 @@ struct VehicleDetailView: View {
         .sheet(isPresented: $showAddService) {
             AddServiceView(vehicle: vehicle)
         }
+        .sheet(isPresented: $showEditVehicle) {
+            EditVehicleView(vehicle: vehicle)
+        }
+        .sheet(isPresented: $showProPrompt) {
+            ProUpgradeView()
+        }
+        .sheet(isPresented: $showPDFShare) {
+            if let data = pdfData {
+                ShareSheet(items: [data])
+            }
+        }
         .alert("Update Mileage", isPresented: $showEditMileage) {
             TextField(settings.distanceUnit.label, text: $newMileage)
                 .keyboardType(.numberPad)
             Button("Update") {
                 if let m = Int(newMileage), m > 0 {
                     vehicle.currentMileage = m
+                    Task {
+                        if let vehicles = try? context.fetch(FetchDescriptor<Vehicle>()) {
+                            await ReminderManager.shared.scheduleReminders(for: vehicles)
+                        }
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {}
@@ -117,57 +219,110 @@ struct VehicleDetailView: View {
         }
     }
 
+    private func exportPDF() {
+        pdfData = PDFExportService.generatePDF(for: vehicle, settings: settings)
+        if pdfData != nil {
+            showPDFShare = true
+        }
+    }
+
     private func statCard(title: String, value: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.title3)
+                .font(.caption)
                 .foregroundStyle(color)
             Text(value)
-                .font(.subheadline.weight(.bold).monospacedDigit())
+                .font(.caption2.weight(.bold).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, 8)
+        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
     }
 }
+
+// MARK: - Service Record Row with Photos
 
 struct ServiceRecordRow: View {
     let record: ServiceRecord
     private let settings = UserSettings.shared
+    private let photoManager = ServicePhotoManager.shared
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: record.icon)
-                .font(.body)
-                .foregroundStyle(record.color)
-                .frame(width: 28)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Image(systemName: record.icon)
+                    .font(.body)
+                    .foregroundStyle(record.color)
+                    .frame(width: 28)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(record.displayServiceType)
-                    .font(.subheadline.weight(.medium))
-                HStack(spacing: 8) {
-                    Text(record.date, format: .dateTime.month(.abbreviated).day().year())
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if record.mileage > 0 {
-                        Text("· \(settings.formatMileage(record.mileage))")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(record.displayServiceType)
+                        .font(.subheadline.weight(.medium))
+                    HStack(spacing: 8) {
+                        Text(record.date, format: .dateTime.month(.abbreviated).day().year())
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if record.mileage > 0 {
+                            Text("· \(settings.formatMileage(record.mileage))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                }
+
+                Spacer()
+
+                if record.cost > 0 {
+                    Text(settings.formatCost(record.cost))
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(Color.wrenchAmber)
                 }
             }
 
-            Spacer()
+            // Notes
+            if !record.notes.isEmpty {
+                Text(record.notes)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(2)
+                    .padding(.leading, 40)
+            }
 
-            if record.cost > 0 {
-                Text(settings.formatCost(record.cost))
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(Color.wrenchAmber)
+            // Photo thumbnails
+            if !record.photoFileNames.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(record.photoFileNames, id: \.self) { fileName in
+                            if let img = photoManager.loadPhoto(named: fileName) {
+                                Image(uiImage: img)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 44, height: 44)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                        }
+                    }
+                }
+                .padding(.leading, 40)
             }
         }
         .padding(.vertical, 2)
     }
+}
+
+// MARK: - Share Sheet
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
