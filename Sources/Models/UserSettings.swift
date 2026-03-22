@@ -24,7 +24,8 @@ final class UserSettings {
     }
 
     func formatMileage(_ miles: Int) -> String {
-        "\(miles.formatted()) \(distanceUnit.label)"
+        if miles == 0 { return "No mileage set" }
+        return "\(miles.formatted()) \(distanceUnit.label)"
     }
 
     private init() {}

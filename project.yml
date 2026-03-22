@@ -39,16 +39,28 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE: NO
 
+  WrenchLogTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: WrenchLog
+
 schemes:
   WrenchLog:
     build:
       targets:
         WrenchLog: all
+        WrenchLogTests: [test]
     run:
       config: Debug
       storeKitConfiguration: Products.storekit
     test:
       config: Debug
+      gatherCoverageData: false
+      targets:
+        - name: WrenchLogTests
     profile:
       config: Release
     analyze:

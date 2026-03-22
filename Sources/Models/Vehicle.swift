@@ -36,6 +36,11 @@ final class Vehicle {
     }
 }
 
+extension Vehicle: Hashable {
+    static func == (lhs: Vehicle, rhs: Vehicle) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
 @Model
 final class ServiceRecord {
     var id: UUID

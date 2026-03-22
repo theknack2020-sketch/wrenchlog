@@ -69,6 +69,12 @@ struct ContentView: View {
                     .contentShape(Rectangle())
                     .onTapGesture { selectedVehicle = vehicle }
             }
+            .onDelete { indexSet in
+                for index in indexSet {
+                    let vehicle = vehicles[index]
+                    vehicle.isArchived = true
+                }
+            }
 
             Section {
                 NavigationLink {

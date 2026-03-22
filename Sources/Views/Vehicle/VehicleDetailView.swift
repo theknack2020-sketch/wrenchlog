@@ -3,7 +3,9 @@ import SwiftUI
 struct VehicleDetailView: View {
     @Bindable var vehicle: Vehicle
     @State private var showAddService = false
-    @State private var showSettings = false
+    @State private var showEditMileage = false
+    @State private var newMileage = ""
+    @Environment(\.modelContext) private var context
     private let settings = UserSettings.shared
 
     var sortedRecords: [ServiceRecord] {
@@ -67,6 +69,24 @@ struct VehicleDetailView: View {
                     ForEach(sortedRecords) { record in
                         ServiceRecordRow(record: record)
                     }
+                    .onDelete { indexSet in
+                        for index in indexSet {
+                            let record = sortedRecords[index]
+                            context.delete(record)
+                        }
+                        try? context.save()
+                    }
+                }
+            }
+
+            // Update mileage
+            Section {
+                Button {
+                    newMileage = "\(vehicle.currentMileage)"
+                    showEditMileage = true
+                } label: {
+                    Label("Update Mileage", systemImage: "gauge.open.with.needle.33percent.and.arrowtriangle")
+                        .foregroundStyle(Color.wrenchAmber)
                 }
             }
         }
@@ -82,6 +102,18 @@ struct VehicleDetailView: View {
         }
         .sheet(isPresented: $showAddService) {
             AddServiceView(vehicle: vehicle)
+        }
+        .alert("Update Mileage", isPresented: $showEditMileage) {
+            TextField(settings.distanceUnit.label, text: $newMileage)
+                .keyboardType(.numberPad)
+            Button("Update") {
+                if let m = Int(newMileage), m > 0 {
+                    vehicle.currentMileage = m
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Current: \(settings.formatMileage(vehicle.currentMileage))")
         }
     }
 
