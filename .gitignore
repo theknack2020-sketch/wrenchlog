@@ -1,0 +1,16 @@
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+fastlane/AuthKey_*.p8
+fastlane/api_key.json
+*.p12
+.env
+*.p8
+.DS_Store
+.gsd/runtime/
+.gsd/activity/
+.gsd/worktrees/
