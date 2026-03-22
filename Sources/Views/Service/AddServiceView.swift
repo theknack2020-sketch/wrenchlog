@@ -26,9 +26,11 @@ struct AddServiceView: View {
             Form {
                 // Service type
                 Section("Service Type") {
-                    Toggle("Custom Service", isOn: $isCustom)
+                    if store.isPro {
+                        Toggle("Custom Service", isOn: $isCustom)
+                    }
 
-                    if isCustom {
+                    if isCustom && store.isPro {
                         TextField("Service name", text: $customTypeName)
                     } else {
                         Picker("Type", selection: $selectedType) {
@@ -47,7 +49,7 @@ struct AddServiceView: View {
 
                 // Details
                 Section("Details") {
-                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                    DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date)
 
                     HStack {
                         Text("Mileage")

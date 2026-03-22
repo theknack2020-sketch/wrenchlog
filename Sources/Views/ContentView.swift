@@ -7,8 +7,13 @@ struct ContentView: View {
     private var vehicles: [Vehicle]
 
     @State private var showAddVehicle = false
+    @State private var showProPrompt = false
     @State private var selectedVehicle: Vehicle?
+    @State private var vehicleToDelete: Vehicle?
+    @State private var showDeleteConfirm = false
     @Environment(\.modelContext) private var context
+
+    private let store = StoreManager.shared
 
     var body: some View {
         NavigationStack {
@@ -22,35 +27,50 @@ struct ContentView: View {
             .navigationTitle("WrenchLog")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { addVehicleTapped() } label: {
+                    Button {
+                        if !store.isPro && vehicles.count >= 1 {
+                            showProPrompt = true
+                        } else {
+                            showAddVehicle = true
+                        }
+                    } label: {
                         Image(systemName: "plus.circle.fill")
                             .foregroundStyle(Color.wrenchAmber)
                     }
+                    .accessibilityLabel("Add vehicle")
                 }
             }
             .sheet(isPresented: $showAddVehicle) {
                 AddVehicleView()
             }
+            .sheet(isPresented: $showProPrompt) {
+                ProUpgradeView()
+            }
             .navigationDestination(item: $selectedVehicle) { vehicle in
                 VehicleDetailView(vehicle: vehicle)
             }
+            .alert("Delete Vehicle?", isPresented: $showDeleteConfirm) {
+                Button("Delete", role: .destructive) {
+                    if let vehicle = vehicleToDelete {
+                        vehicle.isArchived = true
+                        do {
+                            try context.save()
+                        } catch {
+                            print("[WrenchLog] Failed to archive vehicle: \(error)")
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                if let v = vehicleToDelete {
+                    Text("'\(v.displayName)' and all its service records will be removed.")
+                }
+            }
             .onAppear {
-                // Schedule reminders on launch
                 Task {
                     await ReminderManager.shared.scheduleReminders(for: vehicles)
                 }
             }
-        }
-    }
-
-    private func addVehicleTapped() {
-        // Pro gate: free = 1 vehicle, Pro = unlimited
-        if !StoreManager.shared.isPro && vehicles.count >= 1 {
-            // Show pro prompt instead
-            // For simplicity, still allow adding but show prompt after
-            showAddVehicle = true
-        } else {
-            showAddVehicle = true
         }
     }
 
@@ -59,11 +79,12 @@ struct ContentView: View {
             Image(systemName: "car.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(Color.wrenchAmber)
+                .accessibilityHidden(true)
 
-            Text("No Vehicles Yet")
+            Text("Add Your First Vehicle")
                 .font(.title2.weight(.bold))
 
-            Text("Add your first vehicle to start\ntracking maintenance.")
+            Text("Track maintenance, set reminders,\nand keep your car healthy.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -82,38 +103,38 @@ struct ContentView: View {
 
     private var vehicleList: some View {
         List {
-            // Vehicles
             ForEach(vehicles) { vehicle in
                 VehicleRow(vehicle: vehicle)
                     .contentShape(Rectangle())
                     .onTapGesture { selectedVehicle = vehicle }
             }
             .onDelete { indexSet in
-                for index in indexSet {
-                    let vehicle = vehicles[index]
-                    vehicle.isArchived = true
+                if let index = indexSet.first {
+                    vehicleToDelete = vehicles[index]
+                    showDeleteConfirm = true
                 }
-                try? context.save()
             }
 
-            // Pro badge if free tier
-            if !StoreManager.shared.isPro && vehicles.count >= 1 {
+            // Pro upsell
+            if !store.isPro && vehicles.count >= 1 {
                 Section {
-                    HStack {
-                        Image(systemName: "crown.fill")
-                            .foregroundStyle(Color.wrenchAmber)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Free: 1 vehicle")
-                                .font(.subheadline.weight(.medium))
-                            Text("Upgrade to Pro for unlimited vehicles")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    Button { showProPrompt = true } label: {
+                        HStack {
+                            Image(systemName: "crown.fill")
+                                .foregroundStyle(Color.wrenchAmber)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Free: 1 vehicle")
+                                    .font(.subheadline.weight(.medium))
+                                Text("Upgrade to Pro for unlimited vehicles, photos, PDF export")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
+                    .accessibilityLabel("Upgrade to Pro for unlimited vehicles")
                 }
             }
 
-            // Settings
             Section {
                 NavigationLink {
                     SettingsView()
@@ -129,7 +150,6 @@ struct VehicleRow: View {
     let vehicle: Vehicle
     private let settings = UserSettings.shared
 
-    // Count overdue services
     var overdueCount: Int {
         let calendar = Calendar.current
         var count = 0
@@ -147,7 +167,6 @@ struct VehicleRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            // Vehicle icon/photo
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.wrenchAmber.opacity(0.15))
@@ -159,10 +178,12 @@ struct VehicleRow: View {
                         .scaledToFill()
                         .frame(width: 56, height: 56)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .accessibilityLabel("\(vehicle.displayName) photo")
                 } else {
                     Image(systemName: "car.fill")
                         .font(.title2)
                         .foregroundStyle(Color.wrenchAmber)
+                        .accessibilityHidden(true)
                 }
             }
 
@@ -182,6 +203,7 @@ struct VehicleRow: View {
                             .padding(.vertical, 2)
                             .background(Color.wrenchRed.opacity(0.15), in: Capsule())
                             .foregroundStyle(.red)
+                            .accessibilityLabel("\(overdueCount) overdue services")
                     }
                 }
             }
@@ -196,12 +218,15 @@ struct VehicleRow: View {
                     .padding(.vertical, 4)
                     .background(Color.wrenchAmber.opacity(0.15), in: Capsule())
                     .foregroundStyle(Color.wrenchAmber)
+                    .accessibilityLabel("\(count) services logged")
             }
 
             Image(systemName: "chevron.right")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
     }
 }

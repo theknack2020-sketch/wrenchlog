@@ -11,6 +11,7 @@ final class StoreManager {
     private(set) var isPro = false
     private(set) var products: [Product] = []
     private(set) var isLoading = true
+    private(set) var loadError: String?
 
     private init() {
         Task { await loadProducts() }
@@ -19,22 +20,30 @@ final class StoreManager {
     }
 
     func loadProducts() async {
+        loadError = nil
         do {
             products = try await Product.products(for: [Self.yearlyID, Self.lifetimeID])
+            if products.isEmpty {
+                loadError = "No products available"
+            }
         } catch {
-            print("[WrenchLog] Failed to load products: \(error)")
+            loadError = "Failed to load products. Check your connection."
+            print("[WrenchLog] Product load error: \(error)")
         }
         isLoading = false
     }
 
     func checkEntitlements() async {
+        var foundPro = false
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
             if transaction.productID == Self.lifetimeID || transaction.productID == Self.yearlyID {
-                isPro = true
-                return
+                if transaction.revocationDate == nil {
+                    foundPro = true
+                }
             }
         }
+        isPro = foundPro
     }
 
     private func listenForTransactions() async {
@@ -51,7 +60,7 @@ final class StoreManager {
         case .success(let verification):
             guard case .verified(let transaction) = verification else { return false }
             await transaction.finish()
-            isPro = true
+            await checkEntitlements()
             return true
         case .pending, .userCancelled:
             return false
@@ -60,9 +69,15 @@ final class StoreManager {
         }
     }
 
-    func restorePurchases() async {
-        try? await AppStore.sync()
-        await checkEntitlements()
+    func restorePurchases() async -> Bool {
+        do {
+            try await AppStore.sync()
+            await checkEntitlements()
+            return isPro
+        } catch {
+            print("[WrenchLog] Restore error: \(error)")
+            return false
+        }
     }
 
     var yearlyProduct: Product? { products.first { $0.id == Self.yearlyID } }

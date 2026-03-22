@@ -148,12 +148,24 @@ struct VehicleDetailView: View {
 
             // Actions
             Section {
-                // Cost analytics
-                NavigationLink {
-                    CostAnalyticsView(vehicle: vehicle)
+                // Cost analytics (Pro)
+                Button {
+                    if store.isPro {
+                        showCostAnalytics = true
+                    } else {
+                        showProPrompt = true
+                    }
                 } label: {
-                    Label("Cost Analytics", systemImage: "chart.bar.fill")
-                        .foregroundStyle(Color.wrenchAmber)
+                    HStack {
+                        Label("Cost Analytics", systemImage: "chart.bar.fill")
+                        if !store.isPro {
+                            Spacer()
+                            Image(systemName: "crown.fill")
+                                .font(.caption)
+                                .foregroundStyle(Color.wrenchAmber)
+                        }
+                    }
+                    .foregroundStyle(Color.wrenchAmber)
                 }
 
                 // PDF export (Pro)
@@ -197,8 +209,11 @@ struct VehicleDetailView: View {
         }
         .sheet(isPresented: $showPDFShare) {
             if let data = pdfData {
-                ShareSheet(items: [data])
+                ShareSheetView(items: [data])
             }
+        }
+        .navigationDestination(isPresented: $showCostAnalytics) {
+            CostAnalyticsView(vehicle: vehicle)
         }
         .alert("Update Mileage", isPresented: $showEditMileage) {
             TextField(settings.distanceUnit.label, text: $newMileage)
@@ -315,13 +330,16 @@ struct ServiceRecordRow: View {
     }
 }
 
-// MARK: - Share Sheet
+// MARK: - Share Sheet (iPad safe)
 
-struct ShareSheet: UIViewControllerRepresentable {
+struct ShareSheetView: UIViewControllerRepresentable {
     let items: [Any]
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        // iPad requires popover
+        vc.popoverPresentationController?.sourceView = UIView()
+        return vc
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
