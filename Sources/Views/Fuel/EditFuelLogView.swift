@@ -1,0 +1,183 @@
+import SwiftUI
+import SwiftData
+
+struct EditFuelLogView: View {
+    @Bindable var fuelLog: FuelLog
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+
+    @State private var date: Date = .now
+    @State private var mileage = ""
+    @State private var volume = ""
+    @State private var totalCost = ""
+    @State private var pricePerUnit = ""
+    @State private var fuelType: FuelType = .regular
+    @State private var station = ""
+    @State private var isFullTank = true
+    @State private var notes = ""
+
+    // Validation & error state
+    @State private var validationError: String?
+    @State private var saveError: String?
+
+    private let settings = UserSettings.shared
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Fuel Type") {
+                    Picker("Type", selection: $fuelType) {
+                        ForEach(FuelType.allCases) { type in
+                            Label(type.rawValue, systemImage: type.icon)
+                                .tag(type)
+                        }
+                    }
+                }
+
+                Section {
+                    DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date)
+
+                    HStack {
+                        Text("Odometer")
+                        Spacer()
+                        TextField(settings.distanceUnit.label, text: $mileage)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 120)
+                            .onChange(of: mileage) { _, _ in validationError = nil }
+                    }
+
+                    HStack {
+                        Text("Volume")
+                        Spacer()
+                        HStack(spacing: 2) {
+                            TextField("0.00", text: $volume)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 80)
+                                .onChange(of: volume) { _, _ in validationError = nil }
+                            Text(fuelLog.volumeUnit.label)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 30, alignment: .leading)
+                        }
+                    }
+
+                    Toggle("Full Tank", isOn: $isFullTank)
+                } header: {
+                    Text("Fill-Up Details")
+                } footer: {
+                    if let error = validationError {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                    }
+                }
+
+                Section("Cost") {
+                    HStack {
+                        Text("Total Cost")
+                        Spacer()
+                        HStack(spacing: 2) {
+                            Text(settings.currency.symbol)
+                                .foregroundStyle(.secondary)
+                            TextField("0.00", text: $totalCost)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 100)
+                        }
+                    }
+
+                    HStack {
+                        Text("Price/\(fuelLog.volumeUnit.label)")
+                        Spacer()
+                        HStack(spacing: 2) {
+                            Text(settings.currency.symbol)
+                                .foregroundStyle(.secondary)
+                            TextField("0.00", text: $pricePerUnit)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 100)
+                        }
+                    }
+                }
+
+                Section("Station") {
+                    TextField("Gas station name", text: $station)
+                }
+
+                Section("Notes") {
+                    TextField("Notes...", text: $notes, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+            }
+            .navigationTitle("Edit Fuel Log")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { saveChanges() }
+                        .fontWeight(.semibold)
+                }
+            }
+            .onAppear {
+                date = fuelLog.date
+                mileage = fuelLog.mileage > 0 ? "\(fuelLog.mileage)" : ""
+                volume = fuelLog.volume > 0 ? String(format: "%.2f", fuelLog.volume) : ""
+                totalCost = fuelLog.totalCost > 0 ? String(format: "%.2f", fuelLog.totalCost) : ""
+                pricePerUnit = fuelLog.pricePerUnit > 0 ? String(format: "%.3f", fuelLog.pricePerUnit) : ""
+                fuelType = fuelLog.fuelType
+                station = fuelLog.station
+                isFullTank = fuelLog.isFullTank
+                notes = fuelLog.notes
+            }
+            .alert("Save Failed", isPresented: Binding(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK") { saveError = nil }
+            } message: {
+                Text(saveError ?? "An unexpected error occurred.")
+            }
+        }
+    }
+
+    private func saveChanges() {
+        // Validate
+        let result = FuelLogValidator.validate(
+            volume: volume,
+            totalCost: totalCost,
+            mileage: mileage
+        )
+        guard result.isValid else {
+            validationError = result.firstError
+            HapticManager.shared.error()
+            return
+        }
+
+        fuelLog.date = date
+        fuelLog.mileage = max(0, Int(mileage) ?? fuelLog.mileage)
+        fuelLog.volume = max(0, Double(volume) ?? fuelLog.volume)
+        fuelLog.totalCost = max(0, Double(totalCost) ?? fuelLog.totalCost)
+        fuelLog.pricePerUnit = max(0, Double(pricePerUnit) ?? fuelLog.pricePerUnit)
+        fuelLog.fuelTypeRaw = fuelType.rawValue
+        fuelLog.station = station.trimmingCharacters(in: .whitespaces)
+        fuelLog.isFullTank = isFullTank
+        fuelLog.notes = notes.trimmingCharacters(in: .whitespaces)
+
+        // Update vehicle lastUpdated
+        fuelLog.vehicle?.lastUpdated = .now
+
+        do {
+            try DataManager.save(context)
+            HapticManager.shared.success()
+            SoundManager.playSaveSuccess()
+            dismiss()
+        } catch {
+            saveError = error.errorDescription
+            HapticManager.shared.error()
+            SoundManager.playError()
+        }
+    }
+}

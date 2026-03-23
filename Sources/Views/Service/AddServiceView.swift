@@ -1,11 +1,14 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import StoreKit
 
 struct AddServiceView: View {
     let vehicle: Vehicle
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.requestReview) private var requestReview
+    @Environment(\.appTheme) private var theme
 
     @State private var selectedType: ServiceType = .oilChange
     @State private var customTypeName = ""
@@ -17,39 +20,76 @@ struct AddServiceView: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var photoDataItems: [Data] = []
     @State private var showProPrompt = false
+    @State private var showCelebration = false
+    @State private var showTypePicker = false
+
+    // Validation & error state
+    @State private var validationError: String?
+    @State private var saveError: String?
+    @State private var photoWarnings: [String] = []
+    @State private var isSaving = false
 
     private let store = StoreManager.shared
     private let photoManager = ServicePhotoManager.shared
+    private let haptic = HapticManager.shared
 
     var body: some View {
         NavigationStack {
-            Form {
-                // Service type
-                Section("Service Type") {
+            ZStack {
+                Form {
+                // MARK: - Service Type (Grouped by Category)
+                Section {
                     if store.isPro {
                         Toggle("Custom Service", isOn: $isCustom)
+                            .accessibilityHint("Enable to enter a custom service type")
                     }
 
                     if isCustom && store.isPro {
                         TextField("Service name", text: $customTypeName)
+                            .accessibilityLabel("Custom service name")
+                            .onChange(of: customTypeName) { _, _ in validationError = nil }
                     } else {
-                        Picker("Type", selection: $selectedType) {
-                            ForEach(ServiceCategory.allCases.filter { $0 != .custom }) { category in
-                                Section(category.rawValue) {
-                                    ForEach(ServiceType.types(for: category)) { type in
-                                        Label(type.rawValue, systemImage: type.icon)
-                                            .tag(type)
-                                    }
+                        // Service type button with category preview
+                        Button {
+                            showTypePicker = true
+                        } label: {
+                            HStack {
+                                Image(systemName: selectedType.uniqueIcon)
+                                    .foregroundStyle(selectedType.color)
+                                    .frame(width: 24)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(selectedType.rawValue)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.primary)
+                                    Text(selectedType.category.rawValue)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
                                 }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                    .accessibilityHidden(true)
                             }
                         }
-                        .pickerStyle(.navigationLink)
+                        .accessibilityLabel("Service type: \(selectedType.rawValue)")
+                        .accessibilityHint("Double tap to choose a different service type")
+                    }
+                } header: {
+                    Text("Service Type")
+                } footer: {
+                    if let error = validationError {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .font(.caption)
                     }
                 }
 
-                // Details
+                // MARK: - Details
                 Section("Details") {
                     DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date)
+                        .accessibilityLabel("Service date")
 
                     HStack {
                         Text("Mileage")
@@ -58,6 +98,8 @@ struct AddServiceView: View {
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 120)
+                            .accessibilityLabel("Odometer reading at service")
+                            .onChange(of: mileage) { _, _ in validationError = nil }
                     }
 
                     HStack {
@@ -70,23 +112,28 @@ struct AddServiceView: View {
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 100)
+                                .accessibilityLabel("Service cost")
+                                .onChange(of: cost) { _, _ in validationError = nil }
                         }
                     }
                 }
 
-                // Notes
+                // MARK: - Notes
                 Section("Notes (optional)") {
                     TextField("Any additional details...", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
+                        .accessibilityLabel("Service notes")
                 }
 
-                // Photos (Pro feature)
-                Section("Receipt Photos") {
+                // MARK: - Photos (Pro feature)
+                Section {
                     if store.isPro {
                         PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 5, matching: .images) {
                             Label("Add Photos", systemImage: "camera.fill")
-                                .foregroundStyle(Color.wrenchAmber)
+                                .foregroundStyle(theme.accent)
                         }
+                        .accessibilityLabel("Add receipt photos")
+                        .accessibilityHint("Attach up to 5 photos")
 
                         if !photoDataItems.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -107,9 +154,25 @@ struct AddServiceView: View {
                                                             .foregroundStyle(.white, .red)
                                                     }
                                                     .offset(x: 4, y: -4)
+                                                    .accessibilityLabel("Remove photo \(index + 1)")
                                                 }
+                                                .accessibilityLabel("Receipt photo \(index + 1)")
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        // Photo save warnings
+                        if !photoWarnings.isEmpty {
+                            ForEach(photoWarnings, id: \.self) { warning in
+                                HStack(spacing: 6) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.orange)
+                                    Text(warning)
+                                        .font(.caption)
+                                        .foregroundStyle(.orange)
                                 }
                             }
                         }
@@ -120,20 +183,26 @@ struct AddServiceView: View {
                             HStack {
                                 Image(systemName: "lock.fill")
                                     .foregroundStyle(.secondary)
+                                    .accessibilityHidden(true)
                                 Text("Pro feature — attach receipt photos")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        .accessibilityLabel("Receipt photos, Pro feature")
+                        .accessibilityHint("Double tap to view Pro upgrade options")
                     }
+                } header: {
+                    Text("Receipt Photos")
                 }
 
-                // Reminder hint
+                // MARK: - Reminder hint
                 if !isCustom && selectedType.defaultMileageInterval > 0 {
                     Section {
                         HStack {
                             Image(systemName: "bell.fill")
-                                .foregroundStyle(Color.wrenchAmber)
+                                .foregroundStyle(theme.accent)
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Reminder will be set")
                                     .font(.subheadline.weight(.medium))
@@ -142,19 +211,25 @@ struct AddServiceView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        .accessibilityElement(children: .combine)
                     }
                 }
-            }
+                } // Form
+
+                CelebrationOverlay(isShowing: $showCelebration)
+            } // ZStack
             .navigationTitle("Log Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityLabel("Cancel logging service")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveRecord() }
                         .fontWeight(.semibold)
-                        .disabled(isCustom && customTypeName.isEmpty)
+                        .disabled((isCustom && customTypeName.trimmingCharacters(in: .whitespaces).isEmpty) || isSaving)
+                        .accessibilityLabel("Save service record")
                 }
             }
             .onAppear {
@@ -173,55 +248,194 @@ struct AddServiceView: View {
             .sheet(isPresented: $showProPrompt) {
                 ProUpgradeView()
             }
+            .sheet(isPresented: $showTypePicker) {
+                ServiceTypePickerView(selectedType: $selectedType)
+            }
+            .alert("Save Failed", isPresented: Binding(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK") { saveError = nil; isSaving = false }
+            } message: {
+                Text(saveError ?? "An unexpected error occurred.")
+            }
         }
     }
 
     private func saveRecord() {
+        // Validate
+        let result = ServiceRecordValidator.validate(
+            mileage: mileage,
+            cost: cost,
+            customTypeName: customTypeName,
+            isCustom: isCustom,
+            vehicleCurrentMileage: vehicle.currentMileage
+        )
+        guard result.isValid else {
+            validationError = result.firstError
+            haptic.error()
+            return
+        }
+
+        isSaving = true
+
         let record: ServiceRecord
         if isCustom {
             record = ServiceRecord(
                 customType: customTypeName.trimmingCharacters(in: .whitespaces),
                 date: date,
-                mileage: Int(mileage) ?? 0,
-                cost: Double(cost) ?? 0,
+                mileage: max(0, Int(mileage) ?? 0),
+                cost: max(0, Double(cost) ?? 0),
                 notes: notes
             )
         } else {
             record = ServiceRecord(
                 serviceType: selectedType,
                 date: date,
-                mileage: Int(mileage) ?? 0,
-                cost: Double(cost) ?? 0,
+                mileage: max(0, Int(mileage) ?? 0),
+                cost: max(0, Double(cost) ?? 0),
                 notes: notes
             )
         }
 
-        // Save photos
+        // Save photos with error handling
         if store.isPro {
+            photoWarnings = []
             for photoData in photoDataItems {
-                let fileName = photoManager.savePhoto(photoData, for: record.id)
-                record.photoFileNames.append(fileName)
+                switch photoManager.savePhoto(photoData, for: record.id) {
+                case .success(let fileName):
+                    record.photoFileNames.append(fileName)
+                case .failure(let reason):
+                    photoWarnings.append(reason)
+                }
             }
         }
 
         record.vehicle = vehicle
 
-        // Update vehicle mileage if higher
         if let m = Int(mileage), m > vehicle.currentMileage {
             vehicle.currentMileage = m
         }
+        vehicle.lastUpdated = .now
 
         context.insert(record)
-        try? context.save()
 
-        // Reschedule reminders
+        do {
+            try DataManager.save(context)
+        } catch {
+            saveError = error.errorDescription
+            haptic.error()
+            SoundManager.playError()
+            return
+        }
+
         Task {
             if let vehicles = try? context.fetch(FetchDescriptor<Vehicle>()) {
                 await ReminderManager.shared.scheduleReminders(for: vehicles)
             }
         }
 
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        dismiss()
+        let totalServices = vehicle.serviceRecords.count
+        if totalServices > 0 && totalServices % 10 == 0 {
+            haptic.celebrate()
+            SoundManager.playCelebration()
+            showCelebration = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                dismiss()
+            }
+        } else {
+            haptic.success()
+            SoundManager.playSaveSuccess()
+            dismiss()
+        }
+
+        let allServiceCount = (try? context.fetch(FetchDescriptor<ServiceRecord>()))?.count ?? 0
+        if allServiceCount == 5 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                requestReview()
+            }
+        }
+    }
+}
+
+// MARK: - Grouped Service Type Picker
+
+struct ServiceTypePickerView: View {
+    @Binding var selectedType: ServiceType
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.appTheme) private var theme
+    @State private var searchText = ""
+
+    private var filteredCategories: [(category: ServiceCategory, types: [ServiceType])] {
+        ServiceCategory.allCases
+            .filter { $0 != .custom }
+            .compactMap { category in
+                var types = ServiceType.types(for: category)
+                if !searchText.isEmpty {
+                    let q = searchText.lowercased()
+                    types = types.filter { $0.rawValue.lowercased().contains(q) }
+                }
+                return types.isEmpty ? nil : (category: category, types: types)
+            }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(filteredCategories, id: \.category) { group in
+                    Section {
+                        ForEach(group.types) { type in
+                            Button {
+                                selectedType = type
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: type.uniqueIcon)
+                                        .font(.body)
+                                        .foregroundStyle(type.color)
+                                        .frame(width: 28)
+                                        .accessibilityHidden(true)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(type.rawValue)
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(.primary)
+                                        if type.defaultMileageInterval > 0 {
+                                            Text("Every \(type.defaultMileageInterval.formatted()) \(UserSettings.shared.distanceUnit.label)")
+                                                .font(.caption2)
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                    }
+
+                                    Spacer()
+
+                                    if selectedType == type {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(theme.accent)
+                                    }
+                                }
+                            }
+                            .accessibilityLabel(type.rawValue)
+                            .accessibilityAddTraits(selectedType == type ? .isSelected : [])
+                        }
+                    } header: {
+                        HStack(spacing: 6) {
+                            Image(systemName: group.category.icon)
+                                .font(.caption)
+                                .foregroundStyle(group.category.color)
+                            Text(group.category.rawValue)
+                        }
+                    }
+                }
+            }
+            .searchable(text: $searchText, prompt: "Search service types")
+            .navigationTitle("Service Type")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
     }
 }

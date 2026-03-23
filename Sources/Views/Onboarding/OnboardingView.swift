@@ -1,149 +1,305 @@
 import SwiftUI
+import SwiftData
 
 struct OnboardingView: View {
     @Binding var isComplete: Bool
     @State private var currentPage = 0
+    @State private var animatePulse = false
+
+    private let totalPages = 4
 
     var body: some View {
-        VStack {
-            TabView(selection: $currentPage) {
-                welcomePage.tag(0)
-                featuresPage.tag(1)
-                privacyPage.tag(2)
+        ZStack {
+            Color(.systemBackground).ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // Page content
+                TabView(selection: $currentPage) {
+                    welcomePage.tag(0)
+                    vehiclePage.tag(1)
+                    servicePage.tag(2)
+                    notificationsPage.tag(3)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .animation(.spring(response: 0.5, dampingFraction: 0.85), value: currentPage)
+
+                // Bottom navigation
+                VStack(spacing: 16) {
+                    // Progress dots
+                    HStack(spacing: 8) {
+                        ForEach(0..<totalPages, id: \.self) { i in
+                            Capsule()
+                                .fill(i == currentPage ? Color.wrenchAmber : Color.wrenchAmber.opacity(0.25))
+                                .frame(width: i == currentPage ? 24 : 8, height: 8)
+                                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentPage)
+                        }
+                    }
+                    .padding(.bottom, 8)
+
+                    // Action button
+                    Button {
+                        HapticManager.shared.light()
+                        if currentPage < totalPages - 1 {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                currentPage += 1
+                            }
+                        } else {
+                            HapticManager.shared.success()
+                            isComplete = true
+                        }
+                    } label: {
+                        Text(buttonTitle)
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .foregroundStyle(.white)
+                            .background(Color.wrenchAmber, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .padding(.horizontal, 40)
+
+                    // Skip button (not on last page)
+                    if currentPage < totalPages - 1 {
+                        Button {
+                            HapticManager.shared.light()
+                            isComplete = true
+                        } label: {
+                            Text("Skip")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .padding(.bottom, 30)
             }
-            .tabViewStyle(.page(indexDisplayMode: .always))
-            .indexViewStyle(.page(backgroundDisplayMode: .always))
         }
     }
+
+    private var buttonTitle: String {
+        switch currentPage {
+        case 0: "Get Started"
+        case 1: "Next"
+        case 2: "Next"
+        case 3: "Start Tracking"
+        default: "Continue"
+        }
+    }
+
+    // MARK: - Page 1: Welcome
 
     private var welcomePage: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 28) {
             Spacer()
 
-            Image(systemName: "wrench.adjustable.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(Color.wrenchAmber)
-                .accessibilityHidden(true)
-
-            Text("WrenchLog")
-                .font(.system(size: 38, weight: .bold, design: .rounded))
-
-            Text("Your private vehicle\nmaintenance tracker.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Spacer()
-
-            Button {
-                withAnimation { currentPage = 1 }
-            } label: {
-                Text("Get Started")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .foregroundStyle(.white)
-                    .background(Color.wrenchAmber, in: RoundedRectangle(cornerRadius: 14))
-            }
-            .padding(.horizontal, 40)
-
-            dots(current: 0)
-        }
-        .padding()
-    }
-
-    private var featuresPage: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            VStack(alignment: .leading, spacing: 20) {
-                featureRow(icon: "wrench.fill", title: "Log Services", desc: "Oil changes, brakes, tires — 22 preset types")
-                featureRow(icon: "bell.fill", title: "Smart Reminders", desc: "Never miss maintenance again")
-                featureRow(icon: "chart.bar.fill", title: "Cost Tracking", desc: "See where your money goes")
-                featureRow(icon: "doc.text.fill", title: "PDF Reports", desc: "Boost resale value with documented history")
-            }
-            .padding(.horizontal, 24)
-
-            Spacer()
-
-            Button {
-                withAnimation { currentPage = 2 }
-            } label: {
-                Text("Next")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .foregroundStyle(.white)
-                    .background(Color.wrenchAmber, in: RoundedRectangle(cornerRadius: 14))
-            }
-            .padding(.horizontal, 40)
-
-            dots(current: 1)
-        }
-        .padding()
-    }
-
-    private var privacyPage: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(.green)
-                .accessibilityHidden(true)
-
-            Text("Your Data Stays Yours")
-                .font(.title2.weight(.bold))
-
-            Text("No account. No ads. No tracking.\nEverything stays on your device.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Spacer()
-
-            Button {
-                isComplete = true
-            } label: {
-                Text("Start Tracking")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .foregroundStyle(.white)
-                    .background(Color.wrenchAmber, in: RoundedRectangle(cornerRadius: 14))
-            }
-            .padding(.horizontal, 40)
-
-            dots(current: 2)
-        }
-        .padding()
-    }
-
-    private func featureRow(icon: String, title: String, desc: String) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(Color.wrenchAmber)
-                .frame(width: 36)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.subheadline.weight(.semibold))
-                Text(desc).font(.caption).foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func dots(current: Int) -> some View {
-        HStack(spacing: 6) {
-            ForEach(0..<3, id: \.self) { i in
+            // Animated illustration
+            ZStack {
                 Circle()
-                    .fill(i == current ? Color.wrenchAmber : Color.wrenchAmber.opacity(0.3))
-                    .frame(width: 8, height: 8)
+                    .fill(Color.wrenchAmber.opacity(0.1))
+                    .frame(width: 160, height: 160)
+                    .scaleEffect(animatePulse ? 1.1 : 1.0)
+
+                Circle()
+                    .fill(Color.wrenchAmber.opacity(0.05))
+                    .frame(width: 200, height: 200)
+                    .scaleEffect(animatePulse ? 1.15 : 1.0)
+
+                Image(systemName: "wrench.adjustable.fill")
+                    .font(.system(size: 72))
+                    .foregroundStyle(Color.wrenchAmber)
+                    .symbolEffect(.bounce, value: currentPage == 0)
             }
+            .onAppear {
+                withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                    animatePulse = true
+                }
+            }
+            .accessibilityHidden(true)
+
+            VStack(spacing: 12) {
+                Text("WrenchLog")
+                    .font(.system(size: 38, weight: .bold, design: .rounded))
+
+                Text("Your private vehicle\nmaintenance tracker.")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Spacer()
+            Spacer()
         }
-        .padding(.bottom, 8)
-        .accessibilityHidden(true)
+        .padding()
+    }
+
+    // MARK: - Page 2: Add First Vehicle
+
+    private var vehiclePage: some View {
+        VStack(spacing: 28) {
+            Spacer()
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.catTires.opacity(0.1))
+                    .frame(width: 160, height: 160)
+
+                VStack(spacing: 8) {
+                    Image(systemName: "car.side.fill")
+                        .font(.system(size: 56))
+                        .foregroundStyle(Color.catTires)
+                        .symbolEffect(.bounce, value: currentPage == 1)
+
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(Color.wrenchAmber)
+                        .offset(x: 40, y: -20)
+                }
+            }
+            .accessibilityHidden(true)
+
+            VStack(spacing: 12) {
+                Text("Add Your Vehicle")
+                    .font(.title2.weight(.bold))
+
+                Text("Start by adding your car, truck, or\nmotorcycle. Track make, model, year\nand current mileage.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            // Feature pills
+            HStack(spacing: 10) {
+                featurePill(icon: "car.fill", text: "Cars")
+                featurePill(icon: "truck.box.fill", text: "Trucks")
+                featurePill(icon: "bicycle", text: "Any vehicle")
+            }
+
+            Spacer()
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Page 3: Add First Service
+
+    private var servicePage: some View {
+        VStack(spacing: 28) {
+            Spacer()
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.catEngine.opacity(0.1))
+                    .frame(width: 160, height: 160)
+
+                Image(systemName: "checklist.checked")
+                    .font(.system(size: 56))
+                    .foregroundStyle(Color.catEngine)
+                    .symbolEffect(.bounce, value: currentPage == 2)
+            }
+            .accessibilityHidden(true)
+
+            VStack(spacing: 12) {
+                Text("Log Services & Fuel")
+                    .font(.title2.weight(.bold))
+
+                Text("22 preset service types from oil changes\nto timing belts. Track fuel fill-ups\nand see your efficiency trends.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            // Service type preview
+            VStack(alignment: .leading, spacing: 10) {
+                servicePreviewRow(icon: "drop.fill", text: "Oil Change", color: .catEngine)
+                servicePreviewRow(icon: "tire.fill", text: "Tire Rotation", color: .catTires)
+                servicePreviewRow(icon: "battery.100percent.bolt", text: "Battery", color: .catElectrical)
+                servicePreviewRow(icon: "fuelpump.fill", text: "Fuel Tracking", color: .catFuel)
+            }
+            .padding(.horizontal, 40)
+
+            Spacer()
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Page 4: Notifications
+
+    private var notificationsPage: some View {
+        VStack(spacing: 28) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(Color.wrenchGreen.opacity(0.1))
+                    .frame(width: 160, height: 160)
+
+                Image(systemName: "bell.badge.fill")
+                    .font(.system(size: 56))
+                    .foregroundStyle(Color.wrenchGreen)
+                    .symbolEffect(.bounce, value: currentPage == 3)
+            }
+            .accessibilityHidden(true)
+
+            VStack(spacing: 12) {
+                Text("Never Miss Maintenance")
+                    .font(.title2.weight(.bold))
+
+                Text("Smart reminders based on time,\nmileage, and your driving pace.\nWe'll notify you before services are due.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            // Privacy badge
+            HStack(spacing: 12) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.title3)
+                    .foregroundStyle(.green)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("100% Private")
+                        .font(.subheadline.weight(.semibold))
+                    Text("No account · No ads · No tracking")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(16)
+            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal, 40)
+
+            Spacer()
+            Spacer()
+        }
+        .padding()
+    }
+
+    // MARK: - Helpers
+
+    private func featurePill(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption2)
+            Text(text)
+                .font(.caption.weight(.medium))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color(.tertiarySystemGroupedBackground), in: Capsule())
+        .foregroundStyle(.secondary)
+    }
+
+    private func servicePreviewRow(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.body)
+                .foregroundStyle(color)
+                .frame(width: 28)
+            Text(text)
+                .font(.subheadline)
+            Spacer()
+            Image(systemName: "checkmark.circle")
+                .font(.body)
+                .foregroundStyle(.tertiary)
+        }
     }
 }

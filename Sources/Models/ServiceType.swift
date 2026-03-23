@@ -89,6 +89,34 @@ enum ServiceType: String, Codable, CaseIterable, Identifiable {
     var icon: String { category.icon }
     var color: Color { category.color }
 
+    /// Unique icon per service type for visual distinction
+    var uniqueIcon: String {
+        switch self {
+        case .oilChange: "drop.fill"
+        case .transmissionFluid: "gearshape.fill"
+        case .coolantFlush: "thermometer.medium"
+        case .brakeFluid: "drop.triangle.fill"
+        case .powerSteeringFluid: "steeringwheel"
+        case .tireRotation: "arrow.triangle.2.circlepath"
+        case .tireReplacement: "tire.fill"
+        case .wheelAlignment: "arrow.left.arrow.right"
+        case .brakePads: "exclamationmark.octagon.fill"
+        case .brakeRotors: "circle.circle.fill"
+        case .airFilter: "wind"
+        case .cabinAirFilter: "aqi.medium"
+        case .fuelFilter: "fuelpump.fill"
+        case .serpentineBelt: "link"
+        case .timingBelt: "clock.arrow.2.circlepath"
+        case .batteryReplacement: "battery.100percent.bolt"
+        case .sparkPlugs: "bolt.fill"
+        case .alternator: "bolt.circle.fill"
+        case .stateInspection: "checkmark.shield.fill"
+        case .wiperBlades: "windshield.front.and.wiper"
+        case .acService: "snowflake"
+        case .generalRepair: "wrench.and.screwdriver.fill"
+        }
+    }
+
     /// Default reminder interval in miles (0 = no default)
     var defaultMileageInterval: Int {
         switch self {

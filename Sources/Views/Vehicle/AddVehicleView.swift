@@ -1,38 +1,108 @@
 import SwiftUI
+import SwiftData
 import PhotosUI
 
 struct AddVehicleView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appTheme) private var theme
 
     @State private var make = ""
     @State private var model = ""
     @State private var year = Calendar.current.component(.year, from: .now)
     @State private var mileage = ""
     @State private var licensePlate = ""
+    @State private var selectedColor: VehicleColor?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoData: Data?
+
+    // Validation & error state
+    @State private var validationError: String?
+    @State private var showDuplicateWarning = false
+    @State private var saveError: String?
+    @State private var isSaving = false
+
+    private var isFormValid: Bool {
+        let result = VehicleValidator.validate(make: make, model: model, year: year, mileage: mileage)
+        return result.isValid
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Vehicle Info") {
+                Section {
                     TextField("Make (e.g., Toyota)", text: $make)
                         .textInputAutocapitalization(.words)
+                        .accessibilityLabel("Vehicle make")
+                        .accessibilityHint("Enter the manufacturer name")
+                        .onChange(of: make) { _, _ in validationError = nil }
                     TextField("Model (e.g., Camry)", text: $model)
                         .textInputAutocapitalization(.words)
+                        .accessibilityLabel("Vehicle model")
+                        .onChange(of: model) { _, _ in validationError = nil }
                     Picker("Year", selection: $year) {
-                        ForEach((1990...Calendar.current.component(.year, from: .now) + 1).reversed(), id: \.self) { y in
+                        ForEach((1950...Calendar.current.component(.year, from: .now) + 1).reversed(), id: \.self) { y in
                             Text(String(y)).tag(y)
                         }
                     }
+                    .accessibilityLabel("Model year")
                     TextField("Current Mileage", text: $mileage)
                         .keyboardType(.numberPad)
+                        .accessibilityLabel("Current odometer reading")
+                        .onChange(of: mileage) { _, _ in validationError = nil }
+                } header: {
+                    Text("Vehicle Info")
+                } footer: {
+                    if let error = validationError {
+                        Text(error)
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                    }
                 }
 
-                Section("Optional") {
+                // Vehicle Color
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Vehicle Color")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
+                            ForEach(VehicleColor.allCases) { vc in
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        selectedColor = selectedColor == vc ? nil : vc
+                                    }
+                                } label: {
+                                    Circle()
+                                        .fill(vc.color)
+                                        .frame(width: 36, height: 36)
+                                        .overlay {
+                                            Circle()
+                                                .strokeBorder(vc.needsBorder ? Color.secondary.opacity(0.3) : .clear, lineWidth: 1)
+                                        }
+                                        .overlay {
+                                            if selectedColor == vc {
+                                                Image(systemName: "checkmark")
+                                                    .font(.caption.weight(.bold))
+                                                    .foregroundStyle(vc == .black || vc == .navy ? .white : .primary)
+                                            }
+                                        }
+                                        .scaleEffect(selectedColor == vc ? 1.1 : 1.0)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(vc.rawValue)
+                                .accessibilityAddTraits(selectedColor == vc ? .isSelected : [])
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Section {
                     TextField("License Plate", text: $licensePlate)
                         .textInputAutocapitalization(.characters)
+                        .accessibilityLabel("License plate number")
 
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
                         HStack {
@@ -42,13 +112,29 @@ struct AddVehicleView: View {
                                     .scaledToFill()
                                     .frame(width: 60, height: 60)
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .accessibilityLabel("Selected vehicle photo")
                             } else {
-                                Image(systemName: "camera.fill")
-                                    .foregroundStyle(Color.wrenchAmber)
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(theme.accent.opacity(0.1))
+                                        .frame(width: 60, height: 60)
+                                    Image(systemName: "camera.fill")
+                                        .foregroundStyle(theme.accent)
+                                }
+                                .accessibilityHidden(true)
                             }
-                            Text(photoData == nil ? "Add Photo" : "Change Photo")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(photoData == nil ? "Add Photo" : "Change Photo")
+                                    .font(.subheadline)
+                                Text("A photo of your vehicle")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
+                    .accessibilityLabel(photoData == nil ? "Add vehicle photo" : "Change vehicle photo")
+                } header: {
+                    Text("Optional")
                 }
             }
             .navigationTitle("Add Vehicle")
@@ -56,11 +142,14 @@ struct AddVehicleView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityLabel("Cancel adding vehicle")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { saveVehicle() }
-                        .disabled(make.isEmpty || model.isEmpty)
+                    Button("Save") { validateAndSave() }
+                        .disabled(!isFormValid || isSaving)
                         .fontWeight(.semibold)
+                        .accessibilityLabel("Save vehicle")
+                        .accessibilityHint(isFormValid ? "" : "Enter make and model first")
                 }
             }
             .onChange(of: selectedPhoto) { _, item in
@@ -70,20 +159,64 @@ struct AddVehicleView: View {
                     }
                 }
             }
+            .alert("Possible Duplicate", isPresented: $showDuplicateWarning) {
+                Button("Save Anyway") { performSave() }
+                Button("Cancel", role: .cancel) { isSaving = false }
+            } message: {
+                Text("A \(year) \(make) \(model) already exists in your garage. Save anyway?")
+            }
+            .alert("Save Failed", isPresented: Binding(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK") { saveError = nil; isSaving = false }
+            } message: {
+                Text(saveError ?? "An unexpected error occurred.")
+            }
         }
     }
 
-    private func saveVehicle() {
+    private func validateAndSave() {
+        // Run validation
+        let result = VehicleValidator.validate(make: make, model: model, year: year, mileage: mileage)
+        guard result.isValid else {
+            validationError = result.firstError
+            HapticManager.shared.error()
+            return
+        }
+
+        isSaving = true
+
+        // Check for duplicates
+        if DataManager.duplicateVehicleExists(make: make, model: model, year: year, in: context) {
+            showDuplicateWarning = true
+            return
+        }
+
+        performSave()
+    }
+
+    private func performSave() {
         let vehicle = Vehicle(
             make: make.trimmingCharacters(in: .whitespaces),
             model: model.trimmingCharacters(in: .whitespaces),
             year: year,
-            mileage: Int(mileage) ?? 0
+            mileage: max(0, Int(mileage) ?? 0)
         )
         vehicle.licensePlate = licensePlate
         vehicle.photoData = photoData
+        vehicle.colorRaw = selectedColor?.rawValue ?? ""
         context.insert(vehicle)
-        try? context.save()
-        dismiss()
+
+        do {
+            try DataManager.save(context)
+            HapticManager.shared.success()
+            SoundManager.playSaveSuccess()
+            dismiss()
+        } catch {
+            saveError = error.errorDescription
+            HapticManager.shared.error()
+            SoundManager.playError()
+        }
     }
 }
