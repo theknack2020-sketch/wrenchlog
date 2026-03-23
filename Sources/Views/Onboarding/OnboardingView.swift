@@ -10,7 +10,37 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground).ignoresSafeArea()
+            // Gradient background per step
+            Group {
+                switch currentPage {
+                case 0:
+                    LinearGradient(
+                        colors: [Color(red: 0.98, green: 0.94, blue: 0.85), Color(.systemBackground)],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
+                case 1:
+                    LinearGradient(
+                        colors: [Color(red: 0.95, green: 0.92, blue: 0.85), Color(.systemBackground)],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
+                case 2:
+                    LinearGradient(
+                        colors: [Color(red: 0.94, green: 0.90, blue: 0.84), Color(.systemBackground)],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
+                default:
+                    LinearGradient(
+                        colors: [Color(red: 0.90, green: 0.95, blue: 0.90), Color(.systemBackground)],
+                        startPoint: .top,
+                        endPoint: .center
+                    )
+                }
+            }
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.5), value: currentPage)
 
             VStack(spacing: 0) {
                 // Page content
@@ -44,7 +74,8 @@ struct OnboardingView: View {
                                 currentPage += 1
                             }
                         } else {
-                            HapticManager.shared.success()
+                            HapticManager.shared.celebrate()
+                            SoundManager.playCelebration()
                             isComplete = true
                         }
                     } label: {
@@ -53,9 +84,19 @@ struct OnboardingView: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
                             .foregroundStyle(.white)
-                            .background(Color.wrenchAmber, in: RoundedRectangle(cornerRadius: 14))
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.wrenchAmber, Color(red: 0.85, green: 0.55, blue: 0.05)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                in: RoundedRectangle(cornerRadius: 14)
+                            )
+                            .shadow(color: Color.wrenchAmber.opacity(0.3), radius: 8, x: 0, y: 4)
                     }
                     .padding(.horizontal, 40)
+                    .accessibilityLabel(buttonTitle)
+                    .accessibilityHint(currentPage < totalPages - 1 ? "Go to next step" : "Begin using WrenchLog")
 
                     // Skip button (not on last page)
                     if currentPage < totalPages - 1 {
@@ -67,6 +108,7 @@ struct OnboardingView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
+                        .accessibilityLabel("Skip onboarding")
                     }
                 }
                 .padding(.bottom, 30)
@@ -264,8 +306,11 @@ struct OnboardingView: View {
                 }
             }
             .padding(16)
-            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 3)
             .padding(.horizontal, 40)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("100% Private. No account, no ads, no tracking.")
 
             Spacer()
             Spacer()

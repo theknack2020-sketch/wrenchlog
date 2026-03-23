@@ -115,10 +115,13 @@ struct EditFuelLogView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityLabel("Cancel editing fuel log")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveChanges() }
                         .fontWeight(.semibold)
+                        .foregroundStyle(Color.wrenchAmber)
+                        .accessibilityLabel("Save fuel log changes")
                 }
             }
             .onAppear {

@@ -5,6 +5,8 @@ struct CostAnalyticsView: View {
     let vehicle: Vehicle
     private let settings = UserSettings.shared
 
+    @Environment(\.appTheme) private var theme
+
     var records: [ServiceRecord] {
         vehicle.serviceRecords.sorted { $0.date > $1.date }
     }
@@ -99,6 +101,61 @@ struct CostAnalyticsView: View {
     }
 
     var body: some View {
+        Group {
+            if records.isEmpty && fuelLogs.isEmpty {
+                costAnalyticsEmptyState
+            } else {
+                costAnalyticsList
+            }
+        }
+        .navigationTitle("Cost Analytics")
+    }
+
+    // MARK: - Empty State
+
+    private var costAnalyticsEmptyState: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(Color.wrenchAmber.opacity(0.1))
+                    .frame(width: 100, height: 100)
+
+                VStack(spacing: 4) {
+                    Image(systemName: "chart.pie.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(Color.wrenchAmber.opacity(0.5))
+                }
+            }
+
+            VStack(spacing: 8) {
+                Text("No Cost Data Yet")
+                    .font(.title3.weight(.bold))
+                Text("Log services and fuel to see\nspending breakdowns and trends.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            // Mini chart illustration
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach([0.3, 0.6, 0.4, 0.8, 0.5], id: \.self) { height in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.wrenchAmber.opacity(0.15))
+                        .frame(width: 20, height: 60 * height)
+                }
+            }
+            .frame(height: 50)
+            .padding(.top, 4)
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Cost Analytics List
+
+    private var costAnalyticsList: some View {
         List {
             // Summary
             Section {
@@ -114,11 +171,14 @@ struct CostAnalyticsView: View {
                             .font(.caption.weight(.bold))
                             .foregroundStyle(Color.wrenchAmber)
                     }
+                    .shadow(color: Color.wrenchAmber.opacity(0.2), radius: 6, x: 0, y: 0)
 
                     statCard(title: "Total Cost", value: settings.formatCost(totalCost), color: .wrenchAmber)
                     statCard(title: "Services", value: settings.formatCost(totalServiceCost), color: .catEngine)
                     statCard(title: "Fuel", value: settings.formatCost(totalFuelCost), color: .catFuel)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Total cost \(settings.formatCost(totalCost)), services \(settings.formatCost(totalServiceCost)), fuel \(settings.formatCost(totalFuelCost))")
 
                 if averageEfficiency != nil || averageCostPerDistance != nil {
                     HStack(spacing: 8) {
@@ -319,7 +379,6 @@ struct CostAnalyticsView: View {
                 }
             }
         }
-        .navigationTitle("Cost Analytics")
     }
 
     private var averageServiceCost: Double? {
@@ -341,5 +400,8 @@ struct CostAnalyticsView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.12), radius: 4, x: 0, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 }

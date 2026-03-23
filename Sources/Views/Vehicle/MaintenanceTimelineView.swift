@@ -95,17 +95,24 @@ struct MaintenanceTimelineView: View {
                 Section {
                     HStack {
                         Spacer()
-                        VStack(spacing: 12) {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.system(size: 40))
-                                .foregroundStyle(.tertiary)
-                            Text("No events yet")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Text("Service records and fuel logs\nwill appear here chronologically.")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .multilineTextAlignment(.center)
+                        VStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.wrenchAmber.opacity(0.1))
+                                    .frame(width: 80, height: 80)
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .font(.system(size: 36))
+                                    .foregroundStyle(Color.wrenchAmber.opacity(0.4))
+                            }
+                            VStack(spacing: 6) {
+                                Text("No Events Yet")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                Text("Log services and fuel fill-ups to build\nyour maintenance timeline.")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                    .multilineTextAlignment(.center)
+                            }
                         }
                         .padding(.vertical, 30)
                         Spacer()
@@ -181,6 +188,8 @@ struct MaintenanceTimelineView: View {
             kindBadge(entry.kind)
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(entry.title), \(entry.date, format: .dateTime.month(.abbreviated).day())\(entry.cost > 0 ? ", \(settings.formatCost(entry.cost))" : "")")
     }
 
     @ViewBuilder

@@ -85,7 +85,9 @@ struct EditServiceView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveChanges() }
                         .fontWeight(.semibold)
+                        .foregroundStyle(Color.wrenchAmber)
                         .accessibilityLabel("Save changes")
+                        .accessibilityHint("Saves updated service record")
                 }
             }
             .onAppear {

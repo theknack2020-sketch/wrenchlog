@@ -124,7 +124,7 @@ struct GarageOverviewView: View {
                 Circle()
                     .fill(theme.accent.opacity(0.1))
                     .frame(width: 120, height: 120)
-                Image(systemName: "car.side.rear.and.collision.and.car.side.front.fill")
+                Image(systemName: "car.side.fill")
                     .font(.system(size: 48))
                     .foregroundStyle(theme.accent)
                     .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
@@ -135,7 +135,7 @@ struct GarageOverviewView: View {
                 Text("Your Garage is Empty")
                     .font(.title2.weight(.bold))
 
-                Text("Add your first vehicle to start\ntracking maintenance and costs.")
+                Text("Add your first vehicle to get started.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -148,8 +148,13 @@ struct GarageOverviewView: View {
                     .font(.headline)
                     .frame(width: 200, height: 50)
                     .foregroundStyle(.white)
-                    .background(theme.accent, in: RoundedRectangle(cornerRadius: 14))
+                    .background(
+                        LinearGradient(colors: [theme.accent, theme.accent.opacity(0.8)], startPoint: .leading, endPoint: .trailing),
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+                    .shadow(color: theme.accent.opacity(0.3), radius: 8, x: 0, y: 4)
             }
+            .accessibilityLabel("Add your first vehicle")
             .accessibilityHint("Opens a form to add a new vehicle")
 
             Spacer()
@@ -302,6 +307,7 @@ struct GarageOverviewView: View {
                 } label: {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
+                .accessibilityLabel("Open settings")
             }
         }
         .refreshable {
@@ -360,6 +366,9 @@ struct GarageOverviewView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
         .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 
     // MARK: - Next Service Banner
@@ -370,14 +379,16 @@ struct GarageOverviewView: View {
                 Circle()
                     .fill(colorForUrgency(next.urgency).opacity(0.15))
                     .frame(width: 40, height: 40)
+                    .shadow(color: colorForUrgency(next.urgency).opacity(0.3), radius: 6, x: 0, y: 0)
                 Image(systemName: next.urgency == .overdue ? "exclamationmark.triangle.fill" : "bell.fill")
                     .font(.body)
                     .foregroundStyle(colorForUrgency(next.urgency))
             }
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("Next Service Due")
-                    .font(.caption)
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text("\(next.type) — \(next.vehicle.displayName)")
                     .font(.subheadline.weight(.semibold))
@@ -395,6 +406,8 @@ struct GarageOverviewView: View {
         .onTapGesture {
             selectedVehicle = next.vehicle
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Next service due: \(next.type) for \(next.vehicle.displayName). \(next.text)")
     }
 
     // MARK: - Seasonal Row
@@ -405,6 +418,7 @@ struct GarageOverviewView: View {
                 .font(.body)
                 .foregroundStyle(suggestion.color)
                 .frame(width: 28)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(suggestion.title)
                     .font(.subheadline.weight(.medium))
@@ -413,6 +427,8 @@ struct GarageOverviewView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Seasonal tip: \(suggestion.title). \(suggestion.detail)")
     }
 
     // MARK: - Cost Comparison Chart
@@ -591,6 +607,12 @@ struct GarageVehicleCard: View {
                 .accessibilityHidden(true)
         }
         .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemGroupedBackground))
+                .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+        )
         .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(vehicle.displayName), health \(healthScore) percent, total cost \(UserSettings.shared.formatCost(totalCost))")
     }
 }

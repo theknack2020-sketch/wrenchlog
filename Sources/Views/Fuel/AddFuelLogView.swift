@@ -34,6 +34,7 @@ struct AddFuelLogView: View {
                                 .tag(type)
                         }
                     }
+                    .accessibilityLabel("Fuel type: \(fuelType.rawValue)")
                 }
 
                 Section {
@@ -139,11 +140,15 @@ struct AddFuelLogView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityLabel("Cancel fuel log")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveFuelLog() }
                         .fontWeight(.semibold)
+                        .foregroundStyle(Color.wrenchAmber)
                         .disabled(!isValid || isSaving)
+                        .accessibilityLabel("Save fuel log")
+                        .accessibilityHint("Logs this fuel fill-up")
                 }
             }
             .onAppear {

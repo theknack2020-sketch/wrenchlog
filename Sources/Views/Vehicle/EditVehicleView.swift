@@ -109,6 +109,7 @@ struct EditVehicleView: View {
                     TextField("VIN", text: $vin)
                         .textInputAutocapitalization(.characters)
                         .accessibilityLabel("Vehicle identification number")
+                        .accessibilityHint("17-character VIN code")
 
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
                         HStack {
@@ -162,8 +163,10 @@ struct EditVehicleView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { validateAndSave() }
                         .fontWeight(.semibold)
+                        .foregroundStyle(Color.wrenchAmber)
                         .disabled(make.trimmingCharacters(in: .whitespaces).isEmpty || model.trimmingCharacters(in: .whitespaces).isEmpty)
                         .accessibilityLabel("Save changes")
+                        .accessibilityHint("Saves updated vehicle information")
                 }
             }
             .onAppear {

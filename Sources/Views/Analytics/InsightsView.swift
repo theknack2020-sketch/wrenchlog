@@ -258,9 +258,9 @@ struct InsightsView: View {
                     .foregroundStyle(theme.accent)
             }
             VStack(spacing: 8) {
-                Text("No Data Yet")
+                Text("No Insights Yet")
                     .font(.title3.weight(.bold))
-                Text("Log services and fuel to see\ninsights and spending trends.")
+                Text("Add services and fuel logs\nto unlock insights.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -379,8 +379,15 @@ struct InsightsView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(Color.catElectrical.opacity(0.12))
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.catElectrical.opacity(0.2), Color.catElectrical.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .frame(width: 44, height: 44)
+                        .shadow(color: Color.catElectrical.opacity(0.2), radius: 6, x: 0, y: 2)
                     Image(systemName: "chart.line.uptrend.xyaxis")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(Color.catElectrical)
@@ -953,6 +960,9 @@ struct InsightsView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
         .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 
     private func ownershipStat(label: String, value: String, color: Color) -> some View {

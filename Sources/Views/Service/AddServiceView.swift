@@ -25,6 +25,9 @@ struct AddServiceView: View {
 
     // Validation & error state
     @State private var validationError: String?
+    @State private var serviceTypeError: String?
+    @State private var mileageFieldError: String?
+    @State private var costFieldError: String?
     @State private var saveError: String?
     @State private var photoWarnings: [String] = []
     @State private var isSaving = false
@@ -45,15 +48,26 @@ struct AddServiceView: View {
                     }
 
                     if isCustom && store.isPro {
-                        TextField("Service name", text: $customTypeName)
-                            .accessibilityLabel("Custom service name")
-                            .onChange(of: customTypeName) { _, _ in validationError = nil }
+                        VStack(alignment: .leading, spacing: 4) {
+                            TextField("Service name", text: $customTypeName)
+                                .accessibilityLabel("Custom service name")
+                                .onChange(of: customTypeName) { _, _ in serviceTypeError = nil; validationError = nil }
+                            if let err = serviceTypeError {
+                                Text(err)
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
                     } else {
                         // Service type button with category preview
                         Button {
                             showTypePicker = true
                         } label: {
-                            HStack {
+                            HStack(spacing: 0) {
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(selectedType.color)
+                                    .frame(width: 4, height: 36)
+                                    .padding(.trailing, 10)
                                 Image(systemName: selectedType.uniqueIcon)
                                     .foregroundStyle(selectedType.color)
                                     .frame(width: 24)
@@ -66,6 +80,7 @@ struct AddServiceView: View {
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                 }
+                                .padding(.leading, 8)
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
@@ -78,42 +93,52 @@ struct AddServiceView: View {
                     }
                 } header: {
                     Text("Service Type")
-                } footer: {
-                    if let error = validationError {
-                        Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                    }
                 }
 
                 // MARK: - Details
                 Section("Details") {
                     DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date)
                         .accessibilityLabel("Service date")
+                        .accessibilityHint("When the service was performed")
 
-                    HStack {
-                        Text("Mileage")
-                        Spacer()
-                        TextField(UserSettings.shared.distanceUnit.label, text: $mileage)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 120)
-                            .accessibilityLabel("Odometer reading at service")
-                            .onChange(of: mileage) { _, _ in validationError = nil }
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Mileage")
+                            Spacer()
+                            TextField(UserSettings.shared.distanceUnit.label, text: $mileage)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 120)
+                                .accessibilityLabel("Odometer reading at service")
+                                .accessibilityHint("Enter mileage when service was done")
+                                .onChange(of: mileage) { _, _ in mileageFieldError = nil; validationError = nil }
+                        }
+                        if let err = mileageFieldError {
+                            Text(err)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                        }
                     }
 
-                    HStack {
-                        Text("Cost")
-                        Spacer()
-                        HStack(spacing: 2) {
-                            Text(UserSettings.shared.currency.symbol)
-                                .foregroundStyle(.secondary)
-                            TextField("0.00", text: $cost)
-                                .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 100)
-                                .accessibilityLabel("Service cost")
-                                .onChange(of: cost) { _, _ in validationError = nil }
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Cost")
+                            Spacer()
+                            HStack(spacing: 2) {
+                                Text(UserSettings.shared.currency.symbol)
+                                    .foregroundStyle(.secondary)
+                                TextField("0.00", text: $cost)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 100)
+                                    .accessibilityLabel("Service cost in \(UserSettings.shared.currency.symbol)")
+                                    .onChange(of: cost) { _, _ in costFieldError = nil; validationError = nil }
+                            }
+                        }
+                        if let err = costFieldError {
+                            Text(err)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
                         }
                     }
                 }
@@ -228,8 +253,10 @@ struct AddServiceView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveRecord() }
                         .fontWeight(.semibold)
+                        .foregroundStyle(Color.wrenchAmber)
                         .disabled((isCustom && customTypeName.trimmingCharacters(in: .whitespaces).isEmpty) || isSaving)
                         .accessibilityLabel("Save service record")
+                        .accessibilityHint("Logs this service to your vehicle history")
                 }
             }
             .onAppear {
@@ -263,16 +290,33 @@ struct AddServiceView: View {
     }
 
     private func saveRecord() {
-        // Validate
-        let result = ServiceRecordValidator.validate(
-            mileage: mileage,
-            cost: cost,
-            customTypeName: customTypeName,
-            isCustom: isCustom,
-            vehicleCurrentMileage: vehicle.currentMileage
-        )
-        guard result.isValid else {
-            validationError = result.firstError
+        // Clear previous field errors
+        serviceTypeError = nil
+        mileageFieldError = nil
+        costFieldError = nil
+        validationError = nil
+
+        var hasError = false
+
+        // Validate custom type name
+        if isCustom && customTypeName.trimmingCharacters(in: .whitespaces).isEmpty {
+            serviceTypeError = "Custom service name is required."
+            hasError = true
+        }
+
+        // Validate mileage
+        if let m = Int(mileage), m < 0 {
+            mileageFieldError = "Mileage cannot be negative."
+            hasError = true
+        }
+
+        // Validate cost
+        if let c = Double(cost), c < 0 {
+            costFieldError = "Cost cannot be negative."
+            hasError = true
+        }
+
+        guard !hasError else {
             haptic.error()
             return
         }

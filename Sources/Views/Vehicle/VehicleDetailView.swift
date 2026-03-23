@@ -209,11 +209,14 @@ struct VehicleDetailView: View {
                         .frame(maxWidth: .infinity).frame(height: 200)
                         .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
                         .accessibilityLabel("\(vehicle.displayName) photo")
-                    LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 80)
-                        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 14, bottomTrailingRadius: 14))
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                    LinearGradient(
+                        colors: [.clear, .clear, .black.opacity(0.3), .black.opacity(0.65)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(vehicle.displayName).font(.title3.weight(.bold)).foregroundStyle(.white)
                         if !vehicle.licensePlate.isEmpty {
@@ -223,6 +226,7 @@ struct VehicleDetailView: View {
                         }
                     }
                     .padding(12)
+                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
                 }
             }
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
@@ -321,8 +325,12 @@ struct VehicleDetailView: View {
                         .stroke(theme.accent.opacity(0.12), style: StrokeStyle(lineWidth: 8, lineCap: .round))
                         .frame(width: 100, height: 100)
                     Circle().trim(from: 0.15, to: 0.15 + (0.70 * mileageProgress))
-                        .stroke(theme.accent.gradient, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .stroke(
+                            LinearGradient(colors: [theme.accent, theme.accent.opacity(0.6)], startPoint: .leading, endPoint: .trailing),
+                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                        )
                         .frame(width: 100, height: 100)
+                        .shadow(color: theme.accent.opacity(0.25), radius: 6, x: 0, y: 0)
                     VStack(spacing: 2) {
                         Image(systemName: "gauge.open.with.needle.33percent").font(.caption).foregroundStyle(theme.accent)
                         Text(vehicle.currentMileage > 0 ? vehicle.currentMileage.formatted() : "—")
@@ -335,7 +343,7 @@ struct VehicleDetailView: View {
             .frame(maxWidth: .infinity).padding(.vertical, 4)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Current mileage: \(settings.formatMileage(vehicle.currentMileage))")
+        .accessibilityLabel("Current mileage: \(settings.formatMileage(vehicle.currentMileage)). Double tap to update.")
     }
 
     private var dashboardStats: some View {
@@ -474,6 +482,7 @@ struct VehicleDetailView: View {
             NavigationLink { MaintenanceTimelineView(vehicle: vehicle) } label: {
                 Label("Maintenance Timeline", systemImage: "clock.arrow.circlepath").foregroundStyle(theme.accent)
             }
+            .accessibilityLabel("View maintenance timeline")
             NavigationLink { MaintenanceChecklistView(vehicle: vehicle) } label: {
                 HStack {
                     Label("Maintenance Checklist", systemImage: "checklist")
@@ -489,9 +498,11 @@ struct VehicleDetailView: View {
                 }
                 .foregroundStyle(theme.accent)
             }
+            .accessibilityLabel("Maintenance checklist, \(vehicle.checklistItems.filter { !$0.isCompleted }.count) pending items")
             NavigationLink { ReminderSettingsView(vehicle: vehicle) } label: {
                 Label("Reminder Settings", systemImage: "bell.fill").foregroundStyle(theme.accent)
             }
+            .accessibilityLabel("Configure service reminders")
         }
     }
 
@@ -538,7 +549,7 @@ struct VehicleDetailView: View {
                     Image(systemName: "fuelpump.circle.fill").font(.system(size: 32)).foregroundStyle(Color.catFuel.opacity(0.4))
                 }
                 Text("No fuel logs yet").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
-                Text("Track fill-ups to calculate fuel efficiency.").font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+                Text("Start tracking fuel to see your efficiency.").font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
                 Button { showAddFuel = true } label: {
                     Label("Log First Fill-Up", systemImage: "plus.circle.fill").font(.caption.weight(.medium)).foregroundStyle(theme.accent)
                 }
@@ -600,6 +611,7 @@ struct VehicleDetailView: View {
                     ForEach(ServiceSortOption.allCases) { option in
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) { sortOption = option }
+                            haptic.selection()
                         } label: {
                             HStack {
                                 Text(option.rawValue)
@@ -618,12 +630,14 @@ struct VehicleDetailView: View {
                 }
                 filterChip(label: "All", isSelected: filterCategory == nil) {
                     withAnimation(.easeInOut(duration: 0.2)) { filterCategory = nil }
+                    haptic.selection()
                 }
                 ForEach(ServiceCategory.allCases.filter { $0 != .custom }, id: \.self) { cat in
                     filterChip(label: cat.rawValue, icon: cat.icon, isSelected: filterCategory == cat) {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             filterCategory = filterCategory == cat ? nil : cat
                         }
+                        haptic.selection()
                     }
                 }
             }
@@ -642,7 +656,7 @@ struct VehicleDetailView: View {
                             Image(systemName: "wrench.and.screwdriver.fill").font(.system(size: 28)).foregroundStyle(theme.accent.opacity(0.3))
                         }
                         Text("No services logged yet").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
-                        Text("Tap + to log your first oil change,\ntire rotation, or any service.")
+                        Text("Tap + to add your first oil change,\ntire rotation, or any service.")
                             .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
                     } else {
                         Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.tertiary)
@@ -657,6 +671,7 @@ struct VehicleDetailView: View {
         } else {
             ForEach(Array(filteredAndSortedRecords.enumerated()), id: \.element.id) { index, record in
                 NavigationLink { EditServiceView(record: record) } label: { ServiceRecordRow(record: record) }
+                    .simultaneousGesture(TapGesture().onEnded { haptic.light() })
                     .staggeredAppear(index: index)
             }
             .onDelete { indexSet in
@@ -683,6 +698,7 @@ struct VehicleDetailView: View {
                 }
                 .foregroundStyle(theme.accent)
             }
+            .accessibilityLabel("Cost analytics\(store.isPro ? "" : ", Pro feature")")
             Button {
                 if store.isPro { exportPDF() } else { showProPrompt = true }
             } label: {
@@ -694,9 +710,11 @@ struct VehicleDetailView: View {
                     }
                 }
             }
+            .accessibilityLabel("Export PDF report\(store.isPro ? "" : ", Pro feature")")
             Button(role: .destructive) { showSellVehicle = true } label: {
                 Label("Mark as Sold", systemImage: "tag.fill")
             }
+            .accessibilityLabel("Mark vehicle as sold")
         }
     }
 
@@ -813,6 +831,7 @@ struct VehicleDetailView: View {
         }
         .frame(maxWidth: .infinity).padding(.vertical, 8)
         .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
     }
@@ -863,6 +882,7 @@ struct ServiceRecordRow: View {
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(record.displayServiceType), \(record.date, format: .dateTime.month(.abbreviated).day().year()), cost \(UserSettings.shared.formatCost(record.cost))")
     }
 }
 

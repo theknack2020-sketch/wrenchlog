@@ -75,6 +75,7 @@ struct ReminderSettingsView: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
+                    .accessibilityLabel("Save reminder settings")
                 }
             }
             .onAppear {

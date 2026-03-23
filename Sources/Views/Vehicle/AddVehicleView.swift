@@ -18,6 +18,9 @@ struct AddVehicleView: View {
 
     // Validation & error state
     @State private var validationError: String?
+    @State private var makeError: String?
+    @State private var modelError: String?
+    @State private var mileageError: String?
     @State private var showDuplicateWarning = false
     @State private var saveError: String?
     @State private var isSaving = false
@@ -31,33 +34,49 @@ struct AddVehicleView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Make (e.g., Toyota)", text: $make)
-                        .textInputAutocapitalization(.words)
-                        .accessibilityLabel("Vehicle make")
-                        .accessibilityHint("Enter the manufacturer name")
-                        .onChange(of: make) { _, _ in validationError = nil }
-                    TextField("Model (e.g., Camry)", text: $model)
-                        .textInputAutocapitalization(.words)
-                        .accessibilityLabel("Vehicle model")
-                        .onChange(of: model) { _, _ in validationError = nil }
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Make (e.g., Toyota)", text: $make)
+                            .textInputAutocapitalization(.words)
+                            .accessibilityLabel("Vehicle make")
+                            .accessibilityHint("Enter the manufacturer name")
+                            .onChange(of: make) { _, _ in makeError = nil; validationError = nil }
+                        if let err = makeError {
+                            Text(err)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Model (e.g., Camry)", text: $model)
+                            .textInputAutocapitalization(.words)
+                            .accessibilityLabel("Vehicle model")
+                            .onChange(of: model) { _, _ in modelError = nil; validationError = nil }
+                        if let err = modelError {
+                            Text(err)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                        }
+                    }
                     Picker("Year", selection: $year) {
                         ForEach((1950...Calendar.current.component(.year, from: .now) + 1).reversed(), id: \.self) { y in
                             Text(String(y)).tag(y)
                         }
                     }
-                    .accessibilityLabel("Model year")
-                    TextField("Current Mileage", text: $mileage)
-                        .keyboardType(.numberPad)
-                        .accessibilityLabel("Current odometer reading")
-                        .onChange(of: mileage) { _, _ in validationError = nil }
+                    .accessibilityLabel("Model year: \(String(year))")
+                    VStack(alignment: .leading, spacing: 4) {
+                        TextField("Current Mileage", text: $mileage)
+                            .keyboardType(.numberPad)
+                            .accessibilityLabel("Current odometer reading")
+                            .accessibilityHint("Enter current mileage in \(UserSettings.shared.distanceUnit.label)")
+                            .onChange(of: mileage) { _, _ in mileageError = nil; validationError = nil }
+                        if let err = mileageError {
+                            Text(err)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                        }
+                    }
                 } header: {
                     Text("Vehicle Info")
-                } footer: {
-                    if let error = validationError {
-                        Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
-                    }
                 }
 
                 // Vehicle Color
@@ -148,8 +167,9 @@ struct AddVehicleView: View {
                     Button("Save") { validateAndSave() }
                         .disabled(!isFormValid || isSaving)
                         .fontWeight(.semibold)
+                        .foregroundStyle(isFormValid ? Color.wrenchAmber : .secondary)
                         .accessibilityLabel("Save vehicle")
-                        .accessibilityHint(isFormValid ? "" : "Enter make and model first")
+                        .accessibilityHint(isFormValid ? "Saves the vehicle to your garage" : "Enter make and model first")
                 }
             }
             .onChange(of: selectedPhoto) { _, item in
@@ -177,10 +197,39 @@ struct AddVehicleView: View {
     }
 
     private func validateAndSave() {
-        // Run validation
-        let result = VehicleValidator.validate(make: make, model: model, year: year, mileage: mileage)
-        guard result.isValid else {
-            validationError = result.firstError
+        // Clear previous errors
+        makeError = nil
+        modelError = nil
+        mileageError = nil
+
+        // Run per-field validation
+        let trimmedMake = make.trimmingCharacters(in: .whitespaces)
+        let trimmedModel = model.trimmingCharacters(in: .whitespaces)
+
+        var hasError = false
+
+        if trimmedMake.isEmpty {
+            makeError = "Vehicle make is required."
+            hasError = true
+        } else if trimmedMake.count < 2 {
+            makeError = "Make must be at least 2 characters."
+            hasError = true
+        }
+
+        if trimmedModel.isEmpty {
+            modelError = "Vehicle model is required."
+            hasError = true
+        }
+
+        if let m = Int(mileage), m < 0 {
+            mileageError = "Mileage cannot be negative."
+            hasError = true
+        } else if !mileage.isEmpty && Int(mileage) == nil {
+            mileageError = "Mileage must be a whole number."
+            hasError = true
+        }
+
+        guard !hasError else {
             HapticManager.shared.error()
             return
         }

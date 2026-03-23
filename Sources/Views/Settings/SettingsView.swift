@@ -34,6 +34,7 @@ struct SettingsView: View {
                     Text("Miles").tag(DistanceUnit.miles)
                     Text("Kilometers").tag(DistanceUnit.km)
                 }
+                .accessibilityLabel("Distance unit")
                 .onChange(of: distanceUnit) { _, val in
                     UserSettings.shared.distanceUnit = val
                 }
@@ -42,6 +43,7 @@ struct SettingsView: View {
                     Text("Gallons").tag(VolumeUnit.gallons)
                     Text("Liters").tag(VolumeUnit.liters)
                 }
+                .accessibilityLabel("Volume unit")
                 .onChange(of: volumeUnit) { _, val in
                     UserSettings.shared.volumeUnit = val
                 }
@@ -50,6 +52,7 @@ struct SettingsView: View {
                     Text("MPG").tag(EfficiencyUnit.mpg)
                     Text("L/100km").tag(EfficiencyUnit.l100km)
                 }
+                .accessibilityLabel("Fuel efficiency unit")
                 .onChange(of: efficiencyUnit) { _, val in
                     UserSettings.shared.efficiencyUnit = val
                 }
@@ -60,6 +63,7 @@ struct SettingsView: View {
                     Text("£ GBP").tag(Currency.gbp)
                     Text("₺ TRY").tag(Currency.try_)
                 }
+                .accessibilityLabel("Currency for costs")
                 .onChange(of: currency) { _, val in
                     UserSettings.shared.currency = val
                 }
@@ -78,6 +82,7 @@ struct SettingsView: View {
                                     selectedTheme = appTheme
                                     ThemeManager.shared.current = appTheme
                                 }
+                                HapticManager.shared.selection()
                             } label: {
                                 VStack(spacing: 6) {
                                     ZStack {
@@ -118,6 +123,8 @@ struct SettingsView: View {
             // MARK: - Notifications
             Section {
                 Toggle("Service Reminders", isOn: $remindersEnabled)
+                    .accessibilityLabel("Service reminders")
+                    .accessibilityHint("Toggle to enable or disable service due reminders")
                     .onChange(of: remindersEnabled) { _, val in
                         ReminderStore.remindersEnabled = val
                         if val {
@@ -135,6 +142,8 @@ struct SettingsView: View {
                     }
 
                 Toggle("Weekly Mileage Nudge", isOn: $mileageNudge)
+                    .accessibilityLabel("Weekly mileage reminder")
+                    .accessibilityHint("Get a weekly reminder to update your odometer")
                     .onChange(of: mileageNudge) { _, val in
                         ReminderStore.mileageNudgeEnabled = val
                     }
@@ -203,6 +212,7 @@ struct SettingsView: View {
                 } label: {
                     Label("Export Data (CSV)", systemImage: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Export all data as CSV files")
 
                 // Import CSV
                 Button {
@@ -210,6 +220,7 @@ struct SettingsView: View {
                 } label: {
                     Label("Import Data (CSV)", systemImage: "square.and.arrow.down")
                 }
+                .accessibilityLabel("Import data from CSV file")
 
                 // Reset All Data
                 Button(role: .destructive) {
@@ -218,6 +229,8 @@ struct SettingsView: View {
                     Label("Reset All Data", systemImage: "trash")
                         .foregroundStyle(.red)
                 }
+                .accessibilityLabel("Reset all data")
+                .accessibilityHint("Permanently deletes all vehicles and records")
             }
 
             // MARK: - Share & Rate
@@ -230,6 +243,7 @@ struct SettingsView: View {
                 ) {
                     Label("Share WrenchLog", systemImage: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Share WrenchLog with friends")
 
                 // Rate Us
                 Button {
@@ -237,6 +251,7 @@ struct SettingsView: View {
                 } label: {
                     Label("Rate on App Store", systemImage: "star.fill")
                 }
+                .accessibilityLabel("Rate WrenchLog on the App Store")
             }
 
             // MARK: - About
@@ -346,6 +361,8 @@ struct SettingsView: View {
         if !urls.isEmpty {
             exportURLs = urls
             showExportShare = true
+            HapticManager.shared.success()
+            SoundManager.playSaveSuccess()
         }
     }
 

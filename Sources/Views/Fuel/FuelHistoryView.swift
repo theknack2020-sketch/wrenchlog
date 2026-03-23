@@ -64,18 +64,29 @@ struct FuelHistoryView: View {
                 Section("Fuel History") {
                     HStack {
                         Spacer()
-                        VStack(spacing: 8) {
-                            Image(systemName: "fuelpump")
-                                .font(.title)
-                                .foregroundStyle(.tertiary)
-                            Text("No fuel logs yet")
-                                .font(.subheadline)
+                        VStack(spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.catFuel.opacity(0.1))
+                                    .frame(width: 72, height: 72)
+                                Image(systemName: "fuelpump.circle.fill")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(Color.catFuel.opacity(0.4))
+                            }
+                            Text("No Fuel Logs")
+                                .font(.subheadline.weight(.medium))
                                 .foregroundStyle(.secondary)
-                            Text("Tap + to log your first fill-up.")
+                            Text("Start tracking fuel to see your\nefficiency and spending trends.")
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)
+                                .multilineTextAlignment(.center)
+                            Button { showAddFuel = true } label: {
+                                Label("Log First Fill-Up", systemImage: "plus.circle.fill")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(Color.wrenchAmber)
+                            }
                         }
-                        .padding(.vertical, 20)
+                        .padding(.vertical, 24)
                         Spacer()
                     }
                 }
@@ -105,6 +116,7 @@ struct FuelHistoryView: View {
                     Image(systemName: "plus.circle.fill")
                         .foregroundStyle(Color.wrenchAmber)
                 }
+                .accessibilityLabel("Add fuel log")
             }
         }
         .sheet(isPresented: $showAddFuel) {
@@ -171,6 +183,9 @@ struct FuelHistoryView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 
     // MARK: - Undo Banner

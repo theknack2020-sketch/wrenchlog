@@ -282,5 +282,8 @@ struct FuelEfficiencyChartView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 }

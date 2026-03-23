@@ -7,6 +7,9 @@ struct ProUpgradeView: View {
     @State private var restoring = false
     @State private var error: String?
     @State private var restoreSuccess = false
+    @State private var showPurchaseErrorAlert = false
+    @State private var showRestoreAlert = false
+    @State private var restoreAlertMessage = ""
     private let store = StoreManager.shared
 
     var body: some View {
@@ -18,9 +21,24 @@ struct ProUpgradeView: View {
                     VStack(spacing: 24) {
                         // MARK: - Header
                         VStack(spacing: 12) {
-                            Image(systemName: "wrench.adjustable.fill")
-                                .font(.system(size: 56))
-                                .foregroundStyle(Color.wrenchAmber)
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.wrenchAmber.opacity(0.15), Color.wrenchAmber.opacity(0.05)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 100, height: 100)
+                                Image(systemName: "wrench.adjustable.fill")
+                                    .font(.system(size: 56))
+                                    .foregroundStyle(
+                                        LinearGradient(colors: [Color.wrenchAmber, Color(red: 0.85, green: 0.55, blue: 0.05)], startPoint: .top, endPoint: .bottom)
+                                    )
+                            }
+                            .shadow(color: Color.wrenchAmber.opacity(0.25), radius: 12, x: 0, y: 4)
+                            .accessibilityHidden(true)
 
                             Text("WrenchLog Pro")
                                 .font(.title.weight(.bold))
@@ -43,6 +61,8 @@ struct ProUpgradeView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("5 stars. Trusted by car enthusiasts")
 
                         // MARK: - Feature Comparison Table
                         VStack(spacing: 0) {
@@ -73,8 +93,12 @@ struct ProUpgradeView: View {
                             comparisonRow("Custom Categories", free: false, pro: true)
                             comparisonRow("CSV Export", free: false, pro: true)
                         }
-                        .background(Color(.secondarySystemGroupedBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(Color.wrenchAmber.opacity(0.15), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
                         .padding(.horizontal, 24)
 
                         // No ads note
@@ -86,6 +110,19 @@ struct ProUpgradeView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+
+                        // MARK: - Trust Indicators
+                        VStack(spacing: 10) {
+                            HStack(spacing: 20) {
+                                trustBadge(icon: "lock.shield.fill", text: "Lifetime Purchase")
+                                trustBadge(icon: "arrow.clockwise.circle", text: "No Subscription Required")
+                            }
+                            HStack(spacing: 20) {
+                                trustBadge(icon: "iphone.and.arrow.forward", text: "Restore Anytime")
+                                trustBadge(icon: "hand.raised.fill", text: "No Data Collection")
+                            }
+                        }
+                        .padding(.horizontal, 24)
 
                         // MARK: - Products
                         if store.isLoading {
@@ -154,16 +191,13 @@ struct ProUpgradeView: View {
                                 let success = await store.restorePurchases()
                                 restoring = false
                                 if success {
-                                    withAnimation { restoreSuccess = true }
+                                    restoreAlertMessage = "Your Pro purchase has been restored successfully!"
+                                    showRestoreAlert = true
                                     HapticManager.shared.success()
-                                    // Delay dismiss to show success feedback
-                                    try? await Task.sleep(for: .seconds(1.2))
-                                    dismiss()
                                 } else {
+                                    restoreAlertMessage = "No previous purchases found.\n\nIf you believe this is an error, make sure you're signed in with the same Apple ID used for the original purchase."
+                                    showRestoreAlert = true
                                     HapticManager.shared.warning()
-                                    withAnimation {
-                                        error = "No previous purchases found. If you believe this is an error, try again or contact support."
-                                    }
                                 }
                             }
                         } label: {
@@ -207,9 +241,43 @@ struct ProUpgradeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") { dismiss() }
+                        .accessibilityLabel("Close Pro upgrade screen")
                 }
             }
             .disabled(purchasing)
+            .alert("Purchase Failed", isPresented: $showPurchaseErrorAlert) {
+                Button("OK") { error = nil }
+            } message: {
+                Text(error ?? "An unexpected error occurred.")
+            }
+            .alert("Restore Purchases", isPresented: $showRestoreAlert) {
+                if restoreAlertMessage.contains("restored successfully") {
+                    Button("OK") {
+                        dismiss()
+                    }
+                } else {
+                    Button("Try Again") {
+                        Task {
+                            restoring = true
+                            let success = await store.restorePurchases()
+                            restoring = false
+                            if success {
+                                restoreAlertMessage = "Your Pro purchase has been restored successfully!"
+                                showRestoreAlert = true
+                                HapticManager.shared.success()
+                            }
+                        }
+                    }
+                    Button("Contact Support") {
+                        if let url = URL(string: "mailto:theknack2020@gmail.com?subject=WrenchLog%20Pro%20Restore%20Issue") {
+                            UIApplication.shared.open(url)
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
+            } message: {
+                Text(restoreAlertMessage)
+            }
         }
     }
 
@@ -290,12 +358,22 @@ struct ProUpgradeView: View {
                     if ok {
                         HapticManager.shared.celebrate()
                         dismiss()
+                    } else {
+                        purchasing = false
                     }
+                } catch StoreKitError.userCancelled {
+                    purchasing = false
+                } catch StoreKitError.networkError {
+                    HapticManager.shared.error()
+                    self.error = "Network error. Please check your internet connection and try again."
+                    showPurchaseErrorAlert = true
+                    purchasing = false
                 } catch {
                     HapticManager.shared.error()
-                    self.error = "Purchase failed. Please try again."
+                    self.error = "Purchase could not be completed. You have not been charged. Please try again."
+                    showPurchaseErrorAlert = true
+                    purchasing = false
                 }
-                purchasing = false
             }
         } label: {
             HStack {
@@ -307,7 +385,7 @@ struct ProUpgradeView: View {
                                 .font(.caption2.weight(.bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.wrenchAmber, in: Capsule())
+                                .background(Color.white.opacity(0.25), in: Capsule())
                                 .foregroundStyle(.white)
                         }
                     }
@@ -319,10 +397,38 @@ struct ProUpgradeView: View {
             .padding()
             .frame(maxWidth: .infinity)
             .foregroundStyle(recommended ? .white : .primary)
-            .background(
-                recommended ? AnyShapeStyle(Color.wrenchAmber) : AnyShapeStyle(Color(.tertiarySystemGroupedBackground)),
-                in: RoundedRectangle(cornerRadius: 14)
-            )
+            .background {
+                if recommended {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.wrenchAmber, Color.wrenchAmber.opacity(0.85), Color(red: 0.85, green: 0.55, blue: 0.05)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                } else {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color(.tertiarySystemGroupedBackground))
+                }
+            }
+            .shadow(color: recommended ? Color.wrenchAmber.opacity(0.3) : .black.opacity(0.06), radius: recommended ? 10 : 4, x: 0, y: recommended ? 4 : 2)
         }
+        .accessibilityLabel("\(label) plan, \(product.displayPrice)")
+        .accessibilityHint(recommended ? "Best value option" : "")
+    }
+
+    // MARK: - Trust Badge
+
+    private func trustBadge(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundStyle(Color.wrenchAmber)
+            Text(text)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

@@ -99,6 +99,8 @@ struct SellVehicleView: View {
                             Spacer()
                         }
                     }
+                    .accessibilityLabel("Mark vehicle as sold")
+                    .accessibilityHint("Moves the vehicle to sold vehicles list")
                 }
             }
             .navigationTitle("Sell Vehicle")
@@ -106,6 +108,7 @@ struct SellVehicleView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityLabel("Cancel selling vehicle")
                 }
             }
             .alert("Mark Vehicle as Sold?", isPresented: $confirmSell) {

@@ -24,6 +24,7 @@ struct QuickStartTooltip: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
                     }
+                    .accessibilityLabel("Dismiss quick start guide")
                 }
 
                 ForEach(tips.indices, id: \.self) { index in
