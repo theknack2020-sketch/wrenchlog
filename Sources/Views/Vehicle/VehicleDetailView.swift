@@ -55,7 +55,7 @@ struct VehicleDetailView: View {
     // MARK: - Computed
 
     var filteredAndSortedRecords: [ServiceRecord] {
-        var records = vehicle.serviceRecords
+        var records = vehicle.safeServiceRecords
         if !searchText.isEmpty {
             let query = searchText.lowercased()
             records = records.filter {
@@ -77,12 +77,12 @@ struct VehicleDetailView: View {
         return records
     }
 
-    var totalCost: Double { vehicle.serviceRecords.reduce(0) { $0 + $1.cost } }
-    var totalFuelCost: Double { vehicle.fuelLogs.reduce(0) { $0 + $1.totalCost } }
+    var totalCost: Double { vehicle.safeServiceRecords.reduce(0) { $0 + $1.cost } }
+    var totalFuelCost: Double { vehicle.safeFuelLogs.reduce(0) { $0 + $1.totalCost } }
     var totalOwnershipCost: Double { totalCost + totalFuelCost }
 
     var latestEfficiency: String? {
-        let results = vehicle.fuelLogs.calculateEfficiency()
+        let results = vehicle.safeFuelLogs.calculateEfficiency()
         guard let latest = results.last else { return nil }
         return settings.formatEfficiency(latest.efficiency(for: settings.efficiencyUnit))
     }
@@ -94,7 +94,7 @@ struct VehicleDetailView: View {
         let calendar = Calendar.current
         for serviceType in ServiceType.allCases {
             guard serviceType.defaultMonthInterval > 0 else { continue }
-            let lastRecord = vehicle.serviceRecords
+            let lastRecord = vehicle.safeServiceRecords
                 .filter { $0.serviceTypeRaw == serviceType.rawValue }
                 .sorted { $0.date > $1.date }
                 .first
@@ -126,17 +126,17 @@ struct VehicleDetailView: View {
     // MARK: - Mini Stat Computations
 
     private var averageCostPerService: Double {
-        let paid = vehicle.serviceRecords.filter { $0.cost > 0 }
+        let paid = vehicle.safeServiceRecords.filter { $0.cost > 0 }
         guard !paid.isEmpty else { return 0 }
         return paid.reduce(0) { $0 + $1.cost } / Double(paid.count)
     }
 
     private var lastServiceDate: Date? {
-        vehicle.serviceRecords.sorted { $0.date > $1.date }.first?.date
+        vehicle.safeServiceRecords.sorted { $0.date > $1.date }.first?.date
     }
 
     private var mostExpensiveService: ServiceRecord? {
-        vehicle.serviceRecords.max { $0.cost < $1.cost }
+        vehicle.safeServiceRecords.max { $0.cost < $1.cost }
     }
 
     private var daysSinceLastService: Int? {
@@ -279,7 +279,7 @@ struct VehicleDetailView: View {
                 dashboardInfoRow
                 dashboardSpeedometer
                 dashboardStats
-                if !vehicle.fuelLogs.isEmpty { dashboardFuelStats }
+                if !vehicle.safeFuelLogs.isEmpty { dashboardFuelStats }
             }
         }
         .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
@@ -409,7 +409,7 @@ struct VehicleDetailView: View {
             .statPop(index: 0)
             statCard(title: "Total Spent", value: settings.formatCost(totalOwnershipCost), icon: "dollarsign.circle.fill", color: theme.accent)
                 .statPop(index: 1)
-            statCard(title: "Services", value: "\(vehicle.serviceRecords.count)", icon: "wrench.fill", color: .catEngine)
+            statCard(title: "Services", value: "\(vehicle.safeServiceRecords.count)", icon: "wrench.fill", color: .catEngine)
                 .statPop(index: 2)
         }
     }
@@ -417,7 +417,7 @@ struct VehicleDetailView: View {
     private var dashboardFuelStats: some View {
         HStack(spacing: 8) {
             statCard(title: "Fuel Cost", value: settings.formatCost(totalFuelCost), icon: "fuelpump.fill", color: .catFuel)
-            statCard(title: "Fill-Ups", value: "\(vehicle.fuelLogs.count)", icon: "drop.fill", color: .catFuelRegular)
+            statCard(title: "Fill-Ups", value: "\(vehicle.safeFuelLogs.count)", icon: "drop.fill", color: .catFuelRegular)
             if let eff = latestEfficiency {
                 statCard(title: "Latest", value: eff, icon: "gauge.medium", color: .catTires)
             }
@@ -446,7 +446,7 @@ struct VehicleDetailView: View {
                 HStack(spacing: 8) {
                     miniStatCard(
                         title: "Services",
-                        value: "\(vehicle.serviceRecords.count)",
+                        value: "\(vehicle.safeServiceRecords.count)",
                         icon: "wrench.fill",
                         color: .catEngine
                     )
@@ -611,7 +611,7 @@ struct VehicleDetailView: View {
                 HStack {
                     Label("Documents", systemImage: "doc.text.fill").foregroundStyle(theme.accent)
                     Spacer()
-                    let docCount = vehicle.documents.count
+                    let docCount = vehicle.safeDocuments.count
                     if docCount > 0 {
                         Text("\(docCount)")
                             .font(.caption2.weight(.bold))
@@ -621,9 +621,9 @@ struct VehicleDetailView: View {
                     }
                 }
             }
-            .accessibilityLabel("Documents, \(vehicle.documents.count) stored")
+            .accessibilityLabel("Documents, \(vehicle.safeDocuments.count) stored")
 
-            let expiringDocs = Array(vehicle.documents.filter { doc in
+            let expiringDocs = Array(vehicle.safeDocuments.filter { doc in
                 guard let expiry = doc.expirationDate else { return false }
                 return (Calendar.current.dateComponents([.day], from: .now, to: expiry).day ?? 999) <= 30
             })
@@ -657,7 +657,7 @@ struct VehicleDetailView: View {
                 HStack {
                     Label("Maintenance Checklist", systemImage: "checklist")
                     Spacer()
-                    let pending = vehicle.checklistItems.filter { !$0.isCompleted }.count
+                    let pending = vehicle.safeChecklistItems.filter { !$0.isCompleted }.count
                     if pending > 0 {
                         Text("\(pending)")
                             .font(.caption2.weight(.bold))
@@ -668,7 +668,7 @@ struct VehicleDetailView: View {
                 }
                 .foregroundStyle(theme.accent)
             }
-            .accessibilityLabel("Maintenance checklist, \(vehicle.checklistItems.filter { !$0.isCompleted }.count) pending items")
+            .accessibilityLabel("Maintenance checklist, \(vehicle.safeChecklistItems.filter { !$0.isCompleted }.count) pending items")
             NavigationLink { ReminderSettingsView(vehicle: vehicle) } label: {
                 Label("Reminder Settings", systemImage: "bell.fill").foregroundStyle(theme.accent)
             }
@@ -702,7 +702,7 @@ struct VehicleDetailView: View {
 
     private var fuelTrackingSection: some View {
         Section("Fuel Tracking") {
-            if vehicle.fuelLogs.isEmpty {
+            if vehicle.safeFuelLogs.isEmpty {
                 fuelEmptyState
             } else {
                 fuelLogsList
@@ -731,8 +731,8 @@ struct VehicleDetailView: View {
 
     @ViewBuilder
     private var fuelLogsList: some View {
-        let recentFuel = vehicle.fuelLogs.sorted { $0.date > $1.date }.prefix(3)
-        let effResults = vehicle.fuelLogs.calculateEfficiency()
+        let recentFuel = vehicle.safeFuelLogs.sorted { $0.date > $1.date }.prefix(3)
+        let effResults = vehicle.safeFuelLogs.calculateEfficiency()
         ForEach(Array(recentFuel)) { log in
             NavigationLink { EditFuelLogView(fuelLog: log) } label: {
                 FuelLogRow(log: log, efficiency: effResults.first { $0.date == log.date && $0.mileage == log.mileage })
@@ -760,7 +760,7 @@ struct VehicleDetailView: View {
             HStack {
                 Text("Service History")
                 Spacer()
-                if !vehicle.serviceRecords.isEmpty {
+                if !vehicle.safeServiceRecords.isEmpty {
                     Text(serviceHistorySubtitle)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
@@ -770,7 +770,7 @@ struct VehicleDetailView: View {
     }
 
     private var serviceHistorySubtitle: String {
-        let count = vehicle.serviceRecords.count
+        let count = vehicle.safeServiceRecords.count
         switch count {
         case 1...4: return "\(count) logged — off to a great start!"
         case 5...14: return "\(count) logged — solid record keeping 👍"
@@ -832,7 +832,7 @@ struct VehicleDetailView: View {
             HStack {
                 Spacer()
                 VStack(spacing: 10) {
-                    if vehicle.serviceRecords.isEmpty {
+                    if vehicle.safeServiceRecords.isEmpty {
                         ZStack {
                             Circle().fill(theme.accent.opacity(0.08)).frame(width: 72, height: 72)
                             Image(systemName: "wrench.and.screwdriver.fill").font(.system(size: 28)).foregroundStyle(theme.accent.opacity(0.3))

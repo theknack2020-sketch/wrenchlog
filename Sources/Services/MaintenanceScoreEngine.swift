@@ -10,7 +10,7 @@ struct MaintenanceScoreEngine {
         let reminders = ServiceReminderEngine.reminders(for: vehicle)
         guard !reminders.isEmpty else {
             // No trackable services — score based on whether any services exist at all
-            return vehicle.serviceRecords.isEmpty ? 50 : 85
+            return vehicle.safeServiceRecords.isEmpty ? 50 : 85
         }
 
         var totalPoints = 0

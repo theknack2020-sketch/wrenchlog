@@ -6,14 +6,14 @@ import SwiftData
 /// this model tracks metadata.
 @Model
 final class VehicleDocument {
-    var id: UUID
-    var title: String
-    var fileName: String          // filename in documents directory
-    var documentTypeRaw: String   // DocumentType.rawValue
-    var dateAdded: Date
+    var id: UUID = UUID()
+    var title: String = ""
+    var fileName: String = ""          // filename in documents directory
+    var documentTypeRaw: String = "Other"   // DocumentType.rawValue
+    var dateAdded: Date = Date.now
     var expirationDate: Date?
-    var notes: String
-    var fileSizeBytes: Int
+    var notes: String = ""
+    var fileSizeBytes: Int = 0
 
     var vehicle: Vehicle?
 

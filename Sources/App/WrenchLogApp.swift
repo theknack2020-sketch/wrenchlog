@@ -12,7 +12,7 @@ struct WrenchLogApp: App {
         // Crash-safe container initialization with fallback
         do {
             let schema = Schema([Vehicle.self, ServiceRecord.self, FuelLog.self, MaintenanceChecklistItem.self, VehicleDocument.self])
-            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
             modelContainer = try ModelContainer(for: schema, configurations: [config])
         } catch {
             // If migration or store creation fails, log and attempt a fresh container.
@@ -21,7 +21,7 @@ struct WrenchLogApp: App {
             print("[WrenchLog] Attempting fallback with fresh store...")
             do {
                 let schema = Schema([Vehicle.self, ServiceRecord.self, FuelLog.self, MaintenanceChecklistItem.self, VehicleDocument.self])
-                let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+                let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
                 // Attempt to remove corrupt store
                 let storeURL = config.url
                 do {

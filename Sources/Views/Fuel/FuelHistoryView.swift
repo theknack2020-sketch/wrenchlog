@@ -14,19 +14,19 @@ struct FuelHistoryView: View {
     private let settings = UserSettings.shared
 
     var sortedLogs: [FuelLog] {
-        vehicle.fuelLogs.sorted { $0.date > $1.date }
+        vehicle.safeFuelLogs.sorted { $0.date > $1.date }
     }
 
     var totalFuelCost: Double {
-        vehicle.fuelLogs.reduce(0) { $0 + $1.totalCost }
+        vehicle.safeFuelLogs.reduce(0) { $0 + $1.totalCost }
     }
 
     var totalVolume: Double {
-        vehicle.fuelLogs.reduce(0) { $0 + $1.volume }
+        vehicle.safeFuelLogs.reduce(0) { $0 + $1.volume }
     }
 
     var efficiencyResults: [FuelEfficiencyResult] {
-        vehicle.fuelLogs.calculateEfficiency()
+        vehicle.safeFuelLogs.calculateEfficiency()
     }
 
     var averageEfficiency: Double? {

@@ -10,11 +10,11 @@ struct CostAnalyticsView: View {
     @State private var selectedMonthIndex: Int?
 
     var records: [ServiceRecord] {
-        vehicle.serviceRecords.sorted { $0.date > $1.date }
+        vehicle.safeServiceRecords.sorted { $0.date > $1.date }
     }
 
     var fuelLogs: [FuelLog] {
-        vehicle.fuelLogs.sorted { $0.date > $1.date }
+        vehicle.safeFuelLogs.sorted { $0.date > $1.date }
     }
 
     var totalServiceCost: Double {
@@ -98,7 +98,7 @@ struct CostAnalyticsView: View {
 
     // Fuel efficiency summary
     var efficiencyResults: [FuelEfficiencyResult] {
-        vehicle.fuelLogs.calculateEfficiency()
+        vehicle.safeFuelLogs.calculateEfficiency()
     }
 
     var averageEfficiency: Double? {

@@ -18,8 +18,8 @@ struct MilestoneEngine {
     @MainActor
     static func earnedBadges(for vehicles: [Vehicle]) -> [MilestoneBadge] {
         var badges: [MilestoneBadge] = []
-        let totalServices = vehicles.reduce(0) { $0 + $1.serviceRecords.count }
-        let totalFuelLogs = vehicles.reduce(0) { $0 + $1.fuelLogs.count }
+        let totalServices = vehicles.reduce(0) { $0 + $1.safeServiceRecords.count }
+        let totalFuelLogs = vehicles.reduce(0) { $0 + $1.safeFuelLogs.count }
 
         // Service milestones
         badges.append(MilestoneBadge(

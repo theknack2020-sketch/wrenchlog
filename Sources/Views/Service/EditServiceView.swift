@@ -277,7 +277,7 @@ struct EditServiceView: View {
     /// Recent shop names from this vehicle's history for quick selection
     private var recentShops: [String] {
         guard let vehicle = record.vehicle else { return [] }
-        let shops = vehicle.serviceRecords
+        let shops = vehicle.safeServiceRecords
             .map(\.shopName)
             .filter { !$0.isEmpty }
         var seen = Set<String>()

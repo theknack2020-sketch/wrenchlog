@@ -21,7 +21,7 @@ struct VehicleDocumentsView: View {
     private let haptic = HapticManager.shared
 
     var sortedDocuments: [VehicleDocument] {
-        vehicle.documents.sorted { $0.dateAdded > $1.dateAdded }
+        vehicle.safeDocuments.sorted { $0.dateAdded > $1.dateAdded }
     }
 
     var body: some View {

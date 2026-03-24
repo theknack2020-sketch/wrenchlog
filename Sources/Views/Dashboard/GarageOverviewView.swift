@@ -53,12 +53,12 @@ struct GarageOverviewView: View {
     }
 
     var totalServiceCount: Int {
-        activeVehicles.reduce(0) { $0 + $1.serviceRecords.count }
+        activeVehicles.reduce(0) { $0 + $1.safeServiceRecords.count }
     }
 
     var totalCost: Double {
         activeVehicles.reduce(0) { total, v in
-            total + v.serviceRecords.reduce(0) { $0 + $1.cost } + v.fuelLogs.reduce(0) { $0 + $1.totalCost }
+            total + v.safeServiceRecords.reduce(0) { $0 + $1.cost } + v.safeFuelLogs.reduce(0) { $0 + $1.totalCost }
         }
     }
 
@@ -322,7 +322,7 @@ struct GarageOverviewView: View {
                                 }
                             }
                             Spacer()
-                            Text("\(vehicle.serviceRecords.count) services")
+                            Text("\(vehicle.safeServiceRecords.count) services")
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)
                         }
@@ -504,8 +504,8 @@ struct GarageOverviewView: View {
 
     private var costComparisonChart: some View {
         let data = activeVehicles.map { vehicle -> (name: String, service: Double, fuel: Double) in
-            let svc = vehicle.serviceRecords.reduce(0) { $0 + $1.cost }
-            let fuel = vehicle.fuelLogs.reduce(0) { $0 + $1.totalCost }
+            let svc = vehicle.safeServiceRecords.reduce(0) { $0 + $1.cost }
+            let fuel = vehicle.safeFuelLogs.reduce(0) { $0 + $1.totalCost }
             return (name: vehicle.displayName, service: svc, fuel: fuel)
         }
 
@@ -583,8 +583,8 @@ struct GarageVehicleCard: View {
     }
 
     var totalCost: Double {
-        vehicle.serviceRecords.reduce(0) { $0 + $1.cost } +
-        vehicle.fuelLogs.reduce(0) { $0 + $1.totalCost }
+        vehicle.safeServiceRecords.reduce(0) { $0 + $1.cost } +
+        vehicle.safeFuelLogs.reduce(0) { $0 + $1.totalCost }
     }
 
     var nextService: (type: String, urgency: ReminderUrgency, text: String)? {
@@ -676,7 +676,7 @@ struct GarageVehicleCard: View {
 
             Spacer()
 
-            let count = vehicle.serviceRecords.count
+            let count = vehicle.safeServiceRecords.count
             if count > 0 {
                 Text("\(count)")
                     .font(.caption2.weight(.bold))

@@ -8,7 +8,7 @@ struct FuelEfficiencyChartView: View {
     @State private var chartAnimationProgress: Double = 0
 
     var efficiencyResults: [FuelEfficiencyResult] {
-        vehicle.fuelLogs.calculateEfficiency()
+        vehicle.safeFuelLogs.calculateEfficiency()
     }
 
     var averageEfficiency: Double? {
@@ -73,7 +73,7 @@ struct FuelEfficiencyChartView: View {
             let month = calendar.date(byAdding: .month, value: -monthsAgo, to: now)!
             let start = calendar.date(from: calendar.dateComponents([.year, .month], from: month))!
             let end = calendar.date(byAdding: .month, value: 1, to: start)!
-            let total = vehicle.fuelLogs
+            let total = vehicle.safeFuelLogs
                 .filter { $0.date >= start && $0.date < end }
                 .reduce(0) { $0 + $1.totalCost }
             return (month: start, total: total)
@@ -422,7 +422,7 @@ struct FuelEfficiencyChartView: View {
 
     private func fuelTypeBreakdown() -> [(type: FuelType, volume: Double, count: Int)] {
         var map: [String: (volume: Double, count: Int)] = [:]
-        for log in vehicle.fuelLogs {
+        for log in vehicle.safeFuelLogs {
             let key = log.fuelTypeRaw
             let existing = map[key, default: (volume: 0, count: 0)]
             map[key] = (volume: existing.volume + log.volume, count: existing.count + 1)

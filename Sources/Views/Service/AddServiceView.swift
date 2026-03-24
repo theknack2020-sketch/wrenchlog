@@ -478,7 +478,7 @@ struct AddServiceView: View {
 
     /// Recent shop names from this vehicle's history for quick selection
     private var recentShops: [String] {
-        let shops = vehicle.serviceRecords
+        let shops = vehicle.safeServiceRecords
             .map(\.shopName)
             .filter { !$0.isEmpty }
         // Deduplicate while preserving order (most recent first)
@@ -604,7 +604,7 @@ struct AddServiceView: View {
             if let eventId { record.calendarEventId = eventId }
         }
 
-        let totalServices = vehicle.serviceRecords.count
+        let totalServices = vehicle.safeServiceRecords.count
         if totalServices > 0 && totalServices % 10 == 0 {
             haptic.celebrate()
             SoundManager.playCelebration()

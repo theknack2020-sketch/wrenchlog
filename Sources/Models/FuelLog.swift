@@ -73,17 +73,17 @@ enum EfficiencyUnit: String, Codable, CaseIterable {
 
 @Model
 final class FuelLog {
-    var id: UUID
-    var date: Date
-    var mileage: Int
-    var volume: Double          // gallons or liters (stored in user's preferred unit)
-    var totalCost: Double       // total cost for this fill-up
-    var pricePerUnit: Double    // price per gallon/liter
-    var fuelTypeRaw: String     // FuelType.rawValue
-    var station: String
-    var isFullTank: Bool        // needed for accurate MPG calculation
-    var notes: String
-    var volumeUnitRaw: String   // "gallons" or "liters" — unit at time of entry
+    var id: UUID = UUID()
+    var date: Date = Date.now
+    var mileage: Int = 0
+    var volume: Double = 0          // gallons or liters (stored in user's preferred unit)
+    var totalCost: Double = 0       // total cost for this fill-up
+    var pricePerUnit: Double = 0    // price per gallon/liter
+    var fuelTypeRaw: String = "Regular"     // FuelType.rawValue
+    var station: String = ""
+    var isFullTank: Bool = true        // needed for accurate MPG calculation
+    var notes: String = ""
+    var volumeUnitRaw: String = "gallons"   // "gallons" or "liters" — unit at time of entry
 
     var vehicle: Vehicle?
 

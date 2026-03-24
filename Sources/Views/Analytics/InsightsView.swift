@@ -19,11 +19,11 @@ struct InsightsView: View {
     // MARK: - Aggregated Data
 
     private var allRecords: [ServiceRecord] {
-        vehicles.flatMap(\.serviceRecords)
+        vehicles.flatMap(\.safeServiceRecords)
     }
 
     private var allFuelLogs: [FuelLog] {
-        vehicles.flatMap(\.fuelLogs)
+        vehicles.flatMap(\.safeFuelLogs)
     }
 
     private var totalServiceCost: Double {
@@ -87,8 +87,8 @@ struct InsightsView: View {
 
     private var vehicleCosts: [VehicleCost] {
         vehicles.map { v in
-            let svc = v.serviceRecords.reduce(0) { $0 + $1.cost }
-            let fuel = v.fuelLogs.reduce(0) { $0 + $1.totalCost }
+            let svc = v.safeServiceRecords.reduce(0) { $0 + $1.cost }
+            let fuel = v.safeFuelLogs.reduce(0) { $0 + $1.totalCost }
             return VehicleCost(name: v.displayName, services: svc, fuel: fuel, vehicle: v)
         }.sorted { ($0.services + $0.fuel) > ($1.services + $1.fuel) }
     }
@@ -179,7 +179,7 @@ struct InsightsView: View {
     private var fuelEfficiencyData: [EfficiencyPoint] {
         var points: [EfficiencyPoint] = []
         for vehicle in vehicles {
-            let results = vehicle.fuelLogs.calculateEfficiency()
+            let results = vehicle.safeFuelLogs.calculateEfficiency()
             for r in results {
                 points.append(EfficiencyPoint(
                     date: r.date,
@@ -195,7 +195,7 @@ struct InsightsView: View {
 
     private var vehicleEfficiencyComparison: [VehicleEfficiency] {
         vehicles.compactMap { v in
-            let results = v.fuelLogs.calculateEfficiency()
+            let results = v.safeFuelLogs.calculateEfficiency()
             guard !results.isEmpty else { return nil }
             let effValues = results.map { $0.efficiency(for: settings.efficiencyUnit) }
             let avg = effValues.reduce(0, +) / Double(effValues.count)
@@ -224,8 +224,8 @@ struct InsightsView: View {
     private var ownershipCosts: [OwnershipCost] {
         let calendar = Calendar.current
         return vehicles.map { v in
-            let svc = v.serviceRecords.reduce(0) { $0 + $1.cost }
-            let fuel = v.fuelLogs.reduce(0) { $0 + $1.totalCost }
+            let svc = v.safeServiceRecords.reduce(0) { $0 + $1.cost }
+            let fuel = v.safeFuelLogs.reduce(0) { $0 + $1.totalCost }
             let total = svc + fuel
 
             let monthsOwned = max(1, calendar.dateComponents([.month], from: v.dateAdded, to: Date()).month ?? 1)
@@ -237,7 +237,7 @@ struct InsightsView: View {
                 totalCost: total,
                 monthsOwned: monthsOwned,
                 costPerMonth: total / Double(monthsOwned),
-                serviceCount: v.serviceRecords.count
+                serviceCount: v.safeServiceRecords.count
             )
         }.sorted { $0.totalCost > $1.totalCost }
     }

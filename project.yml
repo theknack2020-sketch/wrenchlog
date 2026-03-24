@@ -32,6 +32,7 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: Sources/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sources/Resources/WrenchLog.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: com.theknack.wrenchlog
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"

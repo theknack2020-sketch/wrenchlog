@@ -82,7 +82,7 @@ struct ServiceReminderEngine {
             guard isEnabled else { continue }
             guard monthInterval > 0 || mileageInterval > 0 else { continue }
 
-            let lastRecord = vehicle.serviceRecords
+            let lastRecord = vehicle.safeServiceRecords
                 .filter { $0.serviceTypeRaw == serviceType.rawValue }
                 .sorted { $0.date > $1.date }
                 .first
@@ -177,7 +177,7 @@ struct ServiceReminderEngine {
     /// Estimate driving pace (miles per month) based on service records
     @MainActor
     static func drivingPace(for vehicle: Vehicle) -> DrivingPace? {
-        let records = vehicle.serviceRecords
+        let records = vehicle.safeServiceRecords
             .filter { $0.mileage > 0 }
             .sorted { $0.date < $1.date }
 

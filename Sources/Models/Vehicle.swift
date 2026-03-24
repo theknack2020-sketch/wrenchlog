@@ -4,34 +4,40 @@ import SwiftUI
 
 @Model
 final class Vehicle {
-    var id: UUID
-    var make: String
-    var model: String
-    var year: Int
-    var currentMileage: Int
-    var licensePlate: String
-    var vin: String
+    var id: UUID = UUID()
+    var make: String = ""
+    var model: String = ""
+    var year: Int = 2024
+    var currentMileage: Int = 0
+    var licensePlate: String = ""
+    var vin: String = ""
     var photoData: Data?
-    var vehiclePhotoFileName: String
-    var dateAdded: Date
-    var lastUpdated: Date
-    var isArchived: Bool
-    var colorRaw: String
+    var vehiclePhotoFileName: String = ""
+    var dateAdded: Date = Date.now
+    var lastUpdated: Date = Date.now
+    var isArchived: Bool = false
+    var colorRaw: String = ""
 
     var purchaseDate: Date?
-    var purchasePrice: Double
+    var purchasePrice: Double = 0
 
     @Relationship(deleteRule: .cascade, inverse: \ServiceRecord.vehicle)
-    var serviceRecords: [ServiceRecord]
+    var serviceRecords: [ServiceRecord]?
 
     @Relationship(deleteRule: .cascade, inverse: \FuelLog.vehicle)
-    var fuelLogs: [FuelLog]
+    var fuelLogs: [FuelLog]?
 
     @Relationship(deleteRule: .cascade, inverse: \MaintenanceChecklistItem.vehicle)
-    var checklistItems: [MaintenanceChecklistItem]
+    var checklistItems: [MaintenanceChecklistItem]?
 
     @Relationship(deleteRule: .cascade, inverse: \VehicleDocument.vehicle)
-    var documents: [VehicleDocument]
+    var documents: [VehicleDocument]?
+
+    // MARK: - CloudKit-safe accessors (unwrap optional relationships)
+    var safeServiceRecords: [ServiceRecord] { serviceRecords ?? [] }
+    var safeFuelLogs: [FuelLog] { fuelLogs ?? [] }
+    var safeChecklistItems: [MaintenanceChecklistItem] { checklistItems ?? [] }
+    var safeDocuments: [VehicleDocument] { documents ?? [] }
 
     var soldDate: Date?
 
@@ -117,18 +123,18 @@ extension Vehicle: Hashable {
 
 @Model
 final class ServiceRecord {
-    var id: UUID
-    var date: Date
-    var mileage: Int
-    var cost: Double
-    var serviceTypeRaw: String       // ServiceType.rawValue or custom string
-    var categoryRaw: String          // ServiceCategory.rawValue
-    var notes: String
-    var photoFileNames: [String]     // filenames in app's documents directory
-    var partsUsed: [String]          // parts/products used (e.g. "Mobil 1 5W-30", "K&N air filter")
-    var oilType: String              // oil type/spec (e.g. "5W-30 Full Synthetic")
-    var shopName: String             // service provider/shop name
-    var calendarEventId: String      // iOS Calendar event identifier for managing synced events
+    var id: UUID = UUID()
+    var date: Date = Date.now
+    var mileage: Int = 0
+    var cost: Double = 0
+    var serviceTypeRaw: String = ""       // ServiceType.rawValue or custom string
+    var categoryRaw: String = ""          // ServiceCategory.rawValue
+    var notes: String = ""
+    var photoFileNames: [String] = []     // filenames in app's documents directory
+    var partsUsed: [String] = []          // parts/products used (e.g. "Mobil 1 5W-30", "K&N air filter")
+    var oilType: String = ""              // oil type/spec (e.g. "5W-30 Full Synthetic")
+    var shopName: String = ""             // service provider/shop name
+    var calendarEventId: String = ""      // iOS Calendar event identifier for managing synced events
     var vehicle: Vehicle?
 
     var serviceType: ServiceType? {

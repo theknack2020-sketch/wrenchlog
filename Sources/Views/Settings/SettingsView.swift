@@ -250,6 +250,34 @@ struct SettingsView: View {
                 Text("New service records are automatically added to a \"WrenchLog\" calendar in your iOS Calendar app.")
             }
 
+            // MARK: - iCloud Sync
+            Section {
+                HStack(spacing: 12) {
+                    Image(systemName: "cloud.fill")
+                        .font(.title3)
+                        .foregroundStyle(.green)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("iCloud Sync")
+                            .font(.subheadline.weight(.medium))
+                        Text("Enabled")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                    Spacer()
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+
+                Text("Your data syncs automatically across all your devices via iCloud.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("iCloud Sync")
+            } footer: {
+                Text("Make sure iCloud is enabled in Settings → Apple ID → iCloud for seamless sync.")
+            }
+
             // MARK: - Premium
             Section("Premium") {
                 if store.isPro {
@@ -495,7 +523,7 @@ struct SettingsView: View {
         do {
             let vehicles = try DataManager.fetch(FetchDescriptor<Vehicle>(), from: context)
             for vehicle in vehicles {
-                for record in vehicle.serviceRecords {
+                for record in vehicle.safeServiceRecords {
                     ServicePhotoManager.shared.deletePhotos(for: record.photoFileNames)
                 }
                 context.delete(vehicle)

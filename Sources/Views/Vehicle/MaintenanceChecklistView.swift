@@ -8,11 +8,11 @@ struct MaintenanceChecklistView: View {
     @Environment(\.modelContext) private var context
 
     var pendingItems: [MaintenanceChecklistItem] {
-        vehicle.checklistItems.filter { !$0.isCompleted }.sorted { $0.createdDate > $1.createdDate }
+        vehicle.safeChecklistItems.filter { !$0.isCompleted }.sorted { $0.createdDate > $1.createdDate }
     }
 
     var completedItems: [MaintenanceChecklistItem] {
-        vehicle.checklistItems.filter { $0.isCompleted }.sorted { ($0.completedDate ?? .now) > ($1.completedDate ?? .now) }
+        vehicle.safeChecklistItems.filter { $0.isCompleted }.sorted { ($0.completedDate ?? .now) > ($1.completedDate ?? .now) }
     }
 
     var body: some View {
@@ -35,7 +35,7 @@ struct MaintenanceChecklistView: View {
             }
 
             // Quick-add presets
-            if vehicle.checklistItems.isEmpty {
+            if vehicle.safeChecklistItems.isEmpty {
                 Section("Suggested Items") {
                     ForEach(presetItems, id: \.self) { preset in
                         Button {

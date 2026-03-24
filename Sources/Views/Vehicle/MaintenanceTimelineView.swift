@@ -28,7 +28,7 @@ struct MaintenanceTimelineView: View {
         var items: [TimelineEntry] = []
 
         // Service records
-        for record in vehicle.serviceRecords {
+        for record in vehicle.safeServiceRecords {
             items.append(TimelineEntry(
                 id: record.id,
                 date: record.date,
@@ -43,7 +43,7 @@ struct MaintenanceTimelineView: View {
         }
 
         // Fuel logs
-        for log in vehicle.fuelLogs {
+        for log in vehicle.safeFuelLogs {
             items.append(TimelineEntry(
                 id: log.id,
                 date: log.date,

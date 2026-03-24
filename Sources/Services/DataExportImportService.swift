@@ -10,7 +10,7 @@ struct DataExportImportService {
         // Service records CSV
         var serviceLines = ["Vehicle,Make,Model,Year,Service Type,Category,Service Date,Mileage,Cost,Shop Name,Oil Type,Parts Used,Notes"]
         for vehicle in vehicles {
-            for record in vehicle.serviceRecords.sorted(by: { $0.date > $1.date }) {
+            for record in vehicle.safeServiceRecords.sorted(by: { $0.date > $1.date }) {
                 let dateStr = ISO8601DateFormatter().string(from: record.date)
                 let notes = record.notes.replacingOccurrences(of: ",", with: ";")
                     .replacingOccurrences(of: "\n", with: " ")
@@ -27,7 +27,7 @@ struct DataExportImportService {
         // Fuel logs CSV
         var fuelLines = ["Vehicle,Make,Model,Year,Fuel Type,Date,Mileage,Volume,Volume Unit,Total Cost,Price Per Unit,Station,Full Tank,Notes"]
         for vehicle in vehicles {
-            for log in vehicle.fuelLogs.sorted(by: { $0.date > $1.date }) {
+            for log in vehicle.safeFuelLogs.sorted(by: { $0.date > $1.date }) {
                 let dateStr = ISO8601DateFormatter().string(from: log.date)
                 let station = log.station.replacingOccurrences(of: ",", with: ";")
                 let notes = log.notes.replacingOccurrences(of: ",", with: ";")

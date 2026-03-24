@@ -3,10 +3,10 @@ import SwiftData
 
 @Model
 final class MaintenanceChecklistItem {
-    var id: UUID
-    var title: String
-    var isCompleted: Bool
-    var createdDate: Date
+    var id: UUID = UUID()
+    var title: String = ""
+    var isCompleted: Bool = false
+    var createdDate: Date = Date.now
     var completedDate: Date?
     var vehicle: Vehicle?
 

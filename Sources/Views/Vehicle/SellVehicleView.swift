@@ -10,11 +10,11 @@ struct SellVehicleView: View {
     private let settings = UserSettings.shared
 
     var totalServiceCost: Double {
-        vehicle.serviceRecords.reduce(0) { $0 + $1.cost }
+        vehicle.safeServiceRecords.reduce(0) { $0 + $1.cost }
     }
 
     var totalFuelCost: Double {
-        vehicle.fuelLogs.reduce(0) { $0 + $1.totalCost }
+        vehicle.safeFuelLogs.reduce(0) { $0 + $1.totalCost }
     }
 
     var body: some View {
@@ -48,7 +48,7 @@ struct SellVehicleView: View {
                     HStack {
                         Text("Services Logged")
                         Spacer()
-                        Text("\(vehicle.serviceRecords.count)")
+                        Text("\(vehicle.safeServiceRecords.count)")
                             .foregroundStyle(.secondary)
                     }
                     HStack {

@@ -177,7 +177,7 @@ final class CalendarService {
         guard authorizationStatus == .authorized else { return 0 }
         var count = 0
         for vehicle in vehicles {
-            for record in vehicle.serviceRecords {
+            for record in vehicle.safeServiceRecords {
                 if record.calendarEventId.isEmpty {
                     if let eventId = addServiceEvent(
                         serviceType: record.displayServiceType,

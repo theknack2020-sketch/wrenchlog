@@ -12,9 +12,9 @@ struct PDFExportService {
 
         let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight))
 
-        let records = vehicle.serviceRecords.sorted { $0.date > $1.date }
+        let records = vehicle.safeServiceRecords.sorted { $0.date > $1.date }
         let totalServiceCost = records.reduce(0) { $0 + $1.cost }
-        let fuelLogs = vehicle.fuelLogs.sorted { $0.date > $1.date }
+        let fuelLogs = vehicle.safeFuelLogs.sorted { $0.date > $1.date }
         let totalFuelCost = fuelLogs.reduce(0) { $0 + $1.totalCost }
         let totalCost = totalServiceCost + totalFuelCost
 
@@ -22,7 +22,7 @@ struct PDFExportService {
         let paidRecords = records.filter { $0.cost > 0 }
         let averageCost = paidRecords.isEmpty ? 0 : paidRecords.reduce(0) { $0 + $1.cost } / Double(paidRecords.count)
         let highestService = records.max { $0.cost < $1.cost }
-        let effResults = vehicle.fuelLogs.calculateEfficiency()
+        let effResults = vehicle.safeFuelLogs.calculateEfficiency()
         let avgEfficiency: Double? = effResults.isEmpty ? nil : effResults.reduce(0.0) { $0 + $1.efficiency(for: settings.efficiencyUnit) } / Double(effResults.count)
         let healthScore = MaintenanceScoreEngine.score(for: vehicle)
 
