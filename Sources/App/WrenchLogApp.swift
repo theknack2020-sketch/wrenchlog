@@ -13,7 +13,7 @@ struct WrenchLogApp: App {
         do {
             let schema = Schema([Vehicle.self, ServiceRecord.self, FuelLog.self, MaintenanceChecklistItem.self, VehicleDocument.self])
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-            modelContainer = try ModelContainer(for: schema, migrationPlan: WrenchLogMigrationPlan.self, configurations: [config])
+            modelContainer = try ModelContainer(for: schema, configurations: [config])
         } catch {
             // If migration or store creation fails, log and attempt a fresh container.
             // This prevents a crash loop from corrupt data.
