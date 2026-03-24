@@ -8,5 +8,7 @@
     <string>WrenchLog uses the camera to photograph receipts and parts for your service records.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>WrenchLog accesses your photo library to attach receipt images to service records.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>WrenchLog can add your service records to the Calendar app so you have a complete timeline of vehicle maintenance.</string>
 </dict>
 </plist>

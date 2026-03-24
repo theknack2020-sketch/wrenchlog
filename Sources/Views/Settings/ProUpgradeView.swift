@@ -22,6 +22,11 @@ struct ProUpgradeView: View {
                         // MARK: - Header
                         VStack(spacing: 12) {
                             ZStack {
+                                // Glassmorphism backdrop
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .frame(width: 120, height: 120)
+                                    .shadow(color: Color.wrenchAmber.opacity(0.15), radius: 20, x: 0, y: 8)
                                 Circle()
                                     .fill(
                                         LinearGradient(
@@ -99,6 +104,7 @@ struct ProUpgradeView: View {
                                 .strokeBorder(Color.wrenchAmber.opacity(0.15), lineWidth: 1)
                         )
                         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+                        .shadow(color: Color.wrenchAmber.opacity(0.08), radius: 12, x: 0, y: 6)
                         .padding(.horizontal, 24)
 
                         // No ads note
@@ -123,6 +129,8 @@ struct ProUpgradeView: View {
                             }
                         }
                         .padding(.horizontal, 24)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Lifetime purchase, no subscription required, restore anytime, no data collection")
 
                         // MARK: - Products
                         if store.isLoading {
@@ -246,9 +254,34 @@ struct ProUpgradeView: View {
             }
             .disabled(purchasing)
             .alert("Purchase Failed", isPresented: $showPurchaseErrorAlert) {
-                Button("OK") { error = nil }
+                Button("Try Again") {
+                    if let product = store.lifetimeProduct ?? store.yearlyProduct {
+                        Task {
+                            purchasing = true
+                            error = nil
+                            do {
+                                let ok = try await store.purchase(product)
+                                if ok {
+                                    HapticManager.shared.celebrate()
+                                    dismiss()
+                                } else {
+                                    purchasing = false
+                                }
+                            } catch {
+                                self.error = "Purchase could not be completed. You have not been charged."
+                                purchasing = false
+                            }
+                        }
+                    }
+                }
+                Button("Contact Support") {
+                    if let url = URL(string: "mailto:theknack2020@gmail.com?subject=WrenchLog%20Pro%20Purchase%20Issue") {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("Cancel", role: .cancel) { error = nil }
             } message: {
-                Text(error ?? "An unexpected error occurred.")
+                Text(error ?? "An unexpected error occurred. You have not been charged.")
             }
             .alert("Restore Purchases", isPresented: $showRestoreAlert) {
                 if restoreAlertMessage.contains("restored successfully") {

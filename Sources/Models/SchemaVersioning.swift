@@ -33,15 +33,26 @@ enum WrenchLogSchemaV3: VersionedSchema {
     }
 }
 
+// MARK: - Schema V4 (Service record detail fields)
+
+/// V4 adds partsUsed, oilType, shopName, calendarEventId to ServiceRecord.
+enum WrenchLogSchemaV4: VersionedSchema {
+    nonisolated(unsafe) static var versionIdentifier = Schema.Version(4, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [Vehicle.self, ServiceRecord.self, FuelLog.self, MaintenanceChecklistItem.self, VehicleDocument.self]
+    }
+}
+
 // MARK: - Migration Plan
 
 enum WrenchLogMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [WrenchLogSchemaV1.self, WrenchLogSchemaV2.self, WrenchLogSchemaV3.self]
+        [WrenchLogSchemaV1.self, WrenchLogSchemaV2.self, WrenchLogSchemaV3.self, WrenchLogSchemaV4.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2, migrateV2toV3]
+        [migrateV1toV2, migrateV2toV3, migrateV3toV4]
     }
 
     static let migrateV1toV2 = MigrationStage.lightweight(
@@ -54,5 +65,12 @@ enum WrenchLogMigrationPlan: SchemaMigrationPlan {
     static let migrateV2toV3 = MigrationStage.lightweight(
         fromVersion: WrenchLogSchemaV2.self,
         toVersion: WrenchLogSchemaV3.self
+    )
+
+    /// V3→V4: adds partsUsed, oilType, shopName, calendarEventId to ServiceRecord.
+    /// All have defaults (empty array/string), so lightweight migration works.
+    static let migrateV3toV4 = MigrationStage.lightweight(
+        fromVersion: WrenchLogSchemaV3.self,
+        toVersion: WrenchLogSchemaV4.self
     )
 }

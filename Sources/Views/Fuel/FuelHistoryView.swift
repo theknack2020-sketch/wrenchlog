@@ -7,6 +7,8 @@ struct FuelHistoryView: View {
     @State private var logToDelete: FuelLog?
     @State private var showDeleteConfirm = false
     @State private var showUndoBanner = false
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
     @Environment(\.modelContext) private var context
 
     private let settings = UserSettings.shared
@@ -35,134 +37,149 @@ struct FuelHistoryView: View {
     }
 
     var body: some View {
-        List {
-            // Summary stats
-            Section {
-                HStack(spacing: 8) {
-                    statCard(
-                        title: "Total Fuel",
-                        value: settings.formatCost(totalFuelCost),
-                        color: .catFuel
-                    )
-                    statCard(
-                        title: "Fill-Ups",
-                        value: "\(sortedLogs.count)",
-                        color: .catEngine
-                    )
-                    if let avg = averageEfficiency {
-                        statCard(
-                            title: "Avg \(settings.efficiencyUnit.label)",
-                            value: String(format: "%.1f", avg),
-                            color: .catTires
-                        )
-                    }
-                }
+        fuelHistoryList
+            .navigationTitle("Fuel History")
+            .toolbar { fuelToolbar }
+            .sheet(isPresented: $showAddFuel) {
+                AddFuelLogView(vehicle: vehicle)
             }
-
-            // Fuel log entries
-            if sortedLogs.isEmpty {
-                Section("Fuel History") {
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 12) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.catFuel.opacity(0.1))
-                                    .frame(width: 72, height: 72)
-                                Image(systemName: "fuelpump.circle.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundStyle(Color.catFuel.opacity(0.4))
-                            }
-                            Text("No Fuel Logs")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.secondary)
-                            Text("Start tracking fuel to see your\nefficiency and spending trends.")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .multilineTextAlignment(.center)
-                            Button { showAddFuel = true } label: {
-                                Label("Log First Fill-Up", systemImage: "plus.circle.fill")
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(Color.wrenchAmber)
-                            }
-                        }
-                        .padding(.vertical, 24)
-                        Spacer()
-                    }
-                }
-            } else {
-                Section("Fuel History") {
-                    ForEach(sortedLogs) { log in
-                        NavigationLink {
-                            EditFuelLogView(fuelLog: log)
-                        } label: {
-                            FuelLogRow(
-                                log: log,
-                                efficiency: efficiencyForLog(log)
-                            )
-                        }
-                    }
-                    .onDelete { indexSet in
-                        logToDelete = indexSet.first.map { sortedLogs[$0] }
-                        showDeleteConfirm = true
-                    }
-                }
-            }
-        }
-        .navigationTitle("Fuel History")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { showAddFuel = true } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(Color.wrenchAmber)
-                }
-                .accessibilityLabel("Add fuel log")
-            }
-        }
-        .sheet(isPresented: $showAddFuel) {
-            AddFuelLogView(vehicle: vehicle)
-        }
-        .alert("Delete Fuel Log?", isPresented: $showDeleteConfirm) {
-            Button("Delete", role: .destructive) {
+            .alert("Delete Fuel Log?", isPresented: $showDeleteConfirm) {
+                Button("Delete", role: .destructive) { performDelete() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
                 if let log = logToDelete {
-                    // Store undo snapshot
-                    let snapshot = DeletedFuelLogSnapshot(
-                        date: log.date,
-                        mileage: log.mileage,
-                        volume: log.volume,
-                        totalCost: log.totalCost,
-                        pricePerUnit: log.pricePerUnit,
-                        fuelTypeRaw: log.fuelTypeRaw,
-                        station: log.station,
-                        isFullTank: log.isFullTank,
-                        notes: log.notes,
-                        volumeUnitRaw: log.volumeUnitRaw,
-                        deletedAt: .now
-                    )
-                    DeletionUndoManager.shared.storeDeletedFuelLog(snapshot)
-
-                    context.delete(log)
-                    DataManager.trySave(context)
-
-                    withAnimation { showUndoBanner = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + DeletedFuelLogSnapshot.undoWindowDuration) {
-                        withAnimation { showUndoBanner = false }
-                    }
+                    Text("Delete fuel log from \(log.date, format: .dateTime.month(.abbreviated).day())?")
                 }
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            if let log = logToDelete {
-                Text("Delete fuel log from \(log.date, format: .dateTime.month(.abbreviated).day())?")
+            .alert("Something Went Wrong", isPresented: $showErrorAlert) {
+                Button("OK") {}
+            } message: {
+                Text(errorMessage)
+            }
+            .overlay(alignment: .bottom) {
+                if showUndoBanner {
+                    undoFuelBanner
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .padding(.bottom, 16)
+                        .padding(.horizontal, 16)
+                }
+            }
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var fuelToolbar: some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                HapticManager.shared.buttonTap()
+                showAddFuel = true
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Color.wrenchAmber)
+            }
+            .accessibilityLabel("Add fuel log")
+        }
+    }
+
+    // MARK: - List Content
+
+    private var fuelHistoryList: some View {
+        List {
+            summaryStatsSection
+            fuelEntriesSection
+        }
+    }
+
+    private var summaryStatsSection: some View {
+        Section {
+            HStack(spacing: 8) {
+                statCard(title: "Total Fuel", value: settings.formatCost(totalFuelCost), color: .catFuel)
+                    .statPop(index: 0)
+                statCard(title: "Fill-Ups", value: "\(sortedLogs.count)", color: .catEngine)
+                    .statPop(index: 1)
+                if let avg = averageEfficiency {
+                    statCard(title: "Avg \(settings.efficiencyUnit.label)", value: String(format: "%.1f", avg), color: .catTires)
+                        .statPop(index: 2)
+                }
             }
         }
-        .overlay(alignment: .bottom) {
-            if showUndoBanner {
-                undoFuelBanner
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .padding(.bottom, 16)
-                    .padding(.horizontal, 16)
+    }
+
+    @ViewBuilder
+    private var fuelEntriesSection: some View {
+        if sortedLogs.isEmpty {
+            fuelEmptySection
+        } else {
+            fuelLogListSection
+        }
+    }
+
+    private var fuelEmptySection: some View {
+        Section("Fuel History") {
+            HStack {
+                Spacer()
+                VStack(spacing: 12) {
+                    ZStack {
+                        Circle().fill(Color.catFuel.opacity(0.1)).frame(width: 72, height: 72)
+                        Image(systemName: "fuelpump.circle.fill").font(.system(size: 32)).foregroundStyle(Color.catFuel.opacity(0.4))
+                    }
+                    Text("No Fuel Logs").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+                    Text("Track your fill-ups to see efficiency trends,\nspending patterns, and cost-per-mile.")
+                        .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+                    Button { HapticManager.shared.buttonTap(); showAddFuel = true } label: {
+                        Label("Log First Fill-Up", systemImage: "plus.circle.fill").font(.caption.weight(.medium)).foregroundStyle(Color.wrenchAmber)
+                    }
+                }
+                .padding(.vertical, 24)
+                Spacer()
             }
+        }
+    }
+
+    private var fuelLogListSection: some View {
+        Section("Fuel History") {
+            ForEach(Array(sortedLogs.enumerated()), id: \.element.id) { index, log in
+                NavigationLink { EditFuelLogView(fuelLog: log) } label: {
+                    FuelLogRow(log: log, efficiency: efficiencyForLog(log))
+                }
+                .simultaneousGesture(TapGesture().onEnded { HapticManager.shared.light() })
+                .staggeredAppear(index: index)
+            }
+            .onDelete { indexSet in
+                HapticManager.shared.deleteWarning()
+                logToDelete = indexSet.first.map { sortedLogs[$0] }
+                showDeleteConfirm = true
+            }
+        }
+    }
+
+    // MARK: - Delete Action
+
+    private func performDelete() {
+        guard let log = logToDelete else { return }
+        let snapshot = DeletedFuelLogSnapshot(
+            date: log.date, mileage: log.mileage, volume: log.volume,
+            totalCost: log.totalCost, pricePerUnit: log.pricePerUnit,
+            fuelTypeRaw: log.fuelTypeRaw, station: log.station,
+            isFullTank: log.isFullTank, notes: log.notes,
+            volumeUnitRaw: log.volumeUnitRaw, deletedAt: .now
+        )
+        DeletionUndoManager.shared.storeDeletedFuelLog(snapshot)
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { context.delete(log) }
+        do {
+            try DataManager.save(context)
+            HapticManager.shared.deleteWarning()
+            SoundManager.playDelete()
+            withAnimation { showUndoBanner = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + DeletedFuelLogSnapshot.undoWindowDuration) {
+                withAnimation { showUndoBanner = false }
+            }
+        } catch {
+            errorMessage = error.errorDescription ?? "Unable to delete the fuel log. Please try again."
+            showErrorAlert = true
+            HapticManager.shared.error()
+            SoundManager.playError()
         }
     }
 
@@ -183,7 +200,8 @@ struct FuelHistoryView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 2)
+        .shadow(color: color.opacity(0.12), radius: 5, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.04), radius: 2, x: 0, y: 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
     }
@@ -232,10 +250,16 @@ struct FuelHistoryView: View {
         log.vehicle = vehicle
 
         context.insert(log)
-        DataManager.trySave(context)
-
-        withAnimation { showUndoBanner = false }
-        HapticManager.shared.success()
+        do {
+            try DataManager.save(context)
+            withAnimation { showUndoBanner = false }
+            HapticManager.shared.saveSuccess()
+            SoundManager.playSaveSuccess()
+        } catch {
+            errorMessage = error.errorDescription ?? "Unable to restore the fuel log."
+            showErrorAlert = true
+            HapticManager.shared.error()
+        }
     }
 }
 
@@ -322,5 +346,7 @@ struct FuelLogRow: View {
             }
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(log.fuelType.rawValue) fill-up\(log.station.isEmpty ? "" : " at \(log.station)"), \(log.date, format: .dateTime.month(.abbreviated).day().year()), cost \(UserSettings.shared.formatCost(log.totalCost))")
     }
 }

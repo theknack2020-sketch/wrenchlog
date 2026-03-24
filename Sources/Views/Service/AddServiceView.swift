@@ -23,6 +23,13 @@ struct AddServiceView: View {
     @State private var showCelebration = false
     @State private var showTypePicker = false
 
+    // New detail fields
+    @State private var partsUsed: [String] = []
+    @State private var newPartText = ""
+    @State private var oilType = ""
+    @State private var shopName = ""
+    @State private var showOilTypePicker = false
+
     // Validation & error state
     @State private var validationError: String?
     @State private var serviceTypeError: String?
@@ -58,6 +65,11 @@ struct AddServiceView: View {
                                     .foregroundStyle(.red)
                             }
                         }
+                        .listRowBackground(
+                            serviceTypeError != nil
+                                ? Color.red.opacity(0.06)
+                                : Color(.secondarySystemGroupedBackground)
+                        )
                     } else {
                         // Service type button with category preview
                         Button {
@@ -119,6 +131,11 @@ struct AddServiceView: View {
                                 .foregroundStyle(.red)
                         }
                     }
+                    .listRowBackground(
+                        mileageFieldError != nil
+                            ? Color.red.opacity(0.06)
+                            : Color(.secondarySystemGroupedBackground)
+                    )
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -141,6 +158,11 @@ struct AddServiceView: View {
                                 .foregroundStyle(.red)
                         }
                     }
+                    .listRowBackground(
+                        costFieldError != nil
+                            ? Color.red.opacity(0.06)
+                            : Color(.secondarySystemGroupedBackground)
+                    )
                 }
 
                 // MARK: - Notes
@@ -148,6 +170,168 @@ struct AddServiceView: View {
                     TextField("Any additional details...", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
                         .accessibilityLabel("Service notes")
+                }
+
+                // MARK: - Shop / Service Provider
+                Section {
+                    HStack {
+                        Image(systemName: "building.2.fill")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24)
+                            .accessibilityHidden(true)
+                        TextField("Shop or mechanic name", text: $shopName)
+                            .accessibilityLabel("Service provider name")
+                            .accessibilityHint("Who performed the service")
+                    }
+
+                    if !recentShops.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(recentShops, id: \.self) { shop in
+                                    Button {
+                                        shopName = shop
+                                    } label: {
+                                        Text(shop)
+                                            .font(.caption)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 5)
+                                            .background(shopName == shop ? theme.accent.opacity(0.2) : Color(.systemGray6))
+                                            .foregroundStyle(shopName == shop ? theme.accent : .primary)
+                                            .clipShape(Capsule())
+                                    }
+                                    .accessibilityLabel("Select \(shop)")
+                                    .accessibilityAddTraits(shopName == shop ? .isSelected : [])
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                } header: {
+                    Text("Service Provider")
+                }
+
+                // MARK: - Parts Used
+                Section {
+                    // Suggested parts chips (from service type)
+                    if !isCustom {
+                        let suggestions = selectedType.recommendedParts.filter { !partsUsed.contains($0) }
+                        if !suggestions.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Suggested parts")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                FlowLayout(spacing: 6) {
+                                    ForEach(suggestions, id: \.self) { part in
+                                        Button {
+                                            withAnimation(.snappy(duration: 0.2)) {
+                                                partsUsed.append(part)
+                                            }
+                                        } label: {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "plus.circle.fill")
+                                                    .font(.caption2)
+                                                Text(part)
+                                                    .font(.caption)
+                                            }
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 5)
+                                            .background(Color(.systemGray6))
+                                            .foregroundStyle(.primary)
+                                            .clipShape(Capsule())
+                                        }
+                                        .accessibilityLabel("Add \(part)")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Added parts
+                    ForEach(partsUsed, id: \.self) { part in
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .font(.caption)
+                            Text(part)
+                                .font(.subheadline)
+                            Spacer()
+                            Button {
+                                withAnimation(.snappy(duration: 0.2)) {
+                                    partsUsed.removeAll { $0 == part }
+                                }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                                    .font(.caption)
+                            }
+                            .accessibilityLabel("Remove \(part)")
+                        }
+                    }
+
+                    // Custom part entry
+                    HStack {
+                        Image(systemName: "wrench.fill")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24)
+                            .accessibilityHidden(true)
+                        TextField("Add custom part...", text: $newPartText)
+                            .onSubmit { addCustomPart() }
+                            .accessibilityLabel("Custom part name")
+                        if !newPartText.trimmingCharacters(in: .whitespaces).isEmpty {
+                            Button {
+                                addCustomPart()
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(theme.accent)
+                            }
+                            .accessibilityLabel("Add part")
+                        }
+                    }
+                } header: {
+                    Text("Parts Used")
+                } footer: {
+                    Text("Track parts and products for warranty and reorder reference.")
+                }
+
+                // MARK: - Oil Type (contextual)
+                if !isCustom && selectedType.involvesOil || isCustom {
+                    Section {
+                        Button {
+                            showOilTypePicker = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "drop.fill")
+                                    .foregroundStyle(.blue)
+                                    .frame(width: 24)
+                                    .accessibilityHidden(true)
+                                if oilType.isEmpty {
+                                    Text("Select oil type")
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Text(oilType)
+                                        .foregroundStyle(.primary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        .accessibilityLabel("Oil type: \(oilType.isEmpty ? "not set" : oilType)")
+                        .accessibilityHint("Select the oil type or specification used")
+
+                        if !oilType.isEmpty {
+                            Button(role: .destructive) {
+                                oilType = ""
+                            } label: {
+                                Text("Clear oil type")
+                                    .font(.caption)
+                            }
+                        }
+                    } header: {
+                        Text("Oil / Fluid Type")
+                    }
                 }
 
                 // MARK: - Photos (Pro feature)
@@ -278,6 +462,9 @@ struct AddServiceView: View {
             .sheet(isPresented: $showTypePicker) {
                 ServiceTypePickerView(selectedType: $selectedType)
             }
+            .sheet(isPresented: $showOilTypePicker) {
+                OilTypePickerView(selectedOilType: $oilType)
+            }
             .alert("Save Failed", isPresented: Binding(
                 get: { saveError != nil },
                 set: { if !$0 { saveError = nil } }
@@ -287,6 +474,25 @@ struct AddServiceView: View {
                 Text(saveError ?? "An unexpected error occurred.")
             }
         }
+    }
+
+    /// Recent shop names from this vehicle's history for quick selection
+    private var recentShops: [String] {
+        let shops = vehicle.serviceRecords
+            .map(\.shopName)
+            .filter { !$0.isEmpty }
+        // Deduplicate while preserving order (most recent first)
+        var seen = Set<String>()
+        return shops.reversed().filter { seen.insert($0).inserted }
+    }
+
+    private func addCustomPart() {
+        let trimmed = newPartText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !partsUsed.contains(trimmed) else { return }
+        withAnimation(.snappy(duration: 0.2)) {
+            partsUsed.append(trimmed)
+        }
+        newPartText = ""
     }
 
     private func saveRecord() {
@@ -330,7 +536,10 @@ struct AddServiceView: View {
                 date: date,
                 mileage: max(0, Int(mileage) ?? 0),
                 cost: max(0, Double(cost) ?? 0),
-                notes: notes
+                notes: notes,
+                partsUsed: partsUsed,
+                oilType: oilType,
+                shopName: shopName.trimmingCharacters(in: .whitespaces)
             )
         } else {
             record = ServiceRecord(
@@ -338,7 +547,10 @@ struct AddServiceView: View {
                 date: date,
                 mileage: max(0, Int(mileage) ?? 0),
                 cost: max(0, Double(cost) ?? 0),
-                notes: notes
+                notes: notes,
+                partsUsed: partsUsed,
+                oilType: oilType,
+                shopName: shopName.trimmingCharacters(in: .whitespaces)
             )
         }
 
@@ -377,6 +589,19 @@ struct AddServiceView: View {
             if let vehicles = try? context.fetch(FetchDescriptor<Vehicle>()) {
                 await ReminderManager.shared.scheduleReminders(for: vehicles)
             }
+        }
+
+        // Calendar sync — add event if user has enabled it
+        if CalendarStore.calendarSyncEnabled {
+            let eventId = CalendarService.shared.addServiceEvent(
+                serviceType: record.displayServiceType,
+                vehicleName: vehicle.displayName,
+                date: date,
+                cost: max(0, Double(cost) ?? 0),
+                shopName: shopName.trimmingCharacters(in: .whitespaces),
+                notes: notes
+            )
+            if let eventId { record.calendarEventId = eventId }
         }
 
         let totalServices = vehicle.serviceRecords.count
@@ -481,5 +706,118 @@ struct ServiceTypePickerView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Oil Type Picker
+
+struct OilTypePickerView: View {
+    @Binding var selectedOilType: String
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.appTheme) private var theme
+    @State private var customOilType = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Common Oil Types") {
+                    ForEach(ServiceType.commonOilTypes, id: \.self) { type in
+                        Button {
+                            selectedOilType = type
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text(type)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if selectedOilType == type {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(theme.accent)
+                                }
+                            }
+                        }
+                        .accessibilityLabel(type)
+                        .accessibilityAddTraits(selectedOilType == type ? .isSelected : [])
+                    }
+                }
+
+                Section("Custom") {
+                    HStack {
+                        TextField("Enter oil type...", text: $customOilType)
+                            .onSubmit {
+                                let trimmed = customOilType.trimmingCharacters(in: .whitespaces)
+                                guard !trimmed.isEmpty else { return }
+                                selectedOilType = trimmed
+                                dismiss()
+                            }
+                        if !customOilType.trimmingCharacters(in: .whitespaces).isEmpty {
+                            Button("Add") {
+                                selectedOilType = customOilType.trimmingCharacters(in: .whitespaces)
+                                dismiss()
+                            }
+                            .foregroundStyle(theme.accent)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Oil Type")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Flow Layout (for part suggestion chips)
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = layout(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = layout(proposal: proposal, subviews: subviews)
+        for (index, origin) in result.origins.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
+        }
+    }
+
+    private func layout(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, origins: [CGPoint]) {
+        let maxWidth = proposal.width ?? .infinity
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth && x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            origins.append(CGPoint(x: x, y: y))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+        }
+
+        return (CGSize(width: maxWidth, height: y + rowHeight), origins)
+    }
+}
+
+// MARK: - Calendar Preferences Store
+
+struct CalendarStore {
+    nonisolated(unsafe) private static let defaults = UserDefaults.standard
+
+    static var calendarSyncEnabled: Bool {
+        get { defaults.bool(forKey: "wl_calendar_sync_enabled") }
+        set { defaults.set(newValue, forKey: "wl_calendar_sync_enabled") }
     }
 }

@@ -12,6 +12,10 @@ struct InsightsView: View {
     @Environment(\.appTheme) private var theme
     private let settings = UserSettings.shared
 
+    @State private var chartAnimationProgress: Double = 0
+    @State private var selectedMonthlySpend: MonthlySpend?
+    @State private var selectedComplianceVehicle: Vehicle?
+
     // MARK: - Aggregated Data
 
     private var allRecords: [ServiceRecord] {
@@ -187,6 +191,34 @@ struct InsightsView: View {
         return points.sorted { $0.date < $1.date }
     }
 
+    // MARK: - Per-Vehicle Fuel Efficiency Averages
+
+    private var vehicleEfficiencyComparison: [VehicleEfficiency] {
+        vehicles.compactMap { v in
+            let results = v.fuelLogs.calculateEfficiency()
+            guard !results.isEmpty else { return nil }
+            let effValues = results.map { $0.efficiency(for: settings.efficiencyUnit) }
+            let avg = effValues.reduce(0, +) / Double(effValues.count)
+            let best: Double
+            let worst: Double
+            switch settings.efficiencyUnit {
+            case .mpg:
+                best = effValues.max() ?? avg
+                worst = effValues.min() ?? avg
+            case .l100km:
+                best = effValues.min() ?? avg   // lower is better
+                worst = effValues.max() ?? avg
+            }
+            return VehicleEfficiency(
+                name: v.displayName,
+                average: avg,
+                best: best,
+                worst: worst,
+                fillUps: results.count
+            )
+        }.sorted { $0.average > $1.average }
+    }
+
     // MARK: - Total Cost of Ownership Per Vehicle
 
     private var ownershipCosts: [OwnershipCost] {
@@ -230,6 +262,41 @@ struct InsightsView: View {
         return (compliant: compliant, total: total, percentage: pct)
     }
 
+    // MARK: - Per-Vehicle Compliance Scores
+
+    private var vehicleComplianceScores: [VehicleComplianceScore] {
+        vehicles.compactMap { v in
+            let reminders = ServiceReminderEngine.reminders(for: v)
+            guard !reminders.isEmpty else { return nil }
+            let compliant = reminders.filter { $0.urgency == .ok || $0.urgency == .dueSoon }.count
+            let pct = Double(compliant) / Double(reminders.count) * 100.0
+            let healthScore = MaintenanceScoreEngine.score(for: v)
+            return VehicleComplianceScore(
+                name: v.displayName,
+                vehicle: v,
+                compliancePercent: pct,
+                healthScore: healthScore,
+                compliant: compliant,
+                total: reminders.count,
+                overdue: reminders.filter { $0.urgency == .overdue }.count
+            )
+        }.sorted { $0.healthScore > $1.healthScore }
+    }
+
+    // MARK: - Year-over-Year Change
+
+    private var yearOverYearChange: (currentYear: Int, currentTotal: Double, previousTotal: Double, changePercent: Double)? {
+        guard yearlyCosts.count >= 2 else { return nil }
+        let sorted = yearlyCosts.sorted { $0.year > $1.year }
+        let current = sorted[0]
+        let previous = sorted[1]
+        let currentTotal = current.services + current.fuel
+        let previousTotal = previous.services + previous.fuel
+        guard previousTotal > 0 else { return nil }
+        let change = ((currentTotal - previousTotal) / previousTotal) * 100.0
+        return (currentYear: current.year, currentTotal: currentTotal, previousTotal: previousTotal, changePercent: change)
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -242,6 +309,12 @@ struct InsightsView: View {
         }
         .navigationTitle("Insights")
         .navigationBarTitleDisplayMode(.large)
+        .onAppear {
+            HapticManager.shared.light()
+            withAnimation(.spring(response: 0.7, dampingFraction: 0.72).delay(0.1)) {
+                chartAnimationProgress = 1.0
+            }
+        }
     }
 
     // MARK: - Empty State
@@ -256,14 +329,21 @@ struct InsightsView: View {
                 Image(systemName: "chart.bar.xaxis.ascending")
                     .font(.system(size: 40))
                     .foregroundStyle(theme.accent)
+                    .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
             }
+            .accessibilityHidden(true)
             VStack(spacing: 8) {
                 Text("No Insights Yet")
                     .font(.title3.weight(.bold))
-                Text("Add services and fuel logs\nto unlock insights.")
+                Text("Add services and fuel logs to unlock\nspending trends, projections, and analysis.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                Text("Insights get smarter as you log more data.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 2)
             }
             Spacer()
         }
@@ -281,6 +361,11 @@ struct InsightsView: View {
                 costProjectionSection(projected)
             }
 
+            // Year-over-year change
+            if let yoy = yearOverYearChange {
+                yearOverYearSection(yoy)
+            }
+
             // Monthly spending chart
             monthlySpendingSection
 
@@ -292,6 +377,11 @@ struct InsightsView: View {
             // Cost per vehicle comparison
             if vehicleCosts.count >= 2 {
                 vehicleComparisonSection
+            }
+
+            // Fuel efficiency comparison across vehicles
+            if vehicleEfficiencyComparison.count >= 2 {
+                fuelEfficiencyComparisonSection
             }
 
             // Most expensive service types
@@ -317,6 +407,11 @@ struct InsightsView: View {
                 ownershipSection
             }
 
+            // Maintenance compliance score per vehicle
+            if !vehicleComplianceScores.isEmpty {
+                complianceScoreSection
+            }
+
             // Service interval compliance
             complianceSection
         }
@@ -327,6 +422,33 @@ struct InsightsView: View {
     private var fleetSummarySection: some View {
         Section {
             VStack(spacing: 12) {
+                // Gradient header banner
+                HStack(spacing: 8) {
+                    Image(systemName: "chart.bar.xaxis.ascending")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text("Fleet Overview")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Text(settings.formatCost(totalCost))
+                        .font(.caption.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    LinearGradient(
+                        colors: theme.headerGradient,
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 10)
+                )
+                .shadow(color: theme.accent.opacity(0.2), radius: 6, x: 0, y: 3)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Fleet overview: total spent \(settings.formatCost(totalCost))")
+
                 HStack(spacing: 8) {
                     summaryCard(
                         title: "Total Spent",
@@ -334,18 +456,21 @@ struct InsightsView: View {
                         icon: "dollarsign.circle.fill",
                         color: theme.accent
                     )
+                    .statPop(index: 0)
                     summaryCard(
                         title: "Services",
                         value: "\(totalServiceCount)",
                         icon: "wrench.fill",
                         color: .catEngine
                     )
+                    .statPop(index: 1)
                     summaryCard(
                         title: "Vehicles",
                         value: "\(vehicles.count)",
                         icon: "car.2.fill",
                         color: .catTires
                     )
+                    .statPop(index: 2)
                 }
 
                 HStack(spacing: 8) {
@@ -355,18 +480,21 @@ struct InsightsView: View {
                         icon: "equal.circle.fill",
                         color: .catFilters
                     )
+                    .statPop(index: 3)
                     summaryCard(
                         title: "Service Cost",
                         value: settings.formatCost(totalServiceCost),
                         icon: "wrench.and.screwdriver.fill",
                         color: .catEngine
                     )
+                    .statPop(index: 4)
                     summaryCard(
                         title: "Fuel Cost",
                         value: settings.formatCost(totalFuelCost),
                         icon: "fuelpump.fill",
                         color: .catFuel
                     )
+                    .statPop(index: 5)
                 }
             }
         }
@@ -419,6 +547,67 @@ struct InsightsView: View {
         }
     }
 
+    // MARK: - Year-over-Year Section
+
+    private func yearOverYearSection(_ yoy: (currentYear: Int, currentTotal: Double, previousTotal: Double, changePercent: Double)) -> some View {
+        Section {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(yoy.changePercent >= 0
+                              ? Color.wrenchRed.opacity(0.12)
+                              : Color.wrenchGreen.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: yoy.changePercent >= 0
+                          ? "arrow.up.right"
+                          : "arrow.down.right")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(yoy.changePercent >= 0 ? Color.wrenchRed : Color.wrenchGreen)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text("Year-over-Year")
+                            .font(.subheadline.weight(.semibold))
+                        Text(String(format: "%+.1f%%", yoy.changePercent))
+                            .font(.caption.weight(.bold).monospacedDigit())
+                            .foregroundStyle(yoy.changePercent >= 0 ? Color.wrenchRed : Color.wrenchGreen)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                (yoy.changePercent >= 0 ? Color.wrenchRed : Color.wrenchGreen).opacity(0.12),
+                                in: Capsule()
+                            )
+                    }
+
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("\(String(yoy.currentYear))")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            Text(settings.formatCost(yoy.currentTotal))
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                        }
+                        Image(systemName: "arrow.left")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("\(String(yoy.currentYear - 1))")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            Text(settings.formatCost(yoy.previousTotal))
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Label("Comparison", systemImage: "arrow.left.arrow.right")
+        }
+    }
+
     // MARK: - Monthly Spending Section
 
     private var monthlySpendingSection: some View {
@@ -430,7 +619,7 @@ struct InsightsView: View {
                         if item.services > 0 {
                             BarMark(
                                 x: .value("Month", item.month, unit: .month),
-                                y: .value("Cost", item.services)
+                                y: .value("Cost", item.services * chartAnimationProgress)
                             )
                             .foregroundStyle(Color.catEngine)
                             .position(by: .value("Type", "Services"))
@@ -438,11 +627,17 @@ struct InsightsView: View {
                         if item.fuel > 0 {
                             BarMark(
                                 x: .value("Month", item.month, unit: .month),
-                                y: .value("Cost", item.fuel)
+                                y: .value("Cost", item.fuel * chartAnimationProgress)
                             )
                             .foregroundStyle(Color.catFuel)
                             .position(by: .value("Type", "Fuel"))
                         }
+                    }
+
+                    if let selected = selectedMonthlySpend {
+                        RuleMark(x: .value("Month", selected.month, unit: .month))
+                            .foregroundStyle(.secondary.opacity(0.3))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
                     }
                 }
                 .chartForegroundStyleScale([
@@ -469,7 +664,21 @@ struct InsightsView: View {
                         }
                     }
                 }
+                .chartXSelection(value: $selectedMonthlySpend.animation(.easeInOut(duration: 0.15)))
                 .frame(height: 200)
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.tertiarySystemGroupedBackground))
+                        .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 3)
+                )
+                .chartReveal()
+
+                // Tap detail for selected month
+                if let selected = selectedMonthlySpend, (selected.services + selected.fuel) > 0 {
+                    monthlySpendDetail(selected)
+                        .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                }
 
                 // Monthly average
                 let nonZero = monthlySpending.filter { $0.services + $0.fuel > 0 }
@@ -493,13 +702,47 @@ struct InsightsView: View {
         }
     }
 
+    private func monthlySpendDetail(_ spend: MonthlySpend) -> some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text(spend.month, format: .dateTime.month(.wide).year())
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Text(settings.formatCost(spend.services + spend.fuel))
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundStyle(theme.accent)
+            }
+
+            HStack(spacing: 16) {
+                if spend.services > 0 {
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.catEngine).frame(width: 7, height: 7)
+                        Text("Services: \(settings.formatCost(spend.services))")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if spend.fuel > 0 {
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.catFuel).frame(width: 7, height: 7)
+                        Text("Fuel: \(settings.formatCost(spend.fuel))")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+    }
+
     // MARK: - Category Section
 
     private var categorySection: some View {
         Section("Spending by Category") {
             Chart(categorySpending) { item in
                 SectorMark(
-                    angle: .value("Cost", item.total),
+                    angle: .value("Cost", item.total * chartAnimationProgress),
                     innerRadius: .ratio(0.6),
                     angularInset: 2
                 )
@@ -513,6 +756,7 @@ struct InsightsView: View {
                 }
             }
             .frame(height: 200)
+            .chartReveal()
 
             ForEach(categorySpending) { item in
                 HStack(spacing: 10) {
@@ -538,14 +782,14 @@ struct InsightsView: View {
             Chart(vehicleCosts) { item in
                 BarMark(
                     x: .value("Vehicle", item.name),
-                    y: .value("Cost", item.services)
+                    y: .value("Cost", item.services * chartAnimationProgress)
                 )
                 .foregroundStyle(Color.catEngine)
                 .position(by: .value("Type", "Services"))
 
                 BarMark(
                     x: .value("Vehicle", item.name),
-                    y: .value("Cost", item.fuel)
+                    y: .value("Cost", item.fuel * chartAnimationProgress)
                 )
                 .foregroundStyle(Color.catFuel)
                 .position(by: .value("Type", "Fuel"))
@@ -576,6 +820,7 @@ struct InsightsView: View {
                 }
             }
             .frame(height: 200)
+            .chartReveal()
 
             ForEach(vehicleCosts) { item in
                 HStack(spacing: 10) {
@@ -596,6 +841,81 @@ struct InsightsView: View {
                         .foregroundStyle(theme.accent)
                 }
             }
+        }
+    }
+
+    // MARK: - Fuel Efficiency Comparison Section
+
+    private var fuelEfficiencyComparisonSection: some View {
+        Section {
+            Chart(vehicleEfficiencyComparison) { item in
+                BarMark(
+                    x: .value(settings.efficiencyUnit.label, item.average * chartAnimationProgress),
+                    y: .value("Vehicle", item.name)
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.catFuel, Color.catFuel.opacity(0.6)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(4)
+                .annotation(position: .trailing, spacing: 4) {
+                    Text(String(format: "%.1f", item.average))
+                        .font(.caption2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(Color.catFuel)
+                }
+            }
+            .chartXAxis {
+                AxisMarks(position: .bottom) { value in
+                    if let v = value.as(Double.self) {
+                        AxisValueLabel {
+                            Text(String(format: "%.0f", v))
+                                .font(.caption2)
+                        }
+                    }
+                }
+            }
+            .chartYAxis {
+                AxisMarks { value in
+                    if let name = value.as(String.self) {
+                        AxisValueLabel {
+                            Text(abbreviateVehicleName(name))
+                                .font(.caption2)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+            .frame(height: CGFloat(vehicleEfficiencyComparison.count) * 48 + 20)
+
+            ForEach(vehicleEfficiencyComparison) { item in
+                HStack(spacing: 10) {
+                    Image(systemName: "gauge.medium")
+                        .font(.caption)
+                        .foregroundStyle(Color.catFuel)
+                        .frame(width: 22)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name)
+                            .font(.subheadline)
+                        HStack(spacing: 8) {
+                            Label("Best: \(settings.formatEfficiency(item.best))", systemImage: "arrow.up")
+                                .font(.caption2)
+                                .foregroundStyle(Color.wrenchGreen)
+                            Label("Worst: \(settings.formatEfficiency(item.worst))", systemImage: "arrow.down")
+                                .font(.caption2)
+                                .foregroundStyle(Color.wrenchRed)
+                        }
+                    }
+                    Spacer()
+                    Text("\(item.fillUps) fills")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        } header: {
+            Label("Fuel Efficiency Comparison", systemImage: "gauge.open.with.needle.33percent")
         }
     }
 
@@ -629,7 +949,7 @@ struct InsightsView: View {
                                 .overlay(alignment: .leading) {
                                     RoundedRectangle(cornerRadius: 3)
                                         .fill(item.color)
-                                        .frame(width: geo.size.width * (item.total / maxTotal), height: 6)
+                                        .frame(width: geo.size.width * (item.total / maxTotal) * chartAnimationProgress, height: 6)
                                 }
                         }
                         .frame(height: 6)
@@ -659,7 +979,7 @@ struct InsightsView: View {
                 Chart(maintenanceFrequency) { point in
                     LineMark(
                         x: .value("Month", point.month, unit: .month),
-                        y: .value("Count", point.count)
+                        y: .value("Count", Double(point.count) * chartAnimationProgress)
                     )
                     .foregroundStyle(theme.accent)
                     .interpolationMethod(.catmullRom)
@@ -667,7 +987,7 @@ struct InsightsView: View {
 
                     AreaMark(
                         x: .value("Month", point.month, unit: .month),
-                        y: .value("Count", point.count)
+                        y: .value("Count", Double(point.count) * chartAnimationProgress)
                     )
                     .foregroundStyle(
                         .linearGradient(
@@ -680,7 +1000,7 @@ struct InsightsView: View {
 
                     PointMark(
                         x: .value("Month", point.month, unit: .month),
-                        y: .value("Count", point.count)
+                        y: .value("Count", Double(point.count) * chartAnimationProgress)
                     )
                     .foregroundStyle(theme.accent)
                     .symbolSize(point.count > 0 ? 30 : 0)
@@ -706,6 +1026,7 @@ struct InsightsView: View {
                     }
                 }
                 .frame(height: 160)
+                .chartReveal()
 
                 let totalCount = maintenanceFrequency.reduce(0) { $0 + $1.count }
                 let activeMonths = maintenanceFrequency.filter { $0.count > 0 }.count
@@ -736,14 +1057,14 @@ struct InsightsView: View {
                 Chart(yearlyCosts) { item in
                     BarMark(
                         x: .value("Year", String(item.year)),
-                        y: .value("Services", item.services)
+                        y: .value("Services", item.services * chartAnimationProgress)
                     )
                     .foregroundStyle(Color.catEngine)
                     .position(by: .value("Type", "Services"))
 
                     BarMark(
                         x: .value("Year", String(item.year)),
-                        y: .value("Fuel", item.fuel)
+                        y: .value("Fuel", item.fuel * chartAnimationProgress)
                     )
                     .foregroundStyle(Color.catFuel)
                     .position(by: .value("Type", "Fuel"))
@@ -763,6 +1084,7 @@ struct InsightsView: View {
                     }
                 }
                 .frame(height: 180)
+                .chartReveal()
             }
 
             ForEach(yearlyCosts) { item in
@@ -842,6 +1164,7 @@ struct InsightsView: View {
                 }
             }
             .frame(height: 200)
+            .chartReveal()
 
             // Per-vehicle averages
             ForEach(Array(uniqueVehicles.sorted()), id: \.self) { name in
@@ -888,6 +1211,70 @@ struct InsightsView: View {
                 }
                 .padding(.vertical, 4)
             }
+        }
+    }
+
+    // MARK: - Compliance Score Section (per vehicle)
+
+    private var complianceScoreSection: some View {
+        Section {
+            ForEach(vehicleComplianceScores) { item in
+                HStack(spacing: 12) {
+                    ZStack {
+                        ProgressRing(
+                            progress: Double(item.healthScore) / 100.0,
+                            lineWidth: 5,
+                            color: MaintenanceScoreEngine.color(for: item.healthScore)
+                        )
+                        .frame(width: 46, height: 46)
+
+                        Text("\(item.healthScore)")
+                            .font(.caption.weight(.bold).monospacedDigit())
+                            .foregroundStyle(MaintenanceScoreEngine.color(for: item.healthScore))
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(item.name)
+                                .font(.subheadline.weight(.semibold))
+                            Spacer()
+                            Text(MaintenanceScoreEngine.label(for: item.healthScore))
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(MaintenanceScoreEngine.color(for: item.healthScore))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    MaintenanceScoreEngine.color(for: item.healthScore).opacity(0.12),
+                                    in: Capsule()
+                                )
+                        }
+
+                        HStack(spacing: 12) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.wrenchGreen)
+                                Text("\(item.compliant)/\(item.total) on track")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if item.overdue > 0 {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "exclamationmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(Color.wrenchRed)
+                                    Text("\(item.overdue) overdue")
+                                        .font(.caption2)
+                                        .foregroundStyle(Color.wrenchRed)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        } header: {
+            Label("Maintenance Health by Vehicle", systemImage: "heart.text.clipboard")
         }
     }
 
@@ -1012,13 +1399,46 @@ struct InsightsView: View {
     }
 }
 
+// MARK: - Chart Selection Binding for Monthly Spending
+
+private extension Binding where Value == MonthlySpend? {
+    init(chartSelection: Binding<Date?>, monthlySpending: [MonthlySpend]) {
+        self.init(
+            get: {
+                guard let date = chartSelection.wrappedValue else { return nil }
+                let calendar = Calendar.current
+                return monthlySpending.first { item in
+                    calendar.isDate(item.month, equalTo: date, toGranularity: .month)
+                }
+            },
+            set: { newValue in
+                chartSelection.wrappedValue = newValue?.month
+            }
+        )
+    }
+}
+
 // MARK: - Data Models
 
-private struct MonthlySpend: Identifiable {
+private struct MonthlySpend: Identifiable, Plottable {
     let id = UUID()
     let month: Date
     let services: Double
     let fuel: Double
+
+    var primitivePlottable: Date { month }
+
+    init(month: Date, services: Double, fuel: Double) {
+        self.month = month
+        self.services = services
+        self.fuel = fuel
+    }
+
+    init?(primitivePlottable: Date) {
+        self.month = primitivePlottable
+        self.services = 0
+        self.fuel = 0
+    }
 }
 
 private struct CategorySpend: Identifiable {
@@ -1074,4 +1494,24 @@ private struct OwnershipCost: Identifiable {
     let monthsOwned: Int
     let costPerMonth: Double
     let serviceCount: Int
+}
+
+private struct VehicleEfficiency: Identifiable {
+    var id: String { name }
+    let name: String
+    let average: Double
+    let best: Double
+    let worst: Double
+    let fillUps: Int
+}
+
+private struct VehicleComplianceScore: Identifiable {
+    var id: String { name }
+    let name: String
+    let vehicle: Vehicle
+    let compliancePercent: Double
+    let healthScore: Int
+    let compliant: Int
+    let total: Int
+    let overdue: Int
 }

@@ -5,6 +5,7 @@ import UserNotifications
 
 enum ReminderAction {
     static let categoryId = "SERVICE_REMINDER"
+    static let urgentCategoryId = "SERVICE_REMINDER_URGENT"
     static let markDone = "MARK_DONE"
     static let snooze = "SNOOZE"
 }
@@ -60,16 +61,27 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
             title: "Snooze 1 Week",
             options: []
         )
+
+        // Standard category
         let category = UNNotificationCategory(
             identifier: ReminderAction.categoryId,
             actions: [markDone, snooze],
             intentIdentifiers: [],
             options: []
         )
-        center.setNotificationCategories([category])
+
+        // Urgent category — same actions but shows as time-sensitive
+        let urgentCategory = UNNotificationCategory(
+            identifier: ReminderAction.urgentCategoryId,
+            actions: [markDone, snooze],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        center.setNotificationCategories([category, urgentCategory])
     }
 
-    // MARK: - Schedule Reminders
+    // MARK: - Schedule Reminders (Batch)
 
     func scheduleReminders(for vehicles: [Vehicle]) async {
         center.removeAllPendingNotificationRequests()
@@ -79,88 +91,88 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
         let authorized = await requestAuthorization()
         guard authorized else { return }
 
-        for vehicle in vehicles where !vehicle.isArchived {
-            scheduleVehicleReminders(vehicle)
+        // Use batch scheduling from the engine
+        let batchItems = ServiceReminderEngine.batchNotificationItems(for: vehicles)
+
+        for item in batchItems {
+            let triggerDate = adjustForQuietHours(item.triggerDate)
+            await scheduleNotification(
+                vehicleId: item.vehicleId,
+                vehicleName: item.vehicleName,
+                serviceType: item.serviceType,
+                triggerDate: triggerDate,
+                urgency: item.urgency,
+                displayDue: item.displayDue,
+                isEscalated: item.isEscalated,
+                suffix: item.isEscalated ? "escalated" : nil
+            )
+        }
+
+        // Mileage update nudge per vehicle
+        let appSettings = UserSettings.shared
+        if ReminderStore.mileageNudgeEnabled {
+            for vehicle in vehicles where !vehicle.isArchived {
+                guard ReminderStore.isVehicleReminderEnabled(for: vehicle.id) else { continue }
+
+                let nudgeContent = UNMutableNotificationContent()
+                nudgeContent.title = "Update Mileage"
+                nudgeContent.body = "How many \(appSettings.distanceUnit.label) on your \(vehicle.displayName)? Keep it current for accurate reminders."
+                nudgeContent.sound = .default
+                nudgeContent.threadIdentifier = "vehicle-\(vehicle.id.uuidString)"
+
+                var weeklyComponents = DateComponents()
+                weeklyComponents.weekday = 1
+                weeklyComponents.hour = 10
+                let trigger = UNCalendarNotificationTrigger(dateMatching: weeklyComponents, repeats: true)
+                let id = "mileage-nudge-\(vehicle.id.uuidString)"
+                try? await center.add(UNNotificationRequest(identifier: id, content: nudgeContent, trigger: trigger))
+            }
         }
     }
 
-    private func scheduleVehicleReminders(_ vehicle: Vehicle) {
-        let reminders = ServiceReminderEngine.reminders(for: vehicle)
-        let pace = ServiceReminderEngine.drivingPace(for: vehicle)
-        let appSettings = UserSettings.shared
+    // MARK: - Quiet Hours
 
-        for reminder in reminders {
-            // Skip snoozed items — reschedule at snooze-end
-            if let snoozeEnd = ReminderStore.snoozeDate(for: vehicle.id, serviceType: reminder.id),
-               snoozeEnd > Date() {
-                scheduleNotification(
-                    vehicleId: vehicle.id,
-                    vehicleName: vehicle.displayName,
-                    serviceType: reminder.serviceType,
-                    triggerDate: snoozeEnd,
-                    urgency: reminder.urgency,
-                    displayDue: reminder.displayDue,
-                    suffix: "snoozed"
-                )
-                continue
-            }
+    /// Adjusts a trigger date to respect quiet hours.
+    /// If the date falls inside the quiet window, pushes it to the end of quiet hours.
+    private func adjustForQuietHours(_ date: Date) -> Date {
+        guard ReminderStore.quietHoursEnabled else { return date }
 
-            // Already overdue or due — notify tomorrow at 9am
-            if reminder.urgency == .overdue || reminder.urgency == .due {
-                let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
-                var trigger = Calendar.current.dateComponents([.year, .month, .day], from: tomorrow)
-                trigger.hour = 9
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: date)
+        let start = ReminderStore.quietHoursStart
+        let end = ReminderStore.quietHoursEnd
 
-                let content = makeContent(
-                    vehicleName: vehicle.displayName,
-                    serviceType: reminder.serviceType,
-                    vehicleId: vehicle.id,
-                    urgency: reminder.urgency,
-                    displayDue: reminder.displayDue
-                )
-                let id = "reminder-\(vehicle.id.uuidString)-\(reminder.id)"
-                let req = UNNotificationRequest(
-                    identifier: id,
-                    content: content,
-                    trigger: UNCalendarNotificationTrigger(dateMatching: trigger, repeats: false)
-                )
-                center.add(req)
-                continue
-            }
+        let isQuiet: Bool
+        if start > end {
+            // Wraps midnight: e.g. 22–8
+            isQuiet = hour >= start || hour < end
+        } else if start < end {
+            // Same-day range: e.g. 0–8
+            isQuiet = hour >= start && hour < end
+        } else {
+            isQuiet = false
+        }
 
-            // Due soon / OK — use engine-calculated notification date (pace-aware)
-            if let notifyDate = ServiceReminderEngine.notificationDate(
-                for: reminder,
-                pace: pace,
-                vehicleCurrentMileage: vehicle.currentMileage
-            ) {
-                scheduleNotification(
-                    vehicleId: vehicle.id,
-                    vehicleName: vehicle.displayName,
-                    serviceType: reminder.serviceType,
-                    triggerDate: notifyDate,
-                    urgency: reminder.urgency,
-                    displayDue: reminder.displayDue,
-                    suffix: nil
-                )
+        if isQuiet {
+            // Push to quiet hours end on the same or next day
+            var adjusted = calendar.dateComponents([.year, .month, .day], from: date)
+            adjusted.hour = end
+            adjusted.minute = 0
+            adjusted.second = 0
+
+            if let result = calendar.date(from: adjusted) {
+                // If we'd go backward (quiet start is before midnight, hour is after midnight),
+                // the date is already past quiet-end today — use end time as-is
+                if result <= date {
+                    // We're in the post-midnight portion; today's end time hasn't passed
+                    // Actually if result <= date, quiet end already passed today → push to tomorrow
+                    return calendar.date(byAdding: .day, value: 1, to: result) ?? date
+                }
+                return result
             }
         }
 
-        // Mileage update nudge
-        if ReminderStore.mileageNudgeEnabled {
-            let nudgeContent = UNMutableNotificationContent()
-            nudgeContent.title = "Update Mileage"
-            nudgeContent.body = "How many \(appSettings.distanceUnit.label) on your \(vehicle.displayName)? Keep it current for accurate reminders."
-            nudgeContent.sound = .default
-            nudgeContent.threadIdentifier = "vehicle-\(vehicle.id.uuidString)"
-
-            var weeklyComponents = DateComponents()
-            weeklyComponents.weekday = 1
-            weeklyComponents.hour = 10
-            let trigger = UNCalendarNotificationTrigger(dateMatching: weeklyComponents, repeats: true)
-            let id = "mileage-nudge-\(vehicle.id.uuidString)"
-            center.add(UNNotificationRequest(identifier: id, content: nudgeContent, trigger: trigger))
-        }
+        return date
     }
 
     // MARK: - Notification Content
@@ -170,15 +182,27 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
         serviceType: ServiceType,
         vehicleId: UUID,
         urgency: ReminderUrgency,
-        displayDue: String
+        displayDue: String,
+        isEscalated: Bool
     ) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
-        content.categoryIdentifier = ReminderAction.categoryId
+
+        if isEscalated {
+            content.categoryIdentifier = ReminderAction.urgentCategoryId
+            content.interruptionLevel = .timeSensitive
+        } else {
+            content.categoryIdentifier = ReminderAction.categoryId
+        }
 
         switch urgency {
         case .overdue:
-            content.title = "⚠️ \(vehicleName)"
-            content.body = "\(serviceType.rawValue) is overdue (\(displayDue)). Tap to log it."
+            if isEscalated {
+                content.title = "🚨 \(vehicleName)"
+                content.body = "\(serviceType.rawValue) is overdue (\(displayDue)). This needs attention now."
+            } else {
+                content.title = "⚠️ \(vehicleName)"
+                content.body = "\(serviceType.rawValue) is overdue (\(displayDue)). Tap to log it."
+            }
         case .due:
             content.title = "🔧 \(vehicleName)"
             content.body = "\(serviceType.rawValue) is due now. Time to schedule service."
@@ -190,12 +214,13 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
             content.body = "\(serviceType.rawValue) reminder."
         }
 
-        content.sound = .default
+        content.sound = isEscalated ? .defaultCritical : .default
         content.threadIdentifier = "vehicle-service-\(serviceType.rawValue)"
         content.userInfo = [
             "serviceType": serviceType.rawValue,
             "vehicleName": vehicleName,
-            "vehicleId": vehicleId.uuidString
+            "vehicleId": vehicleId.uuidString,
+            "isEscalated": isEscalated
         ]
 
         return content
@@ -208,8 +233,9 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
         triggerDate: Date,
         urgency: ReminderUrgency,
         displayDue: String,
+        isEscalated: Bool,
         suffix: String?
-    ) {
+    ) async {
         guard triggerDate > Date() else { return }
 
         let content = makeContent(
@@ -217,13 +243,15 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
             serviceType: serviceType,
             vehicleId: vehicleId,
             urgency: urgency,
-            displayDue: displayDue
+            displayDue: displayDue,
+            isEscalated: isEscalated
         )
 
         var components = Calendar.current.dateComponents(
             [.year, .month, .day, .hour],
             from: triggerDate
         )
+        // Ensure we don't schedule in deep night if quiet hours somehow missed
         if components.hour == nil || components.hour! < 8 {
             components.hour = 9
         }
@@ -232,7 +260,7 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
         let idSuffix = suffix.map { "-\($0)" } ?? ""
         let id = "reminder-\(vehicleId.uuidString)-\(serviceType.rawValue)\(idSuffix)"
         let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
-        center.add(request)
+        try? await center.add(request)
     }
 
     func cancelAll() {

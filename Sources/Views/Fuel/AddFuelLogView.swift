@@ -19,6 +19,9 @@ struct AddFuelLogView: View {
 
     // Validation & error state
     @State private var validationError: String?
+    @State private var volumeError: String?
+    @State private var costError: String?
+    @State private var mileageError: String?
     @State private var saveError: String?
     @State private var isSaving = false
 
@@ -35,40 +38,57 @@ struct AddFuelLogView: View {
                         }
                     }
                     .accessibilityLabel("Fuel type: \(fuelType.rawValue)")
+                    .onChange(of: fuelType) { _, _ in HapticManager.shared.selection() }
                 }
 
                 Section {
                     DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date)
 
-                    HStack {
-                        Text("Odometer")
-                        Spacer()
-                        TextField(settings.distanceUnit.label, text: $mileage)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 120)
-                            .onChange(of: mileage) { _, _ in validationError = nil }
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Odometer")
+                            Spacer()
+                            TextField(settings.distanceUnit.label, text: $mileage)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 120)
+                                .onChange(of: mileage) { _, _ in validationError = nil; mileageError = nil }
+                        }
+                        if let err = mileageError {
+                            Text(err)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                        }
                     }
 
-                    HStack {
-                        Text("Volume")
-                        Spacer()
-                        HStack(spacing: 2) {
-                            TextField("0.00", text: $volume)
-                                .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 80)
-                                .onChange(of: volume) { _, _ in
-                                    validationError = nil
-                                    recalcFromVolume()
-                                }
-                            Text(settings.volumeUnit.label)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 30, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Volume")
+                            Spacer()
+                            HStack(spacing: 2) {
+                                TextField("0.00", text: $volume)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 80)
+                                    .onChange(of: volume) { _, _ in
+                                        validationError = nil
+                                        volumeError = nil
+                                        recalcFromVolume()
+                                    }
+                                Text(settings.volumeUnit.label)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 30, alignment: .leading)
+                            }
+                        }
+                        if let err = volumeError {
+                            Text(err)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
                         }
                     }
 
                     Toggle("Full Tank", isOn: $isFullTank)
+                        .onChange(of: isFullTank) { _, _ in HapticManager.shared.sectionToggle() }
 
                     if !isFullTank {
                         HStack {
@@ -90,21 +110,29 @@ struct AddFuelLogView: View {
                 }
 
                 Section("Cost") {
-                    HStack {
-                        Text("Total Cost")
-                        Spacer()
-                        HStack(spacing: 2) {
-                            Text(settings.currency.symbol)
-                                .foregroundStyle(.secondary)
-                            TextField("0.00", text: $totalCost)
-                                .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 100)
-                                .onChange(of: totalCost) { _, _ in
-                                    validationError = nil
-                                    if editingCost { recalcPricePerUnit() }
-                                }
-                                .onTapGesture { editingCost = true }
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Total Cost")
+                            Spacer()
+                            HStack(spacing: 2) {
+                                Text(settings.currency.symbol)
+                                    .foregroundStyle(.secondary)
+                                TextField("0.00", text: $totalCost)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 100)
+                                    .onChange(of: totalCost) { _, _ in
+                                        validationError = nil
+                                        costError = nil
+                                        if editingCost { recalcPricePerUnit() }
+                                    }
+                                    .onTapGesture { editingCost = true }
+                            }
+                        }
+                        if let err = costError {
+                            Text(err)
+                                .font(.caption2)
+                                .foregroundStyle(.red)
                         }
                     }
 
@@ -139,13 +167,25 @@ struct AddFuelLogView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .accessibilityLabel("Cancel fuel log")
+                    Button("Cancel") {
+                        HapticManager.shared.light()
+                        dismiss()
+                    }
+                    .accessibilityLabel("Cancel fuel log")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { saveFuelLog() }
+                    Button("Save") {
+                        HapticManager.shared.buttonTap()
+                        saveFuelLog()
+                    }
                         .fontWeight(.semibold)
-                        .foregroundStyle(Color.wrenchAmber)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [Color.wrenchAmber, Color(red: 0.85, green: 0.55, blue: 0.05)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .disabled(!isValid || isSaving)
                         .accessibilityLabel("Save fuel log")
                         .accessibilityHint("Logs this fuel fill-up")
@@ -190,7 +230,57 @@ struct AddFuelLogView: View {
     }
 
     private func saveFuelLog() {
-        // Validate
+        // Clear previous field errors
+        volumeError = nil
+        costError = nil
+        mileageError = nil
+        validationError = nil
+
+        var hasFieldError = false
+
+        // Per-field inline validation
+        if let vol = Double(volume) {
+            if vol <= 0 {
+                volumeError = "Volume must be greater than zero."
+                hasFieldError = true
+            }
+        } else if volume.isEmpty {
+            volumeError = "Volume is required."
+            hasFieldError = true
+        } else {
+            volumeError = "Volume must be a valid number."
+            hasFieldError = true
+        }
+
+        if let cost = Double(totalCost) {
+            if cost < 0 {
+                costError = "Cost cannot be negative."
+                hasFieldError = true
+            }
+        } else if totalCost.isEmpty {
+            costError = "Total cost is required."
+            hasFieldError = true
+        }
+
+        if let m = Int(mileage) {
+            if m < 0 {
+                mileageError = "Mileage cannot be negative."
+                hasFieldError = true
+            } else if m > 0 && m < vehicle.currentMileage && vehicle.currentMileage > 0 {
+                mileageError = "Mileage is less than current odometer (\(vehicle.currentMileage.formatted()))."
+                hasFieldError = true
+            }
+        } else if !mileage.isEmpty {
+            mileageError = "Mileage must be a whole number."
+            hasFieldError = true
+        }
+
+        guard !hasFieldError else {
+            HapticManager.shared.error()
+            return
+        }
+
+        // Run centralized validation as fallback
         let result = FuelLogValidator.validate(
             volume: volume,
             totalCost: totalCost,
@@ -230,7 +320,7 @@ struct AddFuelLogView: View {
 
         do {
             try DataManager.save(context)
-            HapticManager.shared.success()
+            HapticManager.shared.saveSuccess()
             SoundManager.playSaveSuccess()
             dismiss()
         } catch {

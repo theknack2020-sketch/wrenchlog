@@ -8,14 +8,18 @@ struct DataExportImportService {
     @MainActor
     static func exportCSV(vehicles: [Vehicle], settings: UserSettings) -> (services: String, fuel: String) {
         // Service records CSV
-        var serviceLines = ["Vehicle,Make,Model,Year,Service Type,Category,Service Date,Mileage,Cost,Notes"]
+        var serviceLines = ["Vehicle,Make,Model,Year,Service Type,Category,Service Date,Mileage,Cost,Shop Name,Oil Type,Parts Used,Notes"]
         for vehicle in vehicles {
             for record in vehicle.serviceRecords.sorted(by: { $0.date > $1.date }) {
                 let dateStr = ISO8601DateFormatter().string(from: record.date)
                 let notes = record.notes.replacingOccurrences(of: ",", with: ";")
                     .replacingOccurrences(of: "\n", with: " ")
+                let shopName = record.shopName.replacingOccurrences(of: ",", with: ";")
+                let oilType = record.oilType.replacingOccurrences(of: ",", with: ";")
+                let parts = record.partsUsed.joined(separator: " | ")
+                    .replacingOccurrences(of: ",", with: ";")
                 serviceLines.append(
-                    "\"\(vehicle.displayName)\",\"\(vehicle.make)\",\"\(vehicle.model)\",\(vehicle.year),\"\(record.displayServiceType)\",\"\(record.categoryRaw)\",\(dateStr),\(record.mileage),\(String(format: "%.2f", record.cost)),\"\(notes)\""
+                    "\"\(vehicle.displayName)\",\"\(vehicle.make)\",\"\(vehicle.model)\",\(vehicle.year),\"\(record.displayServiceType)\",\"\(record.categoryRaw)\",\(dateStr),\(record.mileage),\(String(format: "%.2f", record.cost)),\"\(shopName)\",\"\(oilType)\",\"\(parts)\",\"\(notes)\""
                 )
             }
         }
@@ -69,6 +73,9 @@ struct DataExportImportService {
         let dateIdx = header.firstIndex(of: "service date")
         let mileageIdx = header.firstIndex(of: "mileage")
         let costIdx = header.firstIndex(of: "cost")
+        let shopIdx = header.firstIndex(of: "shop name")
+        let oilIdx = header.firstIndex(of: "oil type")
+        let partsIdx = header.firstIndex(of: "parts used")
         let notesIdx = header.firstIndex(of: "notes")
 
         guard typeIdx != nil, dateIdx != nil else { return nil }
@@ -109,14 +116,18 @@ struct DataExportImportService {
             let date = formatter.date(from: dateStr) ?? Date()
             let mileage = mileageIdx.flatMap { $0 < fields.count ? Int(fields[$0]) : nil } ?? 0
             let cost = costIdx.flatMap { $0 < fields.count ? Double(fields[$0]) : nil } ?? 0
+            let shopName = shopIdx.flatMap { $0 < fields.count ? fields[$0] : nil } ?? ""
+            let oilType = oilIdx.flatMap { $0 < fields.count ? fields[$0] : nil } ?? ""
+            let partsStr = partsIdx.flatMap { $0 < fields.count ? fields[$0] : nil } ?? ""
+            let partsUsed = partsStr.isEmpty ? [] : partsStr.components(separatedBy: " | ").map { $0.trimmingCharacters(in: .whitespaces) }
             let notes = notesIdx.flatMap { $0 < fields.count ? fields[$0] : nil } ?? ""
 
             let serviceType = ServiceType(rawValue: typeName)
             let record: ServiceRecord
             if let st = serviceType {
-                record = ServiceRecord(serviceType: st, date: date, mileage: mileage, cost: cost, notes: notes)
+                record = ServiceRecord(serviceType: st, date: date, mileage: mileage, cost: cost, notes: notes, partsUsed: partsUsed, oilType: oilType, shopName: shopName)
             } else {
-                record = ServiceRecord(customType: typeName, date: date, mileage: mileage, cost: cost, notes: notes)
+                record = ServiceRecord(customType: typeName, date: date, mileage: mileage, cost: cost, notes: notes, partsUsed: partsUsed, oilType: oilType, shopName: shopName)
             }
             record.vehicle = vehicle
             context.insert(record)

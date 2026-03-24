@@ -73,4 +73,73 @@ final class HapticManager {
             }
         }
     }
+
+    /// Save confirmation — success + light finish
+    func saveSuccess() {
+        notificationGenerator.notificationOccurred(.success)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [self] in
+            lightGenerator.impactOccurred()
+            lightGenerator.prepare()
+        }
+    }
+
+    /// Delete warning — warning + medium thud
+    func deleteWarning() {
+        notificationGenerator.notificationOccurred(.warning)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
+            mediumGenerator.impactOccurred(intensity: 0.7)
+            mediumGenerator.prepare()
+        }
+    }
+
+    /// Quick button tap — lighter than medium, snappier
+    func buttonTap() {
+        mediumGenerator.impactOccurred(intensity: 0.5)
+        mediumGenerator.prepare()
+    }
+
+    /// Section expand/collapse toggle
+    func sectionToggle() {
+        lightGenerator.impactOccurred(intensity: 0.6)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [self] in
+            selectionGenerator.selectionChanged()
+            selectionGenerator.prepare()
+        }
+    }
+
+    /// Card press — medium + light double-pulse
+    func cardPress() {
+        mediumGenerator.impactOccurred(intensity: 0.4)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [self] in
+            lightGenerator.impactOccurred(intensity: 0.3)
+            lightGenerator.prepare()
+        }
+    }
+
+    /// Tab switch — crisp selection tick
+    func tabSwitch() {
+        selectionGenerator.selectionChanged()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [self] in
+            lightGenerator.impactOccurred(intensity: 0.3)
+            lightGenerator.prepare()
+        }
+    }
+
+    /// Refresh pull — ramp up from light to medium
+    func refreshPull() {
+        lightGenerator.impactOccurred(intensity: 0.4)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
+            mediumGenerator.impactOccurred(intensity: 0.6)
+            mediumGenerator.prepare()
+        }
+    }
+
+    /// Mileage update — ascending double tap
+    func mileageUpdate() {
+        mediumGenerator.impactOccurred(intensity: 0.5)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [self] in
+            notificationGenerator.notificationOccurred(.success)
+            notificationGenerator.prepare()
+        }
+    }
 }

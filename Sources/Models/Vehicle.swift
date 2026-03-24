@@ -125,6 +125,10 @@ final class ServiceRecord {
     var categoryRaw: String          // ServiceCategory.rawValue
     var notes: String
     var photoFileNames: [String]     // filenames in app's documents directory
+    var partsUsed: [String]          // parts/products used (e.g. "Mobil 1 5W-30", "K&N air filter")
+    var oilType: String              // oil type/spec (e.g. "5W-30 Full Synthetic")
+    var shopName: String             // service provider/shop name
+    var calendarEventId: String      // iOS Calendar event identifier for managing synced events
     var vehicle: Vehicle?
 
     var serviceType: ServiceType? {
@@ -152,7 +156,10 @@ final class ServiceRecord {
         date: Date = .now,
         mileage: Int = 0,
         cost: Double = 0,
-        notes: String = ""
+        notes: String = "",
+        partsUsed: [String] = [],
+        oilType: String = "",
+        shopName: String = ""
     ) {
         self.id = UUID()
         self.date = date
@@ -162,6 +169,10 @@ final class ServiceRecord {
         self.categoryRaw = serviceType.category.rawValue
         self.notes = notes
         self.photoFileNames = []
+        self.partsUsed = partsUsed
+        self.oilType = oilType
+        self.shopName = shopName
+        self.calendarEventId = ""
     }
 
     init(
@@ -170,7 +181,10 @@ final class ServiceRecord {
         date: Date = .now,
         mileage: Int = 0,
         cost: Double = 0,
-        notes: String = ""
+        notes: String = "",
+        partsUsed: [String] = [],
+        oilType: String = "",
+        shopName: String = ""
     ) {
         self.id = UUID()
         self.date = date
@@ -180,5 +194,9 @@ final class ServiceRecord {
         self.categoryRaw = category.rawValue
         self.notes = notes
         self.photoFileNames = []
+        self.partsUsed = partsUsed
+        self.oilType = oilType
+        self.shopName = shopName
+        self.calendarEventId = ""
     }
 }

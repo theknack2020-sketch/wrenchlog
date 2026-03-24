@@ -35,6 +35,10 @@ struct VehicleDetailView: View {
     @State private var showUndoBanner = false
     @State private var mileageValidationError: String?
 
+    // Error handling
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
+
     // Search & Filter & Sort
     @State private var searchText = ""
     @State private var filterCategory: ServiceCategory?
@@ -119,6 +123,27 @@ struct VehicleDetailView: View {
         return nil
     }
 
+    // MARK: - Mini Stat Computations
+
+    private var averageCostPerService: Double {
+        let paid = vehicle.serviceRecords.filter { $0.cost > 0 }
+        guard !paid.isEmpty else { return 0 }
+        return paid.reduce(0) { $0 + $1.cost } / Double(paid.count)
+    }
+
+    private var lastServiceDate: Date? {
+        vehicle.serviceRecords.sorted { $0.date > $1.date }.first?.date
+    }
+
+    private var mostExpensiveService: ServiceRecord? {
+        vehicle.serviceRecords.max { $0.cost < $1.cost }
+    }
+
+    private var daysSinceLastService: Int? {
+        guard let lastDate = lastServiceDate else { return nil }
+        return Calendar.current.dateComponents([.day], from: lastDate, to: Date()).day
+    }
+
     // MARK: - Body
 
     var body: some View {
@@ -130,6 +155,8 @@ struct VehicleDetailView: View {
             }
             photoHeaderSection
             dashboardSection
+                .floatIn(delay: 0.05)
+            miniStatCardsSection
             vehicleInfoSection
             documentsSection
             toolsSection
@@ -172,6 +199,11 @@ struct VehicleDetailView: View {
                 Text("Delete '\(record.displayServiceType)' from \(record.date, format: .dateTime.month(.abbreviated).day())?")
             }
         }
+        .alert("Something Went Wrong", isPresented: $showErrorAlert) {
+            Button("OK") {}
+        } message: {
+            Text(errorMessage)
+        }
         .overlay(alignment: .bottom) {
             if showUndoBanner {
                 undoBanner
@@ -188,8 +220,14 @@ struct VehicleDetailView: View {
     private var detailToolbar: some ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             Menu {
-                Button { showAddService = true } label: { Label("Log Service", systemImage: "wrench.fill") }
-                Button { showAddFuel = true } label: { Label("Log Fuel", systemImage: "fuelpump.fill") }
+                Button {
+                    haptic.buttonTap()
+                    showAddService = true
+                } label: { Label("Log Service", systemImage: "wrench.fill") }
+                Button {
+                    haptic.buttonTap()
+                    showAddFuel = true
+                } label: { Label("Log Fuel", systemImage: "fuelpump.fill") }
             } label: {
                 Image(systemName: "plus.circle.fill").foregroundStyle(theme.accent)
             }
@@ -279,7 +317,10 @@ struct VehicleDetailView: View {
                     }
                 }
                 Spacer()
-                Button { showEditVehicle = true } label: {
+                Button {
+                    haptic.buttonTap()
+                    showEditVehicle = true
+                } label: {
                     Image(systemName: "pencil.circle.fill").font(.title3).foregroundStyle(theme.accent)
                 }
                 .accessibilityLabel("Edit vehicle")
@@ -298,7 +339,10 @@ struct VehicleDetailView: View {
                     }
                 }
                 Spacer()
-                Button { showEditVehicle = true } label: {
+                Button {
+                    haptic.buttonTap()
+                    showEditVehicle = true
+                } label: {
                     Image(systemName: "pencil.circle.fill").font(.title3).foregroundStyle(theme.accent)
                 }
                 .accessibilityLabel("Edit vehicle")
@@ -318,7 +362,10 @@ struct VehicleDetailView: View {
     }
 
     private var dashboardSpeedometer: some View {
-        Button { showEditMileage = true } label: {
+        Button {
+            haptic.buttonTap()
+            showEditMileage = true
+        } label: {
             VStack(spacing: 6) {
                 ZStack {
                     Circle().trim(from: 0.15, to: 0.85)
@@ -359,8 +406,11 @@ struct VehicleDetailView: View {
             }
             .frame(maxWidth: .infinity).padding(.vertical, 8)
             .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+            .statPop(index: 0)
             statCard(title: "Total Spent", value: settings.formatCost(totalOwnershipCost), icon: "dollarsign.circle.fill", color: theme.accent)
+                .statPop(index: 1)
             statCard(title: "Services", value: "\(vehicle.serviceRecords.count)", icon: "wrench.fill", color: .catEngine)
+                .statPop(index: 2)
         }
     }
 
@@ -372,6 +422,126 @@ struct VehicleDetailView: View {
                 statCard(title: "Latest", value: eff, icon: "gauge.medium", color: .catTires)
             }
         }
+    }
+
+    // MARK: - Mini Stat Cards
+
+    private var miniStatCardsSection: some View {
+        Section {
+            VStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    miniStatCard(
+                        title: "Total Spent",
+                        value: settings.formatCost(totalOwnershipCost),
+                        icon: "dollarsign.circle.fill",
+                        color: theme.accent
+                    )
+                    miniStatCard(
+                        title: "Avg/Service",
+                        value: averageCostPerService > 0 ? settings.formatCost(averageCostPerService) : "—",
+                        icon: "equal.circle.fill",
+                        color: .catFilters
+                    )
+                }
+                HStack(spacing: 8) {
+                    miniStatCard(
+                        title: "Services",
+                        value: "\(vehicle.serviceRecords.count)",
+                        icon: "wrench.fill",
+                        color: .catEngine
+                    )
+                    miniStatCard(
+                        title: "Last Service",
+                        value: lastServiceDateLabel,
+                        icon: "calendar.badge.clock",
+                        color: lastServiceColor
+                    )
+                }
+                if let expensive = mostExpensiveService, expensive.cost > 0 {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.wrenchRed)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Most Expensive")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text("\(expensive.displayServiceType) — \(settings.formatCost(expensive.cost))")
+                                .font(.caption.weight(.medium).monospacedDigit())
+                        }
+                        Spacer()
+                        Text(expensive.date, format: .dateTime.month(.abbreviated).year(.twoDigits))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.vertical, 2)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Most expensive service: \(expensive.displayServiceType), \(settings.formatCost(expensive.cost))")
+                }
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "chart.bar.fill")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        LinearGradient(colors: theme.headerGradient, startPoint: .leading, endPoint: .trailing)
+                    )
+                Text("Quick Stats")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        LinearGradient(colors: theme.headerGradient, startPoint: .leading, endPoint: .trailing)
+                    )
+            }
+        }
+    }
+
+    private var lastServiceDateLabel: String {
+        guard let date = lastServiceDate else { return "None" }
+        if let days = daysSinceLastService {
+            if days == 0 { return "Today" }
+            if days == 1 { return "Yesterday" }
+            if days < 30 { return "\(days)d ago" }
+            if days < 365 { return "\(days / 30)mo ago" }
+            return "\(days / 365)yr ago"
+        }
+        return date.formatted(.dateTime.month(.abbreviated).day())
+    }
+
+    private var lastServiceColor: Color {
+        guard let days = daysSinceLastService else { return .secondary }
+        if days <= 90 { return .wrenchGreen }
+        if days <= 180 { return .wrenchYellow }
+        return .wrenchRed
+    }
+
+    @ViewBuilder
+    private func miniStatCard(title: String, value: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(0.12))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(color)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(value)
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(title)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.12), radius: 4, x: 0, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
     }
 
     // MARK: - Vehicle Info
@@ -550,7 +720,7 @@ struct VehicleDetailView: View {
                 }
                 Text("No fuel logs yet").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
                 Text("Start tracking fuel to see your efficiency.").font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
-                Button { showAddFuel = true } label: {
+                Button { haptic.buttonTap(); showAddFuel = true } label: {
                     Label("Log First Fill-Up", systemImage: "plus.circle.fill").font(.caption.weight(.medium)).foregroundStyle(theme.accent)
                 }
             }
@@ -568,7 +738,7 @@ struct VehicleDetailView: View {
                 FuelLogRow(log: log, efficiency: effResults.first { $0.date == log.date && $0.mileage == log.mileage })
             }
         }
-        Button { showAddFuel = true } label: {
+        Button { haptic.buttonTap(); showAddFuel = true } label: {
             Label("Add Fill-Up", systemImage: "plus.circle").foregroundStyle(theme.accent).font(.subheadline)
         }
         NavigationLink { FuelHistoryView(vehicle: vehicle) } label: {
@@ -591,9 +761,21 @@ struct VehicleDetailView: View {
                 Text("Service History")
                 Spacer()
                 if !vehicle.serviceRecords.isEmpty {
-                    Text("\(vehicle.serviceRecords.count) total").font(.caption2).foregroundStyle(.tertiary)
+                    Text(serviceHistorySubtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
             }
+        }
+    }
+
+    private var serviceHistorySubtitle: String {
+        let count = vehicle.serviceRecords.count
+        switch count {
+        case 1...4: return "\(count) logged — off to a great start!"
+        case 5...14: return "\(count) logged — solid record keeping 👍"
+        case 15...49: return "\(count) logged — your car thanks you!"
+        default: return "\(count) logged — maintenance pro 🏆"
         }
     }
 
@@ -610,7 +792,7 @@ struct VehicleDetailView: View {
                 Menu {
                     ForEach(ServiceSortOption.allCases) { option in
                         Button {
-                            withAnimation(.easeInOut(duration: 0.2)) { sortOption = option }
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { sortOption = option }
                             haptic.selection()
                         } label: {
                             HStack {
@@ -629,12 +811,12 @@ struct VehicleDetailView: View {
                     .foregroundStyle(theme.accent)
                 }
                 filterChip(label: "All", isSelected: filterCategory == nil) {
-                    withAnimation(.easeInOut(duration: 0.2)) { filterCategory = nil }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { filterCategory = nil }
                     haptic.selection()
                 }
                 ForEach(ServiceCategory.allCases.filter { $0 != .custom }, id: \.self) { cat in
                     filterChip(label: cat.rawValue, icon: cat.icon, isSelected: filterCategory == cat) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             filterCategory = filterCategory == cat ? nil : cat
                         }
                         haptic.selection()
@@ -661,7 +843,10 @@ struct VehicleDetailView: View {
                     } else {
                         Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.tertiary)
                         Text("No matching services").font(.subheadline).foregroundStyle(.secondary)
-                        Button("Clear Filters") { searchText = ""; filterCategory = nil }
+                        Button("Clear Filters") {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { searchText = ""; filterCategory = nil }
+                            haptic.light()
+                        }
                             .font(.caption.weight(.medium)).foregroundStyle(theme.accent)
                     }
                 }
@@ -687,6 +872,7 @@ struct VehicleDetailView: View {
     private var actionsSection: some View {
         Section {
             Button {
+                haptic.buttonTap()
                 if store.isPro { showCostAnalytics = true } else { showProPrompt = true }
             } label: {
                 HStack {
@@ -700,6 +886,7 @@ struct VehicleDetailView: View {
             }
             .accessibilityLabel("Cost analytics\(store.isPro ? "" : ", Pro feature")")
             Button {
+                haptic.buttonTap()
                 if store.isPro { exportPDF() } else { showProPrompt = true }
             } label: {
                 HStack {
@@ -711,10 +898,26 @@ struct VehicleDetailView: View {
                 }
             }
             .accessibilityLabel("Export PDF report\(store.isPro ? "" : ", Pro feature")")
-            Button(role: .destructive) { showSellVehicle = true } label: {
+            Button(role: .destructive) {
+                haptic.warning()
+                showSellVehicle = true
+            } label: {
                 Label("Mark as Sold", systemImage: "tag.fill")
             }
             .accessibilityLabel("Mark vehicle as sold")
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(
+                        LinearGradient(colors: theme.headerGradient, startPoint: .leading, endPoint: .trailing)
+                    )
+                Text("Actions")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(
+                        LinearGradient(colors: theme.headerGradient, startPoint: .leading, endPoint: .trailing)
+                    )
+            }
         }
     }
 
@@ -722,20 +925,35 @@ struct VehicleDetailView: View {
 
     private func exportPDF() {
         pdfData = PDFExportService.generatePDF(for: vehicle, settings: settings)
-        if pdfData != nil { showPDFShare = true }
+        if pdfData != nil {
+            showPDFShare = true
+        } else {
+            surfaceError("Unable to generate PDF report. Please try again.")
+        }
+    }
+
+    private func surfaceError(_ message: String) {
+        errorMessage = message
+        showErrorAlert = true
+        haptic.error()
+        SoundManager.playError()
     }
 
     private func handleMileageUpdate() {
         guard let m = Int(newMileage), m > 0 else { return }
         let validation = VehicleValidator.validateMileageUpdate(newMileage: m, currentMileage: vehicle.currentMileage)
         if validation.isValid {
-            withAnimation(.easeInOut(duration: 0.4)) {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
                 vehicle.currentMileage = m
                 vehicle.lastUpdated = .now
             }
-            haptic.success()
+            haptic.mileageUpdate()
             SoundManager.playSaveSuccess()
-            DataManager.trySave(context)
+            do {
+                try DataManager.save(context)
+            } catch {
+                surfaceError(error.errorDescription ?? "Unable to save mileage update.")
+            }
             Task {
                 if let vehicles = try? context.fetch(FetchDescriptor<Vehicle>()) {
                     await ReminderManager.shared.scheduleReminders(for: vehicles)
@@ -759,10 +977,15 @@ struct VehicleDetailView: View {
             deletedAt: .now
         )
         DeletionUndoManager.shared.storeDeletedService(snapshot)
-        withAnimation(.easeInOut(duration: 0.3)) { context.delete(record) }
-        haptic.warning()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { context.delete(record) }
+        haptic.deleteWarning()
         SoundManager.playDelete()
-        DataManager.trySave(context)
+        do {
+            try DataManager.save(context)
+        } catch {
+            surfaceError(error.errorDescription ?? "Unable to delete the record. Please try again.")
+            return
+        }
         vehicle.lastUpdated = .now
         withAnimation { showUndoBanner = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + DeletedServiceRecordSnapshot.undoWindowDuration) {
@@ -801,10 +1024,15 @@ struct VehicleDetailView: View {
         record.photoFileNames = snapshot.photoFileNames
         record.vehicle = vehicle
         context.insert(record)
-        DataManager.trySave(context)
-        vehicle.lastUpdated = .now
-        withAnimation { showUndoBanner = false }
-        haptic.success()
+        do {
+            try DataManager.save(context)
+            vehicle.lastUpdated = .now
+            withAnimation { showUndoBanner = false }
+            haptic.saveSuccess()
+            SoundManager.playSaveSuccess()
+        } catch {
+            surfaceError(error.errorDescription ?? "Unable to restore the record.")
+        }
     }
 
     private func filterChip(label: String, icon: String? = nil, isSelected: Bool, action: @escaping () -> Void) -> some View {

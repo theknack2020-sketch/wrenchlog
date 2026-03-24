@@ -154,6 +154,82 @@ enum ServiceType: String, Codable, CaseIterable, Identifiable {
     static func types(for category: ServiceCategory) -> [ServiceType] {
         allCases.filter { $0.category == category }
     }
+
+    /// Common parts/products used for each service type — powers autocomplete suggestions
+    var recommendedParts: [String] {
+        switch self {
+        case .oilChange:
+            return ["Oil filter", "Drain plug gasket"]
+        case .transmissionFluid:
+            return ["Transmission filter", "Pan gasket"]
+        case .coolantFlush:
+            return ["Thermostat", "Radiator cap", "Coolant hoses"]
+        case .brakeFluid:
+            return ["Brake fluid reservoir cap"]
+        case .powerSteeringFluid:
+            return ["Power steering filter"]
+        case .tireRotation:
+            return ["Lug nuts"]
+        case .tireReplacement:
+            return ["Tire (x4)", "Tire (x2)", "Valve stems", "TPMS sensors"]
+        case .wheelAlignment:
+            return ["Tie rod ends", "Control arm bushings"]
+        case .brakePads:
+            return ["Brake pads (front)", "Brake pads (rear)", "Brake hardware kit", "Brake grease"]
+        case .brakeRotors:
+            return ["Brake rotors (front)", "Brake rotors (rear)", "Brake pads (front)", "Brake pads (rear)"]
+        case .airFilter:
+            return ["Engine air filter"]
+        case .cabinAirFilter:
+            return ["Cabin air filter"]
+        case .fuelFilter:
+            return ["Fuel filter"]
+        case .serpentineBelt:
+            return ["Serpentine belt", "Belt tensioner"]
+        case .timingBelt:
+            return ["Timing belt kit", "Water pump", "Tensioner pulley", "Idler pulley"]
+        case .batteryReplacement:
+            return ["Battery", "Battery terminals", "Battery hold-down"]
+        case .sparkPlugs:
+            return ["Spark plugs (x4)", "Spark plugs (x6)", "Ignition coils"]
+        case .alternator:
+            return ["Alternator", "Serpentine belt"]
+        case .stateInspection:
+            return []
+        case .wiperBlades:
+            return ["Wiper blade (driver)", "Wiper blade (passenger)", "Rear wiper blade"]
+        case .acService:
+            return ["Refrigerant (R-134a)", "Refrigerant (R-1234yf)", "Cabin air filter", "Compressor oil"]
+        case .generalRepair:
+            return []
+        }
+    }
+
+    /// Common oil types/specs — shown when service involves oil
+    static let commonOilTypes: [String] = [
+        "0W-20 Full Synthetic",
+        "5W-20 Full Synthetic",
+        "5W-30 Full Synthetic",
+        "5W-30 Synthetic Blend",
+        "5W-30 Conventional",
+        "5W-40 Full Synthetic",
+        "10W-30 Conventional",
+        "10W-40 Conventional",
+        "0W-16 Full Synthetic",
+        "High Mileage 5W-30",
+        "Diesel 5W-40",
+        "Diesel 15W-40"
+    ]
+
+    /// Whether this service type typically involves an oil change
+    var involvesOil: Bool {
+        switch self {
+        case .oilChange, .transmissionFluid, .powerSteeringFluid:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 // MARK: - Unit System

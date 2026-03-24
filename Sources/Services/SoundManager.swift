@@ -22,4 +22,9 @@ enum SoundManager {
     static func playCelebration() {
         AudioServicesPlaySystemSound(1025)
     }
+
+    /// Smooth whoosh for transitions and navigation
+    static func playTransition() {
+        AudioServicesPlaySystemSound(1104)
+    }
 }

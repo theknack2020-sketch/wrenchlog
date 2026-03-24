@@ -5,6 +5,8 @@ struct FuelEfficiencyChartView: View {
     let vehicle: Vehicle
     private let settings = UserSettings.shared
 
+    @State private var chartAnimationProgress: Double = 0
+
     var efficiencyResults: [FuelEfficiencyResult] {
         vehicle.fuelLogs.calculateEfficiency()
     }
@@ -28,6 +30,39 @@ struct FuelEfficiencyChartView: View {
         case .mpg: efficiencyResults.min(by: { $0.mpg < $1.mpg })
         case .l100km: efficiencyResults.max(by: { $0.l100km < $1.l100km })
         }
+    }
+
+    // Trend line slope (linear regression)
+    var trendLine: (start: Double, end: Double)? {
+        let results = efficiencyResults
+        guard results.count >= 3 else { return nil }
+
+        let values = results.map { $0.efficiency(for: settings.efficiencyUnit) }
+        let n = Double(values.count)
+        let xs = values.indices.map { Double($0) }
+        let sumX = xs.reduce(0, +)
+        let sumY = values.reduce(0, +)
+        let sumXY = zip(xs, values).reduce(0) { $0 + $1.0 * $1.1 }
+        let sumX2 = xs.reduce(0) { $0 + $1 * $1 }
+
+        let denom = n * sumX2 - sumX * sumX
+        guard denom != 0 else { return nil }
+
+        let slope = (n * sumXY - sumX * sumY) / denom
+        let intercept = (sumY - slope * sumX) / n
+
+        let startVal = intercept
+        let endVal = intercept + slope * (n - 1)
+        return (start: startVal, end: endVal)
+    }
+
+    var trendDirection: String {
+        guard let trend = trendLine else { return "" }
+        let diff = trend.end - trend.start
+        let threshold = 0.5
+        if diff > threshold { return settings.efficiencyUnit == .mpg ? "improving" : "worsening" }
+        if diff < -threshold { return settings.efficiencyUnit == .mpg ? "declining" : "improving" }
+        return "stable"
     }
 
     // Monthly fuel cost
@@ -78,30 +113,85 @@ struct FuelEfficiencyChartView: View {
                             )
                         }
                     }
+
+                    // Trend indicator
+                    if let trend = trendLine, efficiencyResults.count >= 3 {
+                        let direction = trendDirection
+                        let trendColor: Color = direction == "improving" ? .wrenchGreen
+                            : direction == "declining" || direction == "worsening" ? .wrenchRed
+                            : .secondary
+                        let trendIcon = direction == "improving" ? "arrow.up.right"
+                            : direction == "declining" || direction == "worsening" ? "arrow.down.right"
+                            : "arrow.right"
+                        let diff = abs(trend.end - trend.start)
+
+                        HStack(spacing: 8) {
+                            Image(systemName: trendIcon)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(trendColor)
+                                .frame(width: 22)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Efficiency is \(direction)")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(trendColor)
+                                Text("\(String(format: "%.1f", diff)) \(settings.efficiencyUnit.label) change over \(efficiencyResults.count) fill-ups")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
                 }
             }
 
-            // Efficiency trend chart
+            // Efficiency trend chart with trend line, avg, best/worst markers
             if efficiencyResults.count >= 2 {
                 Section("Fuel Efficiency Trend") {
-                    Chart(efficiencyResults) { result in
-                        LineMark(
-                            x: .value("Date", result.date),
-                            y: .value(settings.efficiencyUnit.label, result.efficiency(for: settings.efficiencyUnit))
-                        )
-                        .foregroundStyle(Color.catFuel.gradient)
-                        .interpolationMethod(.catmullRom)
-                        .lineStyle(StrokeStyle(lineWidth: 2.5))
+                    Chart {
+                        // Area fill under the line
+                        ForEach(efficiencyResults) { result in
+                            AreaMark(
+                                x: .value("Date", result.date),
+                                y: .value(settings.efficiencyUnit.label, result.efficiency(for: settings.efficiencyUnit) * chartAnimationProgress)
+                            )
+                            .foregroundStyle(
+                                .linearGradient(
+                                    colors: [Color.catFuel.opacity(0.15), Color.catFuel.opacity(0.02)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .interpolationMethod(.catmullRom)
+                        }
 
-                        PointMark(
-                            x: .value("Date", result.date),
-                            y: .value(settings.efficiencyUnit.label, result.efficiency(for: settings.efficiencyUnit))
-                        )
-                        .foregroundStyle(Color.catFuel)
-                        .symbolSize(30)
+                        // Main line
+                        ForEach(efficiencyResults) { result in
+                            LineMark(
+                                x: .value("Date", result.date),
+                                y: .value(settings.efficiencyUnit.label, result.efficiency(for: settings.efficiencyUnit) * chartAnimationProgress)
+                            )
+                            .foregroundStyle(Color.catFuel.gradient)
+                            .interpolationMethod(.catmullRom)
+                            .lineStyle(StrokeStyle(lineWidth: 2.5))
+                        }
 
+                        // Data points
+                        ForEach(efficiencyResults) { result in
+                            let isBest = bestEfficiency?.id == result.id
+                            let isWorst = worstEfficiency?.id == result.id
+
+                            PointMark(
+                                x: .value("Date", result.date),
+                                y: .value(settings.efficiencyUnit.label, result.efficiency(for: settings.efficiencyUnit) * chartAnimationProgress)
+                            )
+                            .foregroundStyle(isBest ? Color.wrenchGreen : isWorst ? Color.wrenchRed : Color.catFuel)
+                            .symbolSize(isBest || isWorst ? 60 : 30)
+                            .symbol(isBest ? .diamond : isWorst ? .triangle : .circle)
+                        }
+
+                        // Average line
                         if let avg = averageEfficiency {
-                            RuleMark(y: .value("Average", avg))
+                            RuleMark(y: .value("Average", avg * chartAnimationProgress))
                                 .foregroundStyle(.secondary.opacity(0.5))
                                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
                                 .annotation(position: .top, alignment: .trailing) {
@@ -109,6 +199,28 @@ struct FuelEfficiencyChartView: View {
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
                                 }
+                        }
+
+                        // Trend line
+                        if let trend = trendLine, efficiencyResults.count >= 3 {
+                            let firstDate = efficiencyResults.first!.date
+                            let lastDate = efficiencyResults.last!.date
+
+                            LineMark(
+                                x: .value("Date", firstDate),
+                                y: .value(settings.efficiencyUnit.label, trend.start * chartAnimationProgress)
+                            )
+                            .foregroundStyle(Color.catElectrical.opacity(0.5))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [8, 4]))
+                            .accessibilityLabel("Trend line start")
+
+                            LineMark(
+                                x: .value("Date", lastDate),
+                                y: .value(settings.efficiencyUnit.label, trend.end * chartAnimationProgress)
+                            )
+                            .foregroundStyle(Color.catElectrical.opacity(0.5))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [8, 4]))
+                            .accessibilityLabel("Trend line end")
                         }
                     }
                     .chartYAxis {
@@ -131,7 +243,39 @@ struct FuelEfficiencyChartView: View {
                             }
                         }
                     }
-                    .frame(height: 200)
+                    .frame(height: 220)
+
+                    // Best/worst legend
+                    if bestEfficiency != nil || worstEfficiency != nil {
+                        HStack(spacing: 16) {
+                            if let best = bestEfficiency {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "diamond.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(Color.wrenchGreen)
+                                    Text("Best: \(settings.formatEfficiency(best.efficiency(for: settings.efficiencyUnit)))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Text(best.date, format: .dateTime.month(.abbreviated).day())
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            if let worst = worstEfficiency {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "triangle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(Color.wrenchRed)
+                                    Text("Worst: \(settings.formatEfficiency(worst.efficiency(for: settings.efficiencyUnit)))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Text(worst.date, format: .dateTime.month(.abbreviated).day())
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                        }
+                    }
                 }
             } else if !efficiencyResults.isEmpty {
                 Section("Fuel Efficiency Trend") {
@@ -151,7 +295,7 @@ struct FuelEfficiencyChartView: View {
                     Chart(monthlyFuelCost, id: \.month) { item in
                         BarMark(
                             x: .value("Month", item.month, unit: .month),
-                            y: .value("Cost", item.total)
+                            y: .value("Cost", item.total * chartAnimationProgress)
                         )
                         .foregroundStyle(Color.catFuel.gradient)
                         .cornerRadius(4)
@@ -177,6 +321,21 @@ struct FuelEfficiencyChartView: View {
                         }
                     }
                     .frame(height: 180)
+
+                    // Monthly average
+                    let nonZero = monthlyFuelCost.filter { $0.total > 0 }
+                    if !nonZero.isEmpty {
+                        let avg = nonZero.reduce(0) { $0 + $1.total } / Double(nonZero.count)
+                        HStack {
+                            Text("Monthly Average")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(settings.formatCost(avg))
+                                .font(.caption.weight(.semibold).monospacedDigit())
+                                .foregroundStyle(Color.catFuel)
+                        }
+                    }
                 }
             }
 
@@ -186,14 +345,14 @@ struct FuelEfficiencyChartView: View {
                     Chart(costPerDistanceTrend, id: \.date) { item in
                         AreaMark(
                             x: .value("Date", item.date),
-                            y: .value("Cost", item.cost)
+                            y: .value("Cost", item.cost * chartAnimationProgress)
                         )
                         .foregroundStyle(Color.wrenchAmber.opacity(0.2).gradient)
                         .interpolationMethod(.catmullRom)
 
                         LineMark(
                             x: .value("Date", item.date),
-                            y: .value("Cost", item.cost)
+                            y: .value("Cost", item.cost * chartAnimationProgress)
                         )
                         .foregroundStyle(Color.wrenchAmber)
                         .interpolationMethod(.catmullRom)
@@ -229,7 +388,7 @@ struct FuelEfficiencyChartView: View {
                 Section("Fuel Type Breakdown") {
                     Chart(typeBreakdown, id: \.type) { item in
                         SectorMark(
-                            angle: .value("Volume", item.volume),
+                            angle: .value("Volume", item.volume * chartAnimationProgress),
                             innerRadius: .ratio(0.6),
                             angularInset: 2
                         )
@@ -254,6 +413,11 @@ struct FuelEfficiencyChartView: View {
             }
         }
         .navigationTitle("Fuel Efficiency")
+        .onAppear {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.15)) {
+                chartAnimationProgress = 1.0
+            }
+        }
     }
 
     private func fuelTypeBreakdown() -> [(type: FuelType, volume: Double, count: Int)] {

@@ -24,6 +24,53 @@ struct ReminderStore {
         set { defaults.set(newValue, forKey: "wl_mileage_nudge") }
     }
 
+    // MARK: - Quiet Hours
+
+    static var quietHoursEnabled: Bool {
+        get { defaults.object(forKey: "wl_quiet_hours_enabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "wl_quiet_hours_enabled") }
+    }
+
+    /// Start of quiet period (hour, 0–23). Default 22 (10 PM).
+    static var quietHoursStart: Int {
+        get { defaults.object(forKey: "wl_quiet_hours_start") as? Int ?? 22 }
+        set { defaults.set(newValue, forKey: "wl_quiet_hours_start") }
+    }
+
+    /// End of quiet period (hour, 0–23). Default 8 (8 AM).
+    static var quietHoursEnd: Int {
+        get { defaults.object(forKey: "wl_quiet_hours_end") as? Int ?? 8 }
+        set { defaults.set(newValue, forKey: "wl_quiet_hours_end") }
+    }
+
+    // MARK: - Due Soon Threshold
+
+    /// Days before due date to flag as "due soon". Default 30.
+    static var dueSoonThresholdDays: Int {
+        get { defaults.object(forKey: "wl_due_soon_days") as? Int ?? 30 }
+        set { defaults.set(newValue, forKey: "wl_due_soon_days") }
+    }
+
+    // MARK: - Overdue Escalation
+
+    /// Days after overdue before escalating to daily urgent reminders. Default 7.
+    static var overdueEscalationDays: Int {
+        get { defaults.object(forKey: "wl_overdue_escalation_days") as? Int ?? 7 }
+        set { defaults.set(newValue, forKey: "wl_overdue_escalation_days") }
+    }
+
+    // MARK: - Per-Vehicle Toggle
+
+    static func isVehicleReminderEnabled(for vehicleId: UUID) -> Bool {
+        let key = "wl_vehicle_reminder_\(vehicleId.uuidString)"
+        return defaults.object(forKey: key) as? Bool ?? true
+    }
+
+    static func setVehicleReminderEnabled(_ enabled: Bool, for vehicleId: UUID) {
+        let key = "wl_vehicle_reminder_\(vehicleId.uuidString)"
+        defaults.set(enabled, forKey: key)
+    }
+
     // MARK: - Snooze
 
     static func snoozeDate(for vehicleId: UUID, serviceType: String) -> Date? {

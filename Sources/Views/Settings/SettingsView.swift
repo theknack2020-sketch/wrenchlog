@@ -20,7 +20,11 @@ struct SettingsView: View {
     @State private var showImportResult = false
     @State private var remindersEnabled = ReminderStore.remindersEnabled
     @State private var mileageNudge = ReminderStore.mileageNudgeEnabled
+    @State private var calendarSync = CalendarStore.calendarSyncEnabled
+    @State private var calendarStatus: String = ""
     @State private var notificationStatus: String = "Checking..."
+    @State private var showErrorAlert = false
+    @State private var errorAlertMessage = ""
     @Environment(\.modelContext) private var context
     @Environment(\.requestReview) private var requestReview
     @Environment(\.appTheme) private var theme
@@ -176,6 +180,76 @@ struct SettingsView: View {
                 Text("Reminders notify you when services are due based on time intervals, mileage, and your driving pace. Enable notifications for the best experience.")
             }
 
+            // MARK: - Calendar Sync
+            Section {
+                Toggle("Add Services to Calendar", isOn: $calendarSync)
+                    .accessibilityLabel("Calendar sync")
+                    .accessibilityHint("Automatically adds service records to your iOS Calendar")
+                    .onChange(of: calendarSync) { _, enabled in
+                        CalendarStore.calendarSyncEnabled = enabled
+                        if enabled {
+                            Task {
+                                let granted = await CalendarService.shared.requestAccess()
+                                if granted {
+                                    calendarStatus = "Connected"
+                                    // Sync existing records
+                                    let vehicles = (try? context.fetch(FetchDescriptor<Vehicle>())) ?? []
+                                    let count = CalendarService.shared.syncAllRecords(vehicles: vehicles)
+                                    if count > 0 {
+                                        try? DataManager.save(context)
+                                    }
+                                } else {
+                                    calendarStatus = "Denied"
+                                    calendarSync = false
+                                    CalendarStore.calendarSyncEnabled = false
+                                }
+                            }
+                        }
+                    }
+
+                if calendarSync {
+                    HStack {
+                        Text("Calendar Status")
+                        Spacer()
+                        Text(calendarStatus)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if calendarStatus == "Denied" {
+                        Button {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                                Text("Open Settings to enable Calendar access")
+                                    .font(.subheadline)
+                            }
+                        }
+                    }
+
+                    Button {
+                        let vehicles = (try? context.fetch(FetchDescriptor<Vehicle>())) ?? []
+                        let count = CalendarService.shared.syncAllRecords(vehicles: vehicles)
+                        if count > 0 {
+                            try? DataManager.save(context)
+                            HapticManager.shared.success()
+                        }
+                        calendarStatus = "Synced (\(count) new)"
+                    } label: {
+                        Label("Sync All Records Now", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.subheadline)
+                    }
+                }
+            } header: {
+                Text("Calendar")
+            } footer: {
+                Text("New service records are automatically added to a \"WrenchLog\" calendar in your iOS Calendar app.")
+            }
+
             // MARK: - Premium
             Section("Premium") {
                 if store.isPro {
@@ -289,7 +363,10 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .onAppear {
-            Task { await updateNotificationStatus() }
+            Task {
+                await updateNotificationStatus()
+                updateCalendarStatus()
+            }
         }
         .sheet(isPresented: $showPro) {
             ProUpgradeView()
@@ -328,6 +405,11 @@ struct SettingsView: View {
         } message: {
             Text("Last chance. All your data will be permanently erased.")
         }
+        .alert("Something Went Wrong", isPresented: $showErrorAlert) {
+            Button("OK") {}
+        } message: {
+            Text(errorAlertMessage)
+        }
     }
 
     // MARK: - App Version (dynamic from bundle)
@@ -363,6 +445,11 @@ struct SettingsView: View {
             showExportShare = true
             HapticManager.shared.success()
             SoundManager.playSaveSuccess()
+        } else {
+            errorAlertMessage = "Unable to create export files. Please check available storage and try again."
+            showErrorAlert = true
+            HapticManager.shared.error()
+            SoundManager.playError()
         }
     }
 
@@ -432,8 +519,10 @@ struct SettingsView: View {
             HapticManager.shared.warning()
             SoundManager.playDelete()
         } catch {
-            print("[WrenchLog] Reset error: \(error)")
+            errorAlertMessage = "Unable to reset your data. Please restart the app and try again."
+            showErrorAlert = true
             HapticManager.shared.error()
+            SoundManager.playError()
         }
     }
 
@@ -449,6 +538,18 @@ struct SettingsView: View {
         case .notDetermined: notificationStatus = "Not Asked"
         case .ephemeral: notificationStatus = "Ephemeral"
         @unknown default: notificationStatus = "Unknown"
+        }
+    }
+
+    // MARK: - Calendar Status
+
+    private func updateCalendarStatus() {
+        guard calendarSync else { calendarStatus = ""; return }
+        switch CalendarService.shared.authorizationStatus {
+        case .authorized: calendarStatus = "Connected"
+        case .denied: calendarStatus = "Denied"
+        case .restricted: calendarStatus = "Restricted"
+        case .notDetermined: calendarStatus = "Not Asked"
         }
     }
 }

@@ -5,6 +5,11 @@ struct ReminderSettingsView: View {
     @State private var overrides: [String: ReminderOverride] = [:]
     @State private var remindersEnabled = ReminderStore.remindersEnabled
     @State private var mileageNudge = ReminderStore.mileageNudgeEnabled
+    @State private var vehicleRemindersOn = true
+    @State private var quietHoursEnabled = ReminderStore.quietHoursEnabled
+    @State private var quietStart = ReminderStore.quietHoursStart
+    @State private var quietEnd = ReminderStore.quietHoursEnd
+    @State private var dueSoonDays = ReminderStore.dueSoonThresholdDays
     @Environment(\.dismiss) private var dismiss
 
     private let settings = UserSettings.shared
@@ -12,6 +17,7 @@ struct ReminderSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // MARK: - Master Toggles
                 Section {
                     Toggle("Service Reminders", isOn: $remindersEnabled)
                         .onChange(of: remindersEnabled) { _, val in
@@ -25,6 +31,24 @@ struct ReminderSettingsView: View {
                     Text("Get a weekly reminder to update your odometer for accurate service tracking.")
                 }
 
+                // MARK: - Per-Vehicle Toggle
+                Section {
+                    Toggle("Reminders for \(vehicle.displayName)", isOn: $vehicleRemindersOn)
+                        .onChange(of: vehicleRemindersOn) { _, val in
+                            ReminderStore.setVehicleReminderEnabled(val, for: vehicle.id)
+                        }
+                } footer: {
+                    Text("Disable to silence all reminders for this vehicle without affecting others.")
+                }
+
+                // MARK: - Next Reminder Preview
+                if let preview = ServiceReminderEngine.nextReminderPreview(for: vehicle) {
+                    Section("Next Reminder") {
+                        nextReminderRow(preview)
+                    }
+                }
+
+                // MARK: - Driving Pace
                 if let pace = ServiceReminderEngine.drivingPace(for: vehicle) {
                     Section("Driving Pace") {
                         HStack {
@@ -41,6 +65,59 @@ struct ReminderSettingsView: View {
                     }
                 }
 
+                // MARK: - Quiet Hours
+                Section {
+                    Toggle("Quiet Hours", isOn: $quietHoursEnabled)
+                        .onChange(of: quietHoursEnabled) { _, val in
+                            ReminderStore.quietHoursEnabled = val
+                        }
+
+                    if quietHoursEnabled {
+                        Picker("From", selection: $quietStart) {
+                            ForEach(0..<24, id: \.self) { hour in
+                                Text(formatHour(hour)).tag(hour)
+                            }
+                        }
+                        .onChange(of: quietStart) { _, val in
+                            ReminderStore.quietHoursStart = val
+                        }
+
+                        Picker("Until", selection: $quietEnd) {
+                            ForEach(0..<24, id: \.self) { hour in
+                                Text(formatHour(hour)).tag(hour)
+                            }
+                        }
+                        .onChange(of: quietEnd) { _, val in
+                            ReminderStore.quietHoursEnd = val
+                        }
+                    }
+                } header: {
+                    Text("Quiet Hours")
+                } footer: {
+                    if quietHoursEnabled {
+                        Text("Notifications will be delayed until \(formatHour(quietEnd)) if they fall between \(formatHour(quietStart)) and \(formatHour(quietEnd)).")
+                    } else {
+                        Text("No notification timing restrictions. Enable to prevent late-night alerts.")
+                    }
+                }
+
+                // MARK: - Due Soon Threshold
+                Section {
+                    Picker("Due Soon Threshold", selection: $dueSoonDays) {
+                        Text("14 days").tag(14)
+                        Text("21 days").tag(21)
+                        Text("30 days").tag(30)
+                        Text("45 days").tag(45)
+                        Text("60 days").tag(60)
+                    }
+                    .onChange(of: dueSoonDays) { _, val in
+                        ReminderStore.dueSoonThresholdDays = val
+                    }
+                } footer: {
+                    Text("Services within this window are flagged as \"Due Soon\" with an orange badge.")
+                }
+
+                // MARK: - Service Intervals
                 ForEach(ServiceCategory.allCases.filter({ $0 != .custom }), id: \.self) { category in
                     let types = ServiceType.types(for: category).filter {
                         $0.defaultMileageInterval > 0 || $0.defaultMonthInterval > 0
@@ -80,9 +157,47 @@ struct ReminderSettingsView: View {
             }
             .onAppear {
                 overrides = ReminderStore.overrides(for: vehicle.id)
+                vehicleRemindersOn = ReminderStore.isVehicleReminderEnabled(for: vehicle.id)
             }
         }
     }
+
+    // MARK: - Next Reminder Preview Row
+
+    @ViewBuilder
+    private func nextReminderRow(_ preview: String) -> some View {
+        let summary = ServiceReminderEngine.nextServiceSummary(for: vehicle)
+        HStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(badgeColor(for: summary?.urgency ?? .ok).opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "bell.badge.fill")
+                    .font(.body)
+                    .foregroundStyle(badgeColor(for: summary?.urgency ?? .ok))
+            }
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Next reminder")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(preview)
+                    .font(.subheadline.weight(.medium))
+            }
+
+            Spacer()
+
+            if let urgency = summary?.urgency {
+                DueSoonBadge(urgency: urgency, compact: true)
+            }
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Next reminder: \(preview)")
+    }
+
+    // MARK: - Service Row
 
     @ViewBuilder
     private func reminderRow(for serviceType: ServiceType) -> some View {
@@ -150,6 +265,28 @@ struct ReminderSettingsView: View {
         return Text(parts.joined(separator: " / "))
             .font(.caption)
             .foregroundStyle(.secondary)
+    }
+
+    // MARK: - Helpers
+
+    private func formatHour(_ hour: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h a"
+        var components = DateComponents()
+        components.hour = hour
+        if let date = Calendar.current.date(from: components) {
+            return formatter.string(from: date)
+        }
+        return "\(hour):00"
+    }
+
+    private func badgeColor(for urgency: ReminderUrgency) -> Color {
+        switch urgency {
+        case .overdue: .wrenchRed
+        case .due: .wrenchAmber
+        case .dueSoon: .wrenchYellow
+        case .ok: .wrenchGreen
+        }
     }
 
     // MARK: - Bindings

@@ -74,9 +74,10 @@ struct EditVehicleView: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 6), spacing: 12) {
                         ForEach(VehicleColor.allCases) { vc in
                             Button {
-                                withAnimation(.easeInOut(duration: 0.15)) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.65)) {
                                     selectedColor = selectedColor == vc ? nil : vc
                                 }
+                                HapticManager.shared.selection()
                             } label: {
                                 Circle()
                                     .fill(vc.color)
@@ -157,11 +158,17 @@ struct EditVehicleView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .accessibilityLabel("Cancel editing")
+                    Button("Cancel") {
+                        HapticManager.shared.light()
+                        dismiss()
+                    }
+                    .accessibilityLabel("Cancel editing")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { validateAndSave() }
+                    Button("Save") {
+                        HapticManager.shared.buttonTap()
+                        validateAndSave()
+                    }
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.wrenchAmber)
                         .disabled(make.trimmingCharacters(in: .whitespaces).isEmpty || model.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -233,7 +240,7 @@ struct EditVehicleView: View {
 
         do {
             try DataManager.save(context)
-            HapticManager.shared.success()
+            HapticManager.shared.saveSuccess()
             SoundManager.playSaveSuccess()
             dismiss()
         } catch {

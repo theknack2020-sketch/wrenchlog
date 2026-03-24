@@ -180,8 +180,15 @@ struct OnboardingView: View {
 
             ZStack {
                 RoundedRectangle(cornerRadius: 24)
-                    .fill(Color.catTires.opacity(0.1))
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.catTires.opacity(0.15), Color.catTires.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: 160, height: 160)
+                    .shadow(color: Color.catTires.opacity(0.15), radius: 10, x: 0, y: 4)
 
                 VStack(spacing: 8) {
                     Image(systemName: "car.side.fill")
@@ -213,6 +220,8 @@ struct OnboardingView: View {
                 featurePill(icon: "truck.box.fill", text: "Trucks")
                 featurePill(icon: "bicycle", text: "Any vehicle")
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Supports cars, trucks, and any vehicle")
 
             Spacer()
             Spacer()
@@ -228,8 +237,15 @@ struct OnboardingView: View {
 
             ZStack {
                 RoundedRectangle(cornerRadius: 24)
-                    .fill(Color.catEngine.opacity(0.1))
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.catEngine.opacity(0.15), Color.catEngine.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: 160, height: 160)
+                    .shadow(color: Color.catEngine.opacity(0.15), radius: 10, x: 0, y: 4)
 
                 Image(systemName: "checklist.checked")
                     .font(.system(size: 56))
@@ -256,6 +272,8 @@ struct OnboardingView: View {
                 servicePreviewRow(icon: "fuelpump.fill", text: "Fuel Tracking", color: .catFuel)
             }
             .padding(.horizontal, 40)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("22 preset service types including oil change, tire rotation, battery, and fuel tracking")
 
             Spacer()
             Spacer()
