@@ -124,6 +124,20 @@ struct SettingsView: View {
                 Text("Appearance")
             }
 
+            // MARK: - Sound & Haptics
+            Section {
+                Toggle("Sound & Haptics", isOn: Binding(
+                    get: { !UserDefaults.standard.bool(forKey: "wl_sounds_disabled") },
+                    set: { UserDefaults.standard.set(!$0, forKey: "wl_sounds_disabled") }
+                ))
+                .accessibilityLabel("Sound and haptics")
+                .accessibilityHint("Toggle sound effects and haptic feedback throughout the app")
+            } header: {
+                Text("Sound & Haptics")
+            } footer: {
+                Text("Controls system sounds and haptic feedback for actions like saving, deleting, and navigation.")
+            }
+
             // MARK: - Notifications
             Section {
                 Toggle("Service Reminders", isOn: $remindersEnabled)

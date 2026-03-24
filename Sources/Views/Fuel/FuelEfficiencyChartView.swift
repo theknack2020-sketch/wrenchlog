@@ -203,8 +203,8 @@ struct FuelEfficiencyChartView: View {
 
                         // Trend line
                         if let trend = trendLine, efficiencyResults.count >= 3 {
-                            let firstDate = efficiencyResults.first!.date
-                            let lastDate = efficiencyResults.last!.date
+                            let firstDate = efficiencyResults.first?.date ?? Date()
+                            let lastDate = efficiencyResults.last?.date ?? Date()
 
                             LineMark(
                                 x: .value("Date", firstDate),
