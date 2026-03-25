@@ -284,6 +284,33 @@ struct AnimatedMileageText: View {
     }
 }
 
+// MARK: - Pressable Button Style
+
+/// Standard pressable button style — scale + opacity spring on press.
+struct PressableButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Shake Effect
+
+/// Horizontal shake — triggers on the `trigger` value changing.
+struct ShakeEffect: GeometryEffect {
+    var amount: CGFloat = 6
+    var shakesPerUnit = 3
+    var animatableData: CGFloat
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        ProjectionTransform(
+            CGAffineTransform(translationX: amount * sin(animatableData * .pi * CGFloat(shakesPerUnit)), y: 0)
+        )
+    }
+}
+
 // MARK: - View Extension Conveniences
 
 extension View {
@@ -317,5 +344,37 @@ extension View {
 
     func statPop(index: Int) -> some View {
         modifier(StatPopModifier(index: index))
+    }
+
+    /// Pressable button style — apply to any button for tactile press feedback.
+    func pressable() -> some View {
+        buttonStyle(PressableButtonStyle())
+    }
+
+    /// Shake the view when `trigger` increments. Animatable horizontal wiggle.
+    func shake(trigger: Int) -> some View {
+        modifier(ShakeEffect(animatableData: CGFloat(trigger)))
+    }
+
+    /// Glassmorphism card — ultraThinMaterial with rounded corners and dual shadows.
+    func glassCard(cornerRadius: CGFloat = 16) -> some View {
+        self
+            .padding(16)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+            .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+            .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
+    }
+
+    /// Glassmorphism background only — no padding. Use when the view already has its own padding.
+    func glassBackground(cornerRadius: CGFloat = 16) -> some View {
+        self
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+            .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
+            .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
+    }
+
+    /// Section header with rounded design font.
+    func sectionHeaderStyle() -> some View {
+        self.font(.system(.headline, design: .rounded))
     }
 }

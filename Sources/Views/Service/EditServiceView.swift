@@ -22,6 +22,7 @@ struct EditServiceView: View {
     // Validation & error state
     @State private var validationError: String?
     @State private var saveError: String?
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -236,17 +237,20 @@ struct EditServiceView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Edit Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("editServiceCancel")
                         .accessibilityLabel("Cancel editing")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveChanges() }
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.wrenchAmber)
+                        .accessibilityIdentifier("editServiceSave")
                         .accessibilityLabel("Save changes")
                         .accessibilityHint("Saves updated service record")
                 }

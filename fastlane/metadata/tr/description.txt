@@ -1,0 +1,47 @@
+WrenchLog, gizliliğe önem veren, reklamsız araç bakım takip uygulamasıdır. Araçlarınızı sağlıklı, cüzdanınızı bilgili tutar.
+
+Hesap yok. Reklam yok. Takip yok. Verileriniz cihazınızda kalır — nokta.
+
+▸ HER SERVİSİ KAYDET
+Yağ değişimi, lastik rotasyonu, fren bakımı, akü değişimi ve 22 hazır servis türünü kaydedin — veya kendi özel kategorilerinizi oluşturun. Tarih, kilometre, maliyet, not ve fiş fotoğrafı ekleyin.
+
+▸ YAKIT TAKİBİ VE VERİMLİLİK
+Her yakıt alımını tür, hacim, maliyet ve istasyon adıyla kaydedin. WrenchLog, L/100km (veya MPG), kilometre başı maliyeti otomatik hesaplar ve etkileşimli grafiklerle verimlilik trendlerini izler. Benzin, Dizel, LPG ve Elektrikli araçları destekler.
+
+▸ AKILLI HATIRLATMALAR
+Bir daha yağ değişimini unutmayın. WrenchLog, zaman aralıkları, kilometre eşikleri ve gerçek sürüş hızınıza göre akıllı hatırlatmalar gönderir.
+
+▸ ARAÇ SAĞLIK PUANI
+Aracınızın bakım durumunu 0–100 puanla görün. Puan, kritik servisleri (motor, fren) daha ağır değerlendirir.
+
+▸ MALİYET ANALİTİĞİ (Pro)
+Servis-yakıt dağılımı, kategori bazlı harcama, aylık trend grafikleri ve yıllık sahiplik maliyeti.
+
+▸ PDF DIŞA AKTARMA (Pro)
+Temiz, profesyonel servis geçmişi raporları oluşturun. Araç satışı, sigorta veya tamircinizle paylaşım için ideal.
+
+▸ CSV DIŞA/İÇE AKTARMA
+Tüm verilerinizi CSV olarak yedekleyin veya başka uygulamalardan aktarın.
+
+▸ ÇOKLU ARAÇ GARAJ (Pro)
+Tüm filonuzu yönetin — otomobil, kamyonet, motosiklet. Her araç kendi panosuna, zaman çizelgesine ve hatırlatmalarına sahiptir.
+
+▸ BAKIM ZAMAN ÇİZELGESİ
+Her servis ve yakıt alımını aya göre gruplanmış kronolojik zaman çizelgesinde görün.
+
+▸ BAKIM KONTROL LİSTESİ
+Her araç için özel yapılacaklar listesi oluşturun. Lastik basıncı, yağ seviyesi gibi yaygın kontroller için hazır öneriler.
+
+▸ MEVSIMSEL İPUÇLARI
+Mevcut mevsime göre bağlama duyarlı bakım önerileri.
+
+▸ ÖZELLEŞTİRİLEBİLİR BİRİMLER
+Mil veya kilometre. Galon veya litre. MPG veya L/100km. USD, EUR, GBP veya TRY.
+
+▸ GİZLİLİK ÖNCELİKLİ
+WrenchLog sıfır kişisel veri toplar. Hesap kaydı yok. Analitik SDK yok. Üçüncü taraf takibi yok. Reklam asla yok. Araç verileriniz cihazınızdan asla ayrılmaz.
+
+ÜCRETSİZ: 1 araç, servis kaydı, yakıt takibi, hatırlatmalar, kontrol listesi.
+PRO: Sınırsız araç, fiş fotoğrafları, PDF rapor, maliyet analitiği, CSV dışa aktarma.
+
+Sorular? theknack2020@gmail.com

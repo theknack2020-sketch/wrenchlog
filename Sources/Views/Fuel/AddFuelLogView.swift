@@ -24,6 +24,8 @@ struct AddFuelLogView: View {
     @State private var mileageError: String?
     @State private var saveError: String?
     @State private var isSaving = false
+    @State private var shakeTrigger = 0
+    @FocusState private var isFocused: Bool
 
     private let settings = UserSettings.shared
 
@@ -60,6 +62,11 @@ struct AddFuelLogView: View {
                                 .foregroundStyle(.red)
                         }
                     }
+                    .listRowBackground(
+                        mileageError != nil
+                            ? Color.red.opacity(0.06)
+                            : Color(.secondarySystemGroupedBackground)
+                    )
 
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -75,9 +82,9 @@ struct AddFuelLogView: View {
                                         volumeError = nil
                                         recalcFromVolume()
                                     }
-                                Text(settings.volumeUnit.label)
+                                Text(fuelType.volumeLabel(fallback: settings.volumeUnit))
                                     .foregroundStyle(.secondary)
-                                    .frame(width: 30, alignment: .leading)
+                                    .frame(width: 36, alignment: .leading)
                             }
                         }
                         if let err = volumeError {
@@ -86,6 +93,11 @@ struct AddFuelLogView: View {
                                 .foregroundStyle(.red)
                         }
                     }
+                    .listRowBackground(
+                        volumeError != nil
+                            ? Color.red.opacity(0.06)
+                            : Color(.secondarySystemGroupedBackground)
+                    )
 
                     Toggle("Full Tank", isOn: $isFullTank)
                         .onChange(of: isFullTank) { _, _ in HapticManager.shared.sectionToggle() }
@@ -135,9 +147,14 @@ struct AddFuelLogView: View {
                                 .foregroundStyle(.red)
                         }
                     }
+                    .listRowBackground(
+                        costError != nil
+                            ? Color.red.opacity(0.06)
+                            : Color(.secondarySystemGroupedBackground)
+                    )
 
                     HStack {
-                        Text("Price/\(settings.volumeUnit.label)")
+                        Text("Price/\(fuelType.volumeLabel(fallback: settings.volumeUnit))")
                         Spacer()
                         HStack(spacing: 2) {
                             Text(settings.currency.symbol)
@@ -163,6 +180,7 @@ struct AddFuelLogView: View {
                         .lineLimit(3...6)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Log Fuel")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -171,6 +189,7 @@ struct AddFuelLogView: View {
                         HapticManager.shared.light()
                         dismiss()
                     }
+                    .accessibilityIdentifier("addFuelLogCancel")
                     .accessibilityLabel("Cancel fuel log")
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -186,7 +205,9 @@ struct AddFuelLogView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .disabled(!isValid || isSaving)
+                        .disabled(isSaving)
+                        .shake(trigger: shakeTrigger)
+                        .accessibilityIdentifier("addFuelLogSave")
                         .accessibilityLabel("Save fuel log")
                         .accessibilityHint("Logs this fuel fill-up")
                 }
@@ -203,12 +224,6 @@ struct AddFuelLogView: View {
                 Text(saveError ?? "An unexpected error occurred.")
             }
         }
-    }
-
-    private var isValid: Bool {
-        guard let vol = Double(volume), vol > 0 else { return false }
-        guard let cost = Double(totalCost), cost > 0 else { return false }
-        return true
     }
 
     private func recalcPricePerUnit() {
@@ -276,6 +291,7 @@ struct AddFuelLogView: View {
         }
 
         guard !hasFieldError else {
+            withAnimation(.default) { shakeTrigger += 1 }
             HapticManager.shared.error()
             return
         }
@@ -289,6 +305,7 @@ struct AddFuelLogView: View {
         )
         guard result.isValid else {
             validationError = result.firstError
+            withAnimation(.default) { shakeTrigger += 1 }
             HapticManager.shared.error()
             return
         }
@@ -322,6 +339,7 @@ struct AddFuelLogView: View {
             try DataManager.save(context)
             HapticManager.shared.saveSuccess()
             SoundManager.playSaveSuccess()
+            SoftPaywallTracker.shared.recordAction()
             dismiss()
         } catch {
             saveError = error.errorDescription

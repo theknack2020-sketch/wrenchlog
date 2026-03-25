@@ -23,6 +23,7 @@ enum TimelineEntryKind {
 struct MaintenanceTimelineView: View {
     let vehicle: Vehicle
     private let settings = UserSettings.shared
+    @Environment(\.appTheme) private var theme
 
     var entries: [TimelineEntry] {
         var items: [TimelineEntry] = []
@@ -47,8 +48,8 @@ struct MaintenanceTimelineView: View {
             items.append(TimelineEntry(
                 id: log.id,
                 date: log.date,
-                title: "\(log.fuelType.rawValue) Fill-Up",
-                detail: log.station.isEmpty ? "\(settings.formatVolume(log.volume))" : "\(log.station) · \(settings.formatVolume(log.volume))",
+                title: log.fuelType.isElectric ? "EV Charge" : "\(log.fuelType.rawValue) Fill-Up",
+                detail: log.station.isEmpty ? "\(settings.formatVolume(log.volume, fuelType: log.fuelType))" : "\(log.station) · \(settings.formatVolume(log.volume, fuelType: log.fuelType))",
                 icon: log.fuelType.icon,
                 color: log.fuelType.color,
                 cost: log.totalCost,
@@ -93,30 +94,30 @@ struct MaintenanceTimelineView: View {
         List {
             if entries.isEmpty {
                 Section {
-                    HStack {
+                    VStack(spacing: 24) {
                         Spacer()
-                        VStack(spacing: 16) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.wrenchAmber.opacity(0.1))
-                                    .frame(width: 80, height: 80)
-                                Image(systemName: "clock.arrow.circlepath")
-                                    .font(.system(size: 36))
-                                    .foregroundStyle(Color.wrenchAmber.opacity(0.4))
-                            }
-                            VStack(spacing: 6) {
-                                Text("No Events Yet")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                Text("Log services and fuel fill-ups to build\nyour maintenance timeline.")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                                    .multilineTextAlignment(.center)
-                            }
+                        ZStack {
+                            Circle()
+                                .fill(theme.accent.opacity(0.1))
+                                .frame(width: 100, height: 100)
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 40))
+                                .foregroundStyle(theme.accent)
+                                .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
                         }
-                        .padding(.vertical, 30)
+                        .accessibilityHidden(true)
+                        VStack(spacing: 8) {
+                            Text("No Timeline Yet")
+                                .font(.system(.title3, design: .rounded, weight: .bold))
+                            Text("Service records and fuel logs will appear here as a timeline.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
                         Spacer()
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
                 }
             } else {
                 ForEach(groupedEntries, id: \.key) { group in
@@ -143,8 +144,9 @@ struct MaintenanceTimelineView: View {
             // Icon
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(entry.color.opacity(0.12))
+                    .fill(.ultraThinMaterial)
                     .frame(width: 36, height: 36)
+                    .shadow(color: entry.color.opacity(0.15), radius: 3, y: 1)
                 Image(systemName: entry.icon)
                     .font(.caption)
                     .foregroundStyle(entry.color)

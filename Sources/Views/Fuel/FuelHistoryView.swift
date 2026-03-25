@@ -9,7 +9,9 @@ struct FuelHistoryView: View {
     @State private var showUndoBanner = false
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
+    @State private var fuelLogForEdit: FuelLog?
     @Environment(\.modelContext) private var context
+    @Environment(\.appTheme) private var theme
 
     private let settings = UserSettings.shared
 
@@ -43,7 +45,10 @@ struct FuelHistoryView: View {
             .sheet(isPresented: $showAddFuel) {
                 AddFuelLogView(vehicle: vehicle)
             }
-            .alert("Delete Fuel Log?", isPresented: $showDeleteConfirm) {
+            .navigationDestination(item: $fuelLogForEdit) { log in
+                EditFuelLogView(fuelLog: log)
+            }
+            .confirmationDialog("Delete Fuel Log?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
                 Button("Delete", role: .destructive) { performDelete() }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -78,6 +83,7 @@ struct FuelHistoryView: View {
                 Image(systemName: "plus.circle.fill")
                     .foregroundStyle(Color.wrenchAmber)
             }
+            .accessibilityIdentifier("fuelHistoryAdd")
             .accessibilityLabel("Add fuel log")
         }
     }
@@ -116,34 +122,85 @@ struct FuelHistoryView: View {
     }
 
     private var fuelEmptySection: some View {
-        Section("Fuel History") {
-            HStack {
+        Section {
+            VStack(spacing: 24) {
                 Spacer()
-                VStack(spacing: 12) {
-                    ZStack {
-                        Circle().fill(Color.catFuel.opacity(0.1)).frame(width: 72, height: 72)
-                        Image(systemName: "fuelpump.circle.fill").font(.system(size: 32)).foregroundStyle(Color.catFuel.opacity(0.4))
-                    }
-                    Text("No Fuel Logs").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
-                    Text("Track your fill-ups to see efficiency trends,\nspending patterns, and cost-per-mile.")
-                        .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
-                    Button { HapticManager.shared.buttonTap(); showAddFuel = true } label: {
-                        Label("Log First Fill-Up", systemImage: "plus.circle.fill").font(.caption.weight(.medium)).foregroundStyle(Color.wrenchAmber)
-                    }
+                ZStack {
+                    Circle()
+                        .fill(theme.accent.opacity(0.1))
+                        .frame(width: 100, height: 100)
+                    Image(systemName: "fuelpump.circle.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(theme.accent)
+                        .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
                 }
-                .padding(.vertical, 24)
+                .accessibilityHidden(true)
+                VStack(spacing: 8) {
+                    Text("No Fuel Logs")
+                        .font(.system(.title3, design: .rounded, weight: .bold))
+                    Text("Track every fill-up to monitor your fuel costs and efficiency.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                Button {
+                    HapticManager.shared.buttonTap()
+                    showAddFuel = true
+                } label: {
+                    Label("Add Fuel", systemImage: "plus.circle.fill")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(theme.accent)
+                }
+                .pressable()
                 Spacer()
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 20)
         }
     }
 
     private var fuelLogListSection: some View {
-        Section("Fuel History") {
+        Section {
             ForEach(Array(sortedLogs.enumerated()), id: \.element.id) { index, log in
                 NavigationLink { EditFuelLogView(fuelLog: log) } label: {
                     FuelLogRow(log: log, efficiency: efficiencyForLog(log))
                 }
+                .pressable()
                 .simultaneousGesture(TapGesture().onEnded { HapticManager.shared.light() })
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        HapticManager.shared.deleteWarning()
+                        logToDelete = log
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+                .swipeActions(edge: .leading) {
+                    NavigationLink {
+                        EditFuelLogView(fuelLog: log)
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    .tint(.blue)
+                }
+                .contextMenu {
+                    ShareLink(item: shareTextForFuelLog(log)) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    Button {
+                        fuelLogForEdit = log
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    Button(role: .destructive) {
+                        HapticManager.shared.deleteWarning()
+                        logToDelete = log
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
                 .staggeredAppear(index: index)
             }
             .onDelete { indexSet in
@@ -187,10 +244,29 @@ struct FuelHistoryView: View {
         efficiencyResults.first { $0.date == log.date && $0.mileage == log.mileage }
     }
 
+    // MARK: - Share Text
+
+    private func shareTextForFuelLog(_ log: FuelLog) -> String {
+        let dateStr = log.date.formatted(.dateTime.month(.abbreviated).day().year())
+        var text = "⛽ Fuel: \(settings.formatVolume(log.volume, fuelType: log.fuelType)) on \(dateStr)"
+        if log.totalCost > 0 {
+            text += " — \(settings.formatCost(log.totalCost))"
+        }
+        if log.mileage > 0 {
+            text += " at \(settings.formatMileage(log.mileage))"
+        }
+        if !log.station.isEmpty {
+            text += "\nStation: \(log.station)"
+        }
+        text += "\n\n— Shared from WrenchLog"
+        return text
+    }
+
     private func statCard(title: String, value: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
                 .font(.subheadline.weight(.bold).monospacedDigit())
+                .contentTransition(.numericText())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(title)
@@ -199,9 +275,9 @@ struct FuelHistoryView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: color.opacity(0.12), radius: 5, x: 0, y: 2)
-        .shadow(color: .black.opacity(0.04), radius: 2, x: 0, y: 1)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.15), radius: 5, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
     }
@@ -227,9 +303,10 @@ struct FuelHistoryView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(.ultraThinMaterial.opacity(0.9))
+        .background(.ultraThinMaterial)
         .background(Color.wrenchCharcoal.opacity(0.85))
         .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
     }
 
     private func undoDeleteFuelLog() {
@@ -307,10 +384,12 @@ struct FuelLogRow: View {
                     if log.totalCost > 0 {
                         Text(settings.formatCost(log.totalCost))
                             .font(.subheadline.weight(.semibold).monospacedDigit())
+                            .contentTransition(.numericText())
                             .foregroundStyle(Color.wrenchAmber)
                     }
-                    Text(settings.formatVolume(log.volume))
+                    Text(settings.formatVolume(log.volume, fuelType: log.fuelType))
                         .font(.caption.monospacedDigit())
+                        .contentTransition(.numericText())
                         .foregroundStyle(.secondary)
                 }
             }
@@ -323,11 +402,13 @@ struct FuelLogRow: View {
                         .foregroundStyle(Color.catFuel)
                     Text(settings.formatEfficiency(eff.efficiency(for: settings.efficiencyUnit)))
                         .font(.caption2.weight(.medium).monospacedDigit())
+                        .contentTransition(.numericText())
                         .foregroundStyle(Color.catFuel)
                     Text("·")
                         .foregroundStyle(.tertiary)
                     Text(settings.formatCostPerDistance(eff.costPerDistance(for: settings.distanceUnit)))
                         .font(.caption2.monospacedDigit())
+                        .contentTransition(.numericText())
                         .foregroundStyle(.secondary)
                 }
                 .padding(.leading, 40)

@@ -11,6 +11,15 @@ enum PhotoSaveResult {
 struct ServicePhotoManager {
     static let shared = ServicePhotoManager()
 
+    // MARK: - Image Cache
+
+    private nonisolated(unsafe) static let imageCache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 20
+        cache.totalCostLimit = 50 * 1024 * 1024 // 50MB
+        return cache
+    }()
+
     private var documentsURL: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appending(path: "service_photos")
@@ -62,18 +71,30 @@ struct ServicePhotoManager {
     }
 
     func loadPhoto(named fileName: String) -> UIImage? {
+        let key = fileName as NSString
+        if let cached = Self.imageCache.object(forKey: key) {
+            return cached
+        }
         let url = documentsURL.appending(path: fileName)
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return UIImage(data: data)
+        guard let data = try? Data(contentsOf: url),
+              let image = UIImage(data: data) else { return nil }
+        Self.imageCache.setObject(image, forKey: key, cost: data.count)
+        return image
     }
 
     func deletePhoto(named fileName: String) {
+        Self.imageCache.removeObject(forKey: fileName as NSString)
         let url = documentsURL.appending(path: fileName)
         try? FileManager.default.removeItem(at: url)
     }
 
     func deletePhotos(for fileNames: [String]) {
         fileNames.forEach { deletePhoto(named: $0) }
+    }
+
+    /// Clears the in-memory image cache.
+    func clearCache() {
+        Self.imageCache.removeAllObjects()
     }
 
     // MARK: - Disk Space Check

@@ -25,6 +25,7 @@ struct SettingsView: View {
     @State private var notificationStatus: String = "Checking..."
     @State private var showErrorAlert = false
     @State private var errorAlertMessage = ""
+    @AppStorage("wl_onboarding_complete") private var onboardingComplete = true
     @Environment(\.modelContext) private var context
     @Environment(\.requestReview) private var requestReview
     @Environment(\.appTheme) private var theme
@@ -32,8 +33,39 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            // MARK: - Header Banner
+            Section {
+                HStack(spacing: 10) {
+                    Image(systemName: "gearshape.2.fill")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Settings")
+                            .font(.system(.subheadline, design: .rounded, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text("Customize your experience")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        colors: theme.headerGradient,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .shadow(color: theme.accent.opacity(0.25), radius: 8, x: 0, y: 4)
+            }
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            .listRowBackground(Color.clear)
+
             // MARK: - Units
-            Section("Units") {
+            Section {
                 Picker("Distance", selection: $distanceUnit) {
                     Text("Miles").tag(DistanceUnit.miles)
                     Text("Kilometers").tag(DistanceUnit.km)
@@ -71,58 +103,13 @@ struct SettingsView: View {
                 .onChange(of: currency) { _, val in
                     UserSettings.shared.currency = val
                 }
+            } header: {
+                Text("Units")
+                    .font(.system(.headline, design: .rounded))
             }
 
             // MARK: - Appearance
-            Section {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Color Theme")
-                        .font(.subheadline)
-
-                    HStack(spacing: 12) {
-                        ForEach(AppTheme.allCases) { appTheme in
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedTheme = appTheme
-                                    ThemeManager.shared.current = appTheme
-                                }
-                                HapticManager.shared.selection()
-                            } label: {
-                                VStack(spacing: 6) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(appTheme.accent.opacity(0.15))
-                                            .frame(width: 56, height: 56)
-                                        Image(systemName: appTheme.icon)
-                                            .font(.title3)
-                                            .foregroundStyle(appTheme.accent)
-                                    }
-                                    .overlay {
-                                        if selectedTheme == appTheme {
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .strokeBorder(appTheme.accent, lineWidth: 2.5)
-                                                .frame(width: 56, height: 56)
-                                        }
-                                    }
-
-                                    Text(appTheme.rawValue)
-                                        .font(.caption2.weight(.medium))
-                                        .foregroundStyle(selectedTheme == appTheme ? appTheme.accent : .secondary)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.8)
-                                }
-                                .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("\(appTheme.rawValue) theme")
-                            .accessibilityAddTraits(selectedTheme == appTheme ? .isSelected : [])
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Appearance")
-            }
+            appearanceSection
 
             // MARK: - Sound & Haptics
             Section {
@@ -293,64 +280,90 @@ struct SettingsView: View {
             }
 
             // MARK: - Premium
-            Section("Premium") {
+            Section {
                 if store.isPro {
-                    HStack {
+                    HStack(spacing: 10) {
                         Image(systemName: "checkmark.seal.fill")
-                            .foregroundStyle(.green)
-                        Text("WrenchLog Pro Active")
-                            .font(.subheadline.weight(.medium))
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                LinearGradient(
+                                    colors: [.green, Color(red: 0.15, green: 0.70, blue: 0.35)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("WrenchLog Pro")
+                                .font(.subheadline.weight(.semibold))
+                            Text("All features unlocked")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text("Active")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(
+                                LinearGradient(
+                                    colors: [.green, Color(red: 0.15, green: 0.70, blue: 0.35)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(Capsule())
                     }
                 } else {
                     Button {
                         showPro = true
                     } label: {
-                        HStack {
+                        HStack(spacing: 10) {
                             Image(systemName: "crown.fill")
-                                .foregroundStyle(theme.accent)
-                            VStack(alignment: .leading) {
+                                .font(.title3)
+                                .foregroundStyle(.white)
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text("Upgrade to Pro")
                                     .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.white)
                                 Text("Unlimited vehicles, photos, PDF export")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(.white.opacity(0.85))
                             }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.white.opacity(0.7))
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(red: 0.91, green: 0.64, blue: 0.09), Color(red: 0.85, green: 0.55, blue: 0.05)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .shadow(color: Color(red: 0.91, green: 0.64, blue: 0.09).opacity(0.3), radius: 8, x: 0, y: 4)
                     }
+                    .pressable()
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowBackground(Color.clear)
                 }
+            } header: {
+                Text("Premium")
+                    .font(.system(.headline, design: .rounded))
             }
 
             // MARK: - Data Management
-            Section("Data") {
-                // Export CSV
-                Button {
-                    exportData()
-                } label: {
-                    Label("Export Data (CSV)", systemImage: "square.and.arrow.up")
-                }
-                .accessibilityLabel("Export all data as CSV files")
-
-                // Import CSV
-                Button {
-                    showImportPicker = true
-                } label: {
-                    Label("Import Data (CSV)", systemImage: "square.and.arrow.down")
-                }
-                .accessibilityLabel("Import data from CSV file")
-
-                // Reset All Data
-                Button(role: .destructive) {
-                    showResetConfirm = true
-                } label: {
-                    Label("Reset All Data", systemImage: "trash")
-                        .foregroundStyle(.red)
-                }
-                .accessibilityLabel("Reset all data")
-                .accessibilityHint("Permanently deletes all vehicles and records")
-            }
+            dataManagementSection
 
             // MARK: - Share & Rate
-            Section("Spread the Word") {
+            Section {
                 // Share App
                 ShareLink(
                     item: URL(string: "https://apps.apple.com/app/wrenchlog/id6743597962")!,
@@ -367,11 +380,15 @@ struct SettingsView: View {
                 } label: {
                     Label("Rate on App Store", systemImage: "star.fill")
                 }
+                .pressable()
                 .accessibilityLabel("Rate WrenchLog on the App Store")
+            } header: {
+                Text("Spread the Word")
+                    .font(.system(.headline, design: .rounded))
             }
 
             // MARK: - About
-            Section("About") {
+            Section {
                 HStack {
                     Text("Version")
                     Spacer()
@@ -386,10 +403,26 @@ struct SettingsView: View {
 
                 Link("Privacy Policy", destination: URL(string: "https://theknack2020-sketch.github.io/wrenchlog/privacy/")!)
                 Link("Terms of Use", destination: URL(string: "https://theknack2020-sketch.github.io/wrenchlog/terms/")!)
+
+                Button {
+                    onboardingComplete = false
+                    HapticManager.shared.success()
+                } label: {
+                    Label("Replay Onboarding", systemImage: "arrow.counterclockwise")
+                }
+                .accessibilityLabel("Replay onboarding")
+                .accessibilityHint("Shows the welcome screens again on next app launch")
+            } header: {
+                Text("About")
+                    .font(.system(.headline, design: .rounded))
+            } footer: {
+                if !onboardingComplete {
+                    Text("Onboarding will show on next app launch.")
+                }
             }
 
             // MARK: - More Apps
-            Section("More Apps") {
+            Section {
                 Link(destination: URL(string: "https://apps.apple.com/app/lumifaste/id6760971357")!) {
                     HStack(spacing: 12) {
                         Image(systemName: "leaf.fill")
@@ -401,6 +434,9 @@ struct SettingsView: View {
                         }
                     }
                 }
+            } header: {
+                Text("More Apps")
+                    .font(.system(.headline, design: .rounded))
             }
         }
         .navigationTitle("Settings")
@@ -451,6 +487,143 @@ struct SettingsView: View {
             Button("OK") {}
         } message: {
             Text(errorAlertMessage)
+        }
+    }
+
+    // MARK: - Data Management Section (extracted for type-checker)
+
+    private var dataManagementSection: some View {
+        Section {
+            // Export CSV — Pro only
+            Button {
+                if store.isPro {
+                    exportData()
+                } else {
+                    showPro = true
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(theme.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    Text("Export Data (CSV)")
+                    if !store.isPro {
+                        Spacer()
+                        Image(systemName: "crown.fill")
+                            .font(.caption)
+                            .foregroundStyle(theme.accent)
+                    }
+                }
+            }
+            .pressable()
+            .accessibilityIdentifier("settingsExportCSV")
+            .accessibilityLabel(store.isPro ? "Export all data as CSV files" : "Export data, Pro feature")
+
+            // Import CSV
+            Button {
+                showImportPicker = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(theme.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    Text("Import Data (CSV)")
+                }
+            }
+            .pressable()
+            .accessibilityLabel("Import data from CSV file")
+
+            // Reset All Data
+            Button(role: .destructive) {
+                showResetConfirm = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "trash")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(.red, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    Text("Reset All Data")
+                        .foregroundStyle(.red)
+                }
+            }
+            .pressable()
+            .accessibilityLabel("Reset all data")
+            .accessibilityHint("Permanently deletes all vehicles and records")
+        } header: {
+            Text("Data")
+        }
+    }
+
+    // MARK: - Appearance Section (extracted for type-checker)
+
+    private var appearanceSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Color Theme")
+                    .font(.subheadline)
+
+                HStack(spacing: 12) {
+                    ForEach(AppTheme.allCases) { appTheme in
+                        let isFreeTheme = appTheme == .defaultAmber || appTheme == .darkMono
+                        let isLocked = !store.isPro && !isFreeTheme
+                        Button {
+                            if isLocked {
+                                showPro = true
+                            } else {
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedTheme = appTheme
+                                    ThemeManager.shared.current = appTheme
+                                }
+                                HapticManager.shared.selection()
+                            }
+                        } label: {
+                            VStack(spacing: 6) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(appTheme.accent.opacity(isLocked ? 0.08 : 0.15))
+                                        .frame(width: 56, height: 56)
+                                    if isLocked {
+                                        Image(systemName: "lock.fill")
+                                            .font(.body)
+                                            .foregroundStyle(appTheme.accent.opacity(0.4))
+                                    } else {
+                                        Image(systemName: appTheme.icon)
+                                            .font(.title3)
+                                            .foregroundStyle(appTheme.accent)
+                                    }
+                                }
+                                .overlay {
+                                    if selectedTheme == appTheme {
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .strokeBorder(appTheme.accent, lineWidth: 2.5)
+                                            .frame(width: 56, height: 56)
+                                    }
+                                }
+
+                                Text(appTheme.rawValue)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(selectedTheme == appTheme ? AnyShapeStyle(appTheme.accent) : isLocked ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(appTheme.rawValue) theme\(isLocked ? ", Pro only" : "")")
+                        .accessibilityAddTraits(selectedTheme == appTheme ? .isSelected : [])
+                    }
+                }
+                .padding(10)
+                .glassBackground(cornerRadius: 14)
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Appearance")
         }
     }
 

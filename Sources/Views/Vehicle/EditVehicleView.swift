@@ -17,12 +17,16 @@ struct EditVehicleView: View {
     @State private var selectedColor: VehicleColor?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoData: Data?
+    @State private var photoChanged = false
+
+    private let vehiclePhotoManager = VehiclePhotoManager.shared
 
     // Validation & error state
     @State private var validationError: String?
     @State private var mileageWarning: String?
     @State private var showDuplicateWarning = false
     @State private var saveError: String?
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -154,6 +158,7 @@ struct EditVehicleView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Edit Vehicle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -162,6 +167,7 @@ struct EditVehicleView: View {
                         HapticManager.shared.light()
                         dismiss()
                     }
+                    .accessibilityIdentifier("editVehicleCancel")
                     .accessibilityLabel("Cancel editing")
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -172,6 +178,7 @@ struct EditVehicleView: View {
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.wrenchAmber)
                         .disabled(make.trimmingCharacters(in: .whitespaces).isEmpty || model.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .accessibilityIdentifier("editVehicleSave")
                         .accessibilityLabel("Save changes")
                         .accessibilityHint("Saves updated vehicle information")
                 }
@@ -184,12 +191,19 @@ struct EditVehicleView: View {
                 licensePlate = vehicle.licensePlate
                 vin = vehicle.vin
                 selectedColor = vehicle.vehicleColor
-                photoData = vehicle.photoData
+
+                // Load existing photo: prefer file-based, fall back to legacy blob
+                if let img = vehiclePhotoManager.loadVehiclePhoto(named: vehicle.vehiclePhotoFileName) {
+                    photoData = img.jpegData(compressionQuality: 0.8)
+                } else {
+                    photoData = vehicle.photoData
+                }
             }
             .onChange(of: selectedPhoto) { _, item in
                 Task {
                     if let data = try? await item?.loadTransferable(type: Data.self) {
                         photoData = data
+                        photoChanged = true
                     }
                 }
             }
@@ -235,7 +249,18 @@ struct EditVehicleView: View {
         vehicle.licensePlate = licensePlate
         vehicle.vin = vin
         vehicle.colorRaw = selectedColor?.rawValue ?? ""
-        vehicle.photoData = photoData
+
+        // Save photo via file-based manager only if user picked a new one
+        if photoChanged, let data = photoData {
+            // Delete old file if it exists
+            if !vehicle.vehiclePhotoFileName.isEmpty {
+                vehiclePhotoManager.deleteVehiclePhoto(named: vehicle.vehiclePhotoFileName)
+            }
+            if let fileName = vehiclePhotoManager.saveVehiclePhoto(data, vehicleId: vehicle.id) {
+                vehicle.vehiclePhotoFileName = fileName
+            }
+        }
+        vehicle.photoData = nil  // Migrate away from blob storage
         vehicle.lastUpdated = .now
 
         do {

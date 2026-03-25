@@ -87,73 +87,85 @@ struct ServiceReminderEngine {
                 .sorted { $0.date > $1.date }
                 .first
 
-            var urgency: ReminderUrgency = .ok
-            var displayDue = ""
+            var timeUrgency: ReminderUrgency = .ok
+            var mileageUrgency: ReminderUrgency = .ok
+            var timeDisplay = ""
+            var mileageDisplay = ""
             var nextDueDate: Date? = nil
             var nextDueMileage: Int? = nil
             var daysOverdue = 0
 
-            // Time-based check
+            // ── Time-based check ──
             if monthInterval > 0, let last = lastRecord {
                 let due = calendar.date(byAdding: .month, value: monthInterval, to: last.date) ?? Date()
                 nextDueDate = due
                 let daysUntil = calendar.dateComponents([.day], from: Date(), to: due).day ?? 0
 
                 if daysUntil < 0 {
-                    urgency = .overdue
+                    timeUrgency = .overdue
                     daysOverdue = abs(daysUntil)
-                    displayDue = "\(daysOverdue) days overdue"
+                    timeDisplay = "\(daysOverdue)d overdue"
                 } else if daysUntil == 0 {
-                    urgency = .due
-                    displayDue = "Due today"
+                    timeUrgency = .due
+                    timeDisplay = "Due today"
                 } else if daysUntil <= dueSoonDays {
-                    urgency = .dueSoon
-                    let formatter = RelativeDateTimeFormatter()
-                    formatter.unitsStyle = .abbreviated
-                    displayDue = formatter.localizedString(for: due, relativeTo: Date())
+                    timeUrgency = .dueSoon
+                    timeDisplay = "Due in \(daysUntil)d"
                 } else {
-                    let formatter = RelativeDateTimeFormatter()
-                    formatter.unitsStyle = .abbreviated
-                    displayDue = formatter.localizedString(for: due, relativeTo: Date())
+                    timeDisplay = "Due in \(daysUntil)d"
                 }
             }
 
-            // Mileage-based check
+            // ── Mileage-based check ──
             if mileageInterval > 0, let last = lastRecord {
                 let dueMileage = last.mileage + mileageInterval
                 nextDueMileage = dueMileage
                 let milesRemaining = dueMileage - vehicle.currentMileage
 
-                if milesRemaining <= 0 && urgency != .overdue {
-                    urgency = .overdue
-                    displayDue = "\(abs(milesRemaining)) mi overdue"
-                    // Estimate days overdue from pace
+                if milesRemaining <= 0 {
+                    mileageUrgency = .overdue
+                    let milesOver = abs(milesRemaining)
+                    mileageDisplay = "\(milesOver.formatted()) mi overdue"
+                    // Estimate days overdue from pace for notification scheduling
                     if let pace = drivingPace(for: vehicle), pace.milesPerMonth > 0 {
-                        let milesOver = abs(milesRemaining)
-                        daysOverdue = max(1, Int(Double(milesOver) / (pace.milesPerMonth / 30.0)))
+                        let paceDaysOver = max(1, Int(Double(milesOver) / (pace.milesPerMonth / 30.0)))
+                        daysOverdue = max(daysOverdue, paceDaysOver)
                     } else {
                         daysOverdue = max(daysOverdue, 1)
                     }
-                } else if milesRemaining <= 500 && urgency == .ok {
-                    urgency = .dueSoon
-                }
-            }
-
-            // Smart pace check — if pace predicts mileage due within threshold days
-            if let pace = drivingPace(for: vehicle),
-               let dueMileage = nextDueMileage,
-               urgency == .ok {
-                let milesRemaining = dueMileage - vehicle.currentMileage
-                if milesRemaining > 0 {
-                    let daysToMileageDue = Double(milesRemaining) / (pace.milesPerMonth / 30.0)
-                    if daysToMileageDue <= Double(dueSoonDays) {
-                        urgency = .dueSoon
+                } else if milesRemaining <= 500 {
+                    mileageUrgency = .due
+                    mileageDisplay = "Due in \(milesRemaining.formatted()) mi"
+                } else {
+                    mileageDisplay = "Due in \(milesRemaining.formatted()) mi"
+                    // Smart pace check — predict mileage due within threshold days
+                    if let pace = drivingPace(for: vehicle), pace.milesPerMonth > 0 {
+                        let daysToMileageDue = Double(milesRemaining) / (pace.milesPerMonth / 30.0)
+                        if daysToMileageDue <= Double(dueSoonDays) {
+                            mileageUrgency = .dueSoon
+                        }
                     }
                 }
             }
 
-            // Skip if no record and no useful default
-            if lastRecord == nil && monthInterval > 0 {
+            // ── Merge: pick the more urgent of time vs mileage ──
+            let urgency = min(timeUrgency, mileageUrgency) // min = more urgent (overdue < due < dueSoon < ok)
+            let displayDue: String
+            if timeUrgency < mileageUrgency {
+                // Time is more urgent — lead with time, append mileage hint
+                displayDue = mileageDisplay.isEmpty ? timeDisplay : "\(timeDisplay) · \(mileageDisplay)"
+            } else if mileageUrgency < timeUrgency {
+                // Mileage is more urgent — lead with mileage, append time hint
+                displayDue = timeDisplay.isEmpty ? mileageDisplay : "\(mileageDisplay) · \(timeDisplay)"
+            } else if !timeDisplay.isEmpty && !mileageDisplay.isEmpty {
+                // Same urgency — show both with separator
+                displayDue = "\(timeDisplay) · \(mileageDisplay)"
+            } else {
+                displayDue = timeDisplay.isEmpty ? mileageDisplay : timeDisplay
+            }
+
+            // Skip if no record and interval requires one
+            if lastRecord == nil && (monthInterval > 0 || mileageInterval > 0) {
                 continue
             }
 

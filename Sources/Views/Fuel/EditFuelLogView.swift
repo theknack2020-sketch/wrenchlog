@@ -19,6 +19,7 @@ struct EditFuelLogView: View {
     // Validation & error state
     @State private var validationError: String?
     @State private var saveError: String?
+    @FocusState private var isFocused: Bool
 
     private let settings = UserSettings.shared
 
@@ -56,9 +57,9 @@ struct EditFuelLogView: View {
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 80)
                                 .onChange(of: volume) { _, _ in validationError = nil }
-                            Text(fuelLog.volumeUnit.label)
+                            Text(fuelType.volumeLabel(fallback: fuelLog.volumeUnit))
                                 .foregroundStyle(.secondary)
-                                .frame(width: 30, alignment: .leading)
+                                .frame(width: 36, alignment: .leading)
                         }
                     }
 
@@ -110,17 +111,20 @@ struct EditFuelLogView: View {
                         .lineLimit(3...6)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Edit Fuel Log")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("editFuelLogCancel")
                         .accessibilityLabel("Cancel editing fuel log")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveChanges() }
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.wrenchAmber)
+                        .accessibilityIdentifier("editFuelLogSave")
                         .accessibilityLabel("Save fuel log changes")
                 }
             }

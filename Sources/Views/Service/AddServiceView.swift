@@ -38,6 +38,8 @@ struct AddServiceView: View {
     @State private var saveError: String?
     @State private var photoWarnings: [String] = []
     @State private var isSaving = false
+    @State private var shakeTrigger = 0
+    @FocusState private var isFocused: Bool
 
     private let store = StoreManager.shared
     private let photoManager = ServicePhotoManager.shared
@@ -49,12 +51,9 @@ struct AddServiceView: View {
                 Form {
                 // MARK: - Service Type (Grouped by Category)
                 Section {
-                    if store.isPro {
-                        Toggle("Custom Service", isOn: $isCustom)
-                            .accessibilityHint("Enable to enter a custom service type")
-                    }
+                    customServiceToggleRow
 
-                    if isCustom && store.isPro {
+                    if isCustom {
                         VStack(alignment: .leading, spacing: 4) {
                             TextField("Service name", text: $customTypeName)
                                 .accessibilityLabel("Custom service name")
@@ -102,13 +101,15 @@ struct AddServiceView: View {
                         }
                         .accessibilityLabel("Service type: \(selectedType.rawValue)")
                         .accessibilityHint("Double tap to choose a different service type")
+                        .pressable()
                     }
                 } header: {
                     Text("Service Type")
+                        .font(.system(.headline, design: .rounded))
                 }
 
                 // MARK: - Details
-                Section("Details") {
+                Section {
                     DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date)
                         .accessibilityLabel("Service date")
                         .accessibilityHint("When the service was performed")
@@ -328,6 +329,7 @@ struct AddServiceView: View {
                                 Text("Clear oil type")
                                     .font(.caption)
                             }
+                            .accessibilityLabel("Clear selected oil type")
                         }
                     } header: {
                         Text("Oil / Fluid Type")
@@ -421,28 +423,17 @@ struct AddServiceView: View {
                             }
                         }
                         .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Reminder will be set. Next: \(selectedType.defaultMileageInterval.formatted()) \(UserSettings.shared.distanceUnit.label) or \(selectedType.defaultMonthInterval) months")
                     }
                 }
                 } // Form
+                .scrollDismissesKeyboard(.interactively)
 
                 CelebrationOverlay(isShowing: $showCelebration)
             } // ZStack
             .navigationTitle("Log Service")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .accessibilityLabel("Cancel logging service")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { saveRecord() }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.wrenchAmber)
-                        .disabled((isCustom && customTypeName.trimmingCharacters(in: .whitespaces).isEmpty) || isSaving)
-                        .accessibilityLabel("Save service record")
-                        .accessibilityHint("Logs this service to your vehicle history")
-                }
-            }
+            .toolbar { toolbarContent }
             .onAppear {
                 mileage = vehicle.currentMileage > 0 ? "\(vehicle.currentMileage)" : ""
             }
@@ -460,7 +451,11 @@ struct AddServiceView: View {
                 ProUpgradeView()
             }
             .sheet(isPresented: $showTypePicker) {
-                ServiceTypePickerView(selectedType: $selectedType)
+                ServiceTypePickerView(
+                    selectedType: $selectedType,
+                    isCustom: $isCustom,
+                    customTypeName: $customTypeName
+                )
             }
             .sheet(isPresented: $showOilTypePicker) {
                 OilTypePickerView(selectedOilType: $oilType)
@@ -473,6 +468,25 @@ struct AddServiceView: View {
             } message: {
                 Text(saveError ?? "An unexpected error occurred.")
             }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Cancel") { dismiss() }
+                .accessibilityIdentifier("addServiceCancel")
+                .accessibilityLabel("Cancel logging service")
+        }
+        ToolbarItem(placement: .confirmationAction) {
+            Button("Save") { saveRecord() }
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.wrenchAmber)
+                .disabled(isSaving)
+                .shake(trigger: shakeTrigger)
+                .accessibilityIdentifier("addServiceSave")
+                .accessibilityLabel("Save service record")
+                .accessibilityHint("Logs this service to your vehicle history")
         }
     }
 
@@ -493,6 +507,28 @@ struct AddServiceView: View {
             partsUsed.append(trimmed)
         }
         newPartText = ""
+    }
+
+    @ViewBuilder
+    private var customServiceToggleRow: some View {
+        if store.isPro {
+            Toggle("Custom Service", isOn: $isCustom)
+                .accessibilityHint("Enable to enter a custom service type")
+        } else {
+            Button {
+                showProPrompt = true
+            } label: {
+                HStack {
+                    Text("Custom Service")
+                    Spacer()
+                    Image(systemName: "crown.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.wrenchAmber)
+                }
+            }
+            .accessibilityLabel("Custom service, Pro feature")
+            .accessibilityHint("Upgrade to Pro to create custom service types")
+        }
     }
 
     private func saveRecord() {
@@ -523,6 +559,7 @@ struct AddServiceView: View {
         }
 
         guard !hasError else {
+            withAnimation(.default) { shakeTrigger += 1 }
             haptic.error()
             return
         }
@@ -531,8 +568,9 @@ struct AddServiceView: View {
 
         let record: ServiceRecord
         if isCustom {
+            let trimmedCustom = customTypeName.trimmingCharacters(in: .whitespaces)
             record = ServiceRecord(
-                customType: customTypeName.trimmingCharacters(in: .whitespaces),
+                customType: trimmedCustom,
                 date: date,
                 mileage: max(0, Int(mileage) ?? 0),
                 cost: max(0, Double(cost) ?? 0),
@@ -541,6 +579,12 @@ struct AddServiceView: View {
                 oilType: oilType,
                 shopName: shopName.trimmingCharacters(in: .whitespaces)
             )
+            // Persist custom type for future picker use
+            var saved = UserDefaults.standard.stringArray(forKey: "wl_custom_service_types") ?? []
+            if !saved.contains(trimmedCustom) {
+                saved.append(trimmedCustom)
+                UserDefaults.standard.set(saved, forKey: "wl_custom_service_types")
+            }
         } else {
             record = ServiceRecord(
                 serviceType: selectedType,
@@ -618,6 +662,9 @@ struct AddServiceView: View {
             dismiss()
         }
 
+        // Track action for soft paywall
+        SoftPaywallTracker.shared.recordAction()
+
         let allServiceCount = (try? context.fetch(FetchDescriptor<ServiceRecord>()))?.count ?? 0
         if allServiceCount == 5 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
@@ -631,9 +678,18 @@ struct AddServiceView: View {
 
 struct ServiceTypePickerView: View {
     @Binding var selectedType: ServiceType
+    @Binding var isCustom: Bool
+    @Binding var customTypeName: String
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appTheme) private var theme
     @State private var searchText = ""
+    @State private var newCustomType = ""
+    private let store = StoreManager.shared
+
+    private var savedCustomTypes: [String] {
+        (UserDefaults.standard.stringArray(forKey: "wl_custom_service_types") ?? [])
+            .sorted()
+    }
 
     private var filteredCategories: [(category: ServiceCategory, types: [ServiceType])] {
         ServiceCategory.allCases
@@ -648,54 +704,17 @@ struct ServiceTypePickerView: View {
             }
     }
 
+    private var filteredCustomTypes: [String] {
+        if searchText.isEmpty { return savedCustomTypes }
+        let q = searchText.lowercased()
+        return savedCustomTypes.filter { $0.lowercased().contains(q) }
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                ForEach(filteredCategories, id: \.category) { group in
-                    Section {
-                        ForEach(group.types) { type in
-                            Button {
-                                selectedType = type
-                                dismiss()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: type.uniqueIcon)
-                                        .font(.body)
-                                        .foregroundStyle(type.color)
-                                        .frame(width: 28)
-                                        .accessibilityHidden(true)
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(type.rawValue)
-                                            .font(.subheadline.weight(.medium))
-                                            .foregroundStyle(.primary)
-                                        if type.defaultMileageInterval > 0 {
-                                            Text("Every \(type.defaultMileageInterval.formatted()) \(UserSettings.shared.distanceUnit.label)")
-                                                .font(.caption2)
-                                                .foregroundStyle(.tertiary)
-                                        }
-                                    }
-
-                                    Spacer()
-
-                                    if selectedType == type {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(theme.accent)
-                                    }
-                                }
-                            }
-                            .accessibilityLabel(type.rawValue)
-                            .accessibilityAddTraits(selectedType == type ? .isSelected : [])
-                        }
-                    } header: {
-                        HStack(spacing: 6) {
-                            Image(systemName: group.category.icon)
-                                .font(.caption)
-                                .foregroundStyle(group.category.color)
-                            Text(group.category.rawValue)
-                        }
-                    }
-                }
+                standardCategorySections
+                customTypesSection
             }
             .searchable(text: $searchText, prompt: "Search service types")
             .navigationTitle("Service Type")
@@ -706,6 +725,142 @@ struct ServiceTypePickerView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var standardCategorySections: some View {
+        ForEach(filteredCategories, id: \.category) { group in
+            Section {
+                ForEach(group.types) { type in
+                    Button {
+                        isCustom = false
+                        customTypeName = ""
+                        selectedType = type
+                        dismiss()
+                    } label: {
+                        standardTypeRow(type)
+                    }
+                    .accessibilityLabel(type.rawValue)
+                    .accessibilityAddTraits(!isCustom && selectedType == type ? .isSelected : [])
+                }
+            } header: {
+                HStack(spacing: 6) {
+                    Image(systemName: group.category.icon)
+                        .font(.caption)
+                        .foregroundStyle(group.category.color)
+                    Text(group.category.rawValue)
+                }
+            }
+        }
+    }
+
+    private func standardTypeRow(_ type: ServiceType) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: type.uniqueIcon)
+                .font(.body)
+                .foregroundStyle(type.color)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(type.rawValue)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                if type.defaultMileageInterval > 0 {
+                    Text("Every \(type.defaultMileageInterval.formatted()) \(UserSettings.shared.distanceUnit.label)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            Spacer()
+
+            if !isCustom && selectedType == type {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(theme.accent)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var customTypesSection: some View {
+        if store.isPro {
+            Section {
+                ForEach(filteredCustomTypes, id: \.self) { typeName in
+                    Button {
+                        isCustom = true
+                        customTypeName = typeName
+                        dismiss()
+                    } label: {
+                        customTypeRow(typeName)
+                    }
+                    .accessibilityLabel(typeName)
+                    .accessibilityAddTraits(isCustom && customTypeName == typeName ? .isSelected : [])
+                }
+                .onDelete { indexSet in
+                    var types = savedCustomTypes
+                    types.remove(atOffsets: indexSet)
+                UserDefaults.standard.set(types, forKey: "wl_custom_service_types")
+            }
+
+            // Add new custom type inline
+            HStack {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(theme.accent)
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
+                TextField("Add custom type…", text: $newCustomType)
+                    .onSubmit { addAndSelectCustomType() }
+                    .accessibilityLabel("New custom service type name")
+                if !newCustomType.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Button("Add") { addAndSelectCustomType() }
+                        .foregroundStyle(theme.accent)
+                        .accessibilityLabel("Add custom type")
+                }
+            }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: ServiceCategory.custom.icon)
+                    .font(.caption)
+                    .foregroundStyle(ServiceCategory.custom.color)
+                Text("Custom")
+            }
+        }
+        } // end if store.isPro
+    }
+
+    private func customTypeRow(_ typeName: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "wrench.and.screwdriver.fill")
+                .font(.body)
+                .foregroundStyle(Color.catCustom)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+            Text(typeName)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+            Spacer()
+            if isCustom && customTypeName == typeName {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(theme.accent)
+            }
+        }
+    }
+
+    private func addAndSelectCustomType() {
+        guard store.isPro else { return }
+        let trimmed = newCustomType.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        // Persist to UserDefaults
+        var types = UserDefaults.standard.stringArray(forKey: "wl_custom_service_types") ?? []
+        if !types.contains(trimmed) {
+            types.append(trimmed)
+            UserDefaults.standard.set(types, forKey: "wl_custom_service_types")
+        }
+        // Select it
+        isCustom = true
+        customTypeName = trimmed
+        dismiss()
     }
 }
 

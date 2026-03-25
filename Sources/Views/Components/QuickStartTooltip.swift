@@ -45,7 +45,9 @@ struct QuickStartTooltip: View {
                 }
             }
             .padding(16)
-            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+            .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(Color.wrenchAmber.opacity(0.2), lineWidth: 1)

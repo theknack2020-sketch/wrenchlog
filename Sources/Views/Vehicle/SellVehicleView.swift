@@ -44,30 +44,33 @@ struct SellVehicleView: View {
                     DatePicker("Date Sold", selection: $soldDate, in: ...Date.now, displayedComponents: .date)
                 }
 
-                Section("Ownership Summary") {
+                Section {
                     HStack {
                         Text("Services Logged")
                         Spacer()
                         Text("\(vehicle.safeServiceRecords.count)")
+                            .font(.subheadline.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                     HStack {
                         Text("Service Cost")
                         Spacer()
                         Text(settings.formatCost(totalServiceCost))
+                            .font(.subheadline.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                     HStack {
                         Text("Fuel Cost")
                         Spacer()
                         Text(settings.formatCost(totalFuelCost))
+                            .font(.subheadline.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                     HStack {
                         Text("Total Ownership Cost")
                         Spacer()
                         Text(settings.formatCost(totalServiceCost + totalFuelCost))
-                            .font(.subheadline.weight(.semibold))
+                            .font(.subheadline.weight(.semibold).monospacedDigit())
                             .foregroundStyle(Color.wrenchAmber)
                     }
                     HStack {
@@ -76,6 +79,9 @@ struct SellVehicleView: View {
                         Text(vehicle.dateAdded, format: .dateTime.month(.abbreviated).year())
                             .foregroundStyle(.secondary)
                     }
+                } header: {
+                    Text("Ownership Summary")
+                        .font(.system(.headline, design: .rounded))
                 }
 
                 Section {
@@ -99,6 +105,7 @@ struct SellVehicleView: View {
                             Spacer()
                         }
                     }
+                    .pressable()
                     .accessibilityLabel("Mark vehicle as sold")
                     .accessibilityHint("Moves the vehicle to sold vehicles list")
                 }
@@ -108,6 +115,7 @@ struct SellVehicleView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("sellVehicleCancel")
                         .accessibilityLabel("Cancel selling vehicle")
                 }
             }

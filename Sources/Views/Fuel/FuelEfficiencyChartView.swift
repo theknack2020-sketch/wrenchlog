@@ -4,8 +4,10 @@ import Charts
 struct FuelEfficiencyChartView: View {
     let vehicle: Vehicle
     private let settings = UserSettings.shared
+    private let store = StoreManager.shared
 
     @State private var chartAnimationProgress: Double = 0
+    @State private var showProPrompt = false
 
     var efficiencyResults: [FuelEfficiencyResult] {
         vehicle.safeFuelLogs.calculateEfficiency()
@@ -89,7 +91,7 @@ struct FuelEfficiencyChartView: View {
 
     var body: some View {
         List {
-            // Summary cards
+            // Summary cards — FREE (basic average)
             if let avg = averageEfficiency {
                 Section {
                     HStack(spacing: 8) {
@@ -98,53 +100,61 @@ struct FuelEfficiencyChartView: View {
                             value: settings.formatEfficiency(avg),
                             color: .catFuel
                         )
-                        if let best = bestEfficiency {
-                            statCard(
-                                title: "Best",
-                                value: settings.formatEfficiency(best.efficiency(for: settings.efficiencyUnit)),
-                                color: .wrenchGreen
-                            )
-                        }
-                        if let worst = worstEfficiency {
-                            statCard(
-                                title: "Worst",
-                                value: settings.formatEfficiency(worst.efficiency(for: settings.efficiencyUnit)),
-                                color: .wrenchRed
-                            )
+                        if store.isPro {
+                            if let best = bestEfficiency {
+                                statCard(
+                                    title: "Best",
+                                    value: settings.formatEfficiency(best.efficiency(for: settings.efficiencyUnit)),
+                                    color: .wrenchGreen
+                                )
+                            }
+                            if let worst = worstEfficiency {
+                                statCard(
+                                    title: "Worst",
+                                    value: settings.formatEfficiency(worst.efficiency(for: settings.efficiencyUnit)),
+                                    color: .wrenchRed
+                                )
+                            }
+                        } else {
+                            // Locked best/worst
+                            lockedStatCard(title: "Best", color: .wrenchGreen)
+                            lockedStatCard(title: "Worst", color: .wrenchRed)
                         }
                     }
 
-                    // Trend indicator
-                    if let trend = trendLine, efficiencyResults.count >= 3 {
-                        let direction = trendDirection
-                        let trendColor: Color = direction == "improving" ? .wrenchGreen
-                            : direction == "declining" || direction == "worsening" ? .wrenchRed
-                            : .secondary
-                        let trendIcon = direction == "improving" ? "arrow.up.right"
-                            : direction == "declining" || direction == "worsening" ? "arrow.down.right"
-                            : "arrow.right"
-                        let diff = abs(trend.end - trend.start)
+                    // Trend indicator — PRO only
+                    if store.isPro {
+                        if let trend = trendLine, efficiencyResults.count >= 3 {
+                            let direction = trendDirection
+                            let trendColor: Color = direction == "improving" ? .wrenchGreen
+                                : direction == "declining" || direction == "worsening" ? .wrenchRed
+                                : .secondary
+                            let trendIcon = direction == "improving" ? "arrow.up.right"
+                                : direction == "declining" || direction == "worsening" ? "arrow.down.right"
+                                : "arrow.right"
+                            let diff = abs(trend.end - trend.start)
 
-                        HStack(spacing: 8) {
-                            Image(systemName: trendIcon)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(trendColor)
-                                .frame(width: 22)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Efficiency is \(direction)")
-                                    .font(.caption.weight(.medium))
+                            HStack(spacing: 8) {
+                                Image(systemName: trendIcon)
+                                    .font(.caption.weight(.semibold))
                                     .foregroundStyle(trendColor)
-                                Text("\(String(format: "%.1f", diff)) \(settings.efficiencyUnit.label) change over \(efficiencyResults.count) fill-ups")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .frame(width: 22)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Efficiency is \(direction)")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(trendColor)
+                                    Text("\(String(format: "%.1f", diff)) \(settings.efficiencyUnit.label) change over \(efficiencyResults.count) fill-ups")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
+                            .padding(.vertical, 2)
                         }
-                        .padding(.vertical, 2)
                     }
                 }
             }
 
-            // Efficiency trend chart with trend line, avg, best/worst markers
+            // Efficiency chart — FREE (basic line), PRO (trend line + markers)
             if efficiencyResults.count >= 2 {
                 Section("Fuel Efficiency Trend") {
                     Chart {
@@ -175,10 +185,10 @@ struct FuelEfficiencyChartView: View {
                             .lineStyle(StrokeStyle(lineWidth: 2.5))
                         }
 
-                        // Data points
+                        // Data points — PRO shows best/worst markers
                         ForEach(efficiencyResults) { result in
-                            let isBest = bestEfficiency?.id == result.id
-                            let isWorst = worstEfficiency?.id == result.id
+                            let isBest = store.isPro && bestEfficiency?.id == result.id
+                            let isWorst = store.isPro && worstEfficiency?.id == result.id
 
                             PointMark(
                                 x: .value("Date", result.date),
@@ -201,8 +211,8 @@ struct FuelEfficiencyChartView: View {
                                 }
                         }
 
-                        // Trend line
-                        if let trend = trendLine, efficiencyResults.count >= 3 {
+                        // Trend line — PRO only
+                        if store.isPro, let trend = trendLine, efficiencyResults.count >= 3 {
                             let firstDate = efficiencyResults.first?.date ?? Date()
                             let lastDate = efficiencyResults.last?.date ?? Date()
 
@@ -245,34 +255,54 @@ struct FuelEfficiencyChartView: View {
                     }
                     .frame(height: 220)
 
-                    // Best/worst legend
-                    if bestEfficiency != nil || worstEfficiency != nil {
-                        HStack(spacing: 16) {
-                            if let best = bestEfficiency {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "diamond.fill")
-                                        .font(.caption2)
-                                        .foregroundStyle(Color.wrenchGreen)
-                                    Text("Best: \(settings.formatEfficiency(best.efficiency(for: settings.efficiencyUnit)))")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                    Text(best.date, format: .dateTime.month(.abbreviated).day())
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
+                    // Best/worst legend — PRO only
+                    if store.isPro {
+                        if bestEfficiency != nil || worstEfficiency != nil {
+                            HStack(spacing: 16) {
+                                if let best = bestEfficiency {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "diamond.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(Color.wrenchGreen)
+                                        Text("Best: \(settings.formatEfficiency(best.efficiency(for: settings.efficiencyUnit)))")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Text(best.date, format: .dateTime.month(.abbreviated).day())
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                if let worst = worstEfficiency {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "triangle.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(Color.wrenchRed)
+                                        Text("Worst: \(settings.formatEfficiency(worst.efficiency(for: settings.efficiencyUnit)))")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Text(worst.date, format: .dateTime.month(.abbreviated).day())
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                    }
                                 }
                             }
-                            if let worst = worstEfficiency {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "triangle.fill")
-                                        .font(.caption2)
-                                        .foregroundStyle(Color.wrenchRed)
-                                    Text("Worst: \(settings.formatEfficiency(worst.efficiency(for: settings.efficiencyUnit)))")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                    Text(worst.date, format: .dateTime.month(.abbreviated).day())
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
-                                }
+                        }
+                    } else {
+                        // Pro teaser
+                        HStack(spacing: 8) {
+                            Image(systemName: "lock.fill")
+                                .font(.caption)
+                                .foregroundStyle(Color.wrenchAmber)
+                            Text("Trend line, best/worst markers — Pro")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button {
+                                showProPrompt = true
+                            } label: {
+                                Text("Unlock")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Color.wrenchAmber)
                             }
                         }
                     }
@@ -289,135 +319,158 @@ struct FuelEfficiencyChartView: View {
                 }
             }
 
-            // Monthly fuel cost chart
-            if monthlyFuelCost.contains(where: { $0.total > 0 }) {
-                Section("Monthly Fuel Cost") {
-                    Chart(monthlyFuelCost, id: \.month) { item in
-                        BarMark(
-                            x: .value("Month", item.month, unit: .month),
-                            y: .value("Cost", item.total * chartAnimationProgress)
-                        )
-                        .foregroundStyle(Color.catFuel.gradient)
-                        .cornerRadius(4)
-                    }
-                    .chartXAxis {
-                        AxisMarks(values: .stride(by: .month, count: 2)) { value in
-                            if let date = value.as(Date.self) {
-                                AxisValueLabel {
-                                    Text(date, format: .dateTime.month(.abbreviated))
-                                        .font(.caption2)
+            // Monthly fuel cost chart — PRO
+            if store.isPro {
+                if monthlyFuelCost.contains(where: { $0.total > 0 }) {
+                    Section("Monthly Fuel Cost") {
+                        Chart(monthlyFuelCost, id: \.month) { item in
+                            BarMark(
+                                x: .value("Month", item.month, unit: .month),
+                                y: .value("Cost", item.total * chartAnimationProgress)
+                            )
+                            .foregroundStyle(Color.catFuel.gradient)
+                            .cornerRadius(4)
+                        }
+                        .chartXAxis {
+                            AxisMarks(values: .stride(by: .month, count: 2)) { value in
+                                if let date = value.as(Date.self) {
+                                    AxisValueLabel {
+                                        Text(date, format: .dateTime.month(.abbreviated))
+                                            .font(.caption2)
+                                    }
                                 }
                             }
                         }
-                    }
-                    .chartYAxis {
-                        AxisMarks(position: .leading) { value in
-                            if let cost = value.as(Double.self) {
-                                AxisValueLabel {
-                                    Text(settings.formatCost(cost))
-                                        .font(.caption2)
+                        .chartYAxis {
+                            AxisMarks(position: .leading) { value in
+                                if let cost = value.as(Double.self) {
+                                    AxisValueLabel {
+                                        Text(settings.formatCost(cost))
+                                            .font(.caption2)
+                                    }
                                 }
                             }
                         }
-                    }
-                    .frame(height: 180)
+                        .frame(height: 180)
 
-                    // Monthly average
-                    let nonZero = monthlyFuelCost.filter { $0.total > 0 }
-                    if !nonZero.isEmpty {
-                        let avg = nonZero.reduce(0) { $0 + $1.total } / Double(nonZero.count)
-                        HStack {
-                            Text("Monthly Average")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(settings.formatCost(avg))
-                                .font(.caption.weight(.semibold).monospacedDigit())
-                                .foregroundStyle(Color.catFuel)
+                        // Monthly average
+                        let nonZero = monthlyFuelCost.filter { $0.total > 0 }
+                        if !nonZero.isEmpty {
+                            let avg = nonZero.reduce(0) { $0 + $1.total } / Double(nonZero.count)
+                            HStack {
+                                Text("Monthly Average")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text(settings.formatCost(avg))
+                                    .font(.caption.weight(.semibold).monospacedDigit())
+                                    .foregroundStyle(Color.catFuel)
+                            }
                         }
                     }
                 }
-            }
 
-            // Cost per mile/km trend
-            if costPerDistanceTrend.count >= 2 {
-                Section("Cost per \(settings.distanceUnit == .miles ? "Mile" : "Kilometer")") {
-                    Chart(costPerDistanceTrend, id: \.date) { item in
-                        AreaMark(
-                            x: .value("Date", item.date),
-                            y: .value("Cost", item.cost * chartAnimationProgress)
-                        )
-                        .foregroundStyle(Color.wrenchAmber.opacity(0.2).gradient)
-                        .interpolationMethod(.catmullRom)
+                // Cost per mile/km trend — PRO
+                if costPerDistanceTrend.count >= 2 {
+                    Section("Cost per \(settings.distanceUnit == .miles ? "Mile" : "Kilometer")") {
+                        Chart(costPerDistanceTrend, id: \.date) { item in
+                            AreaMark(
+                                x: .value("Date", item.date),
+                                y: .value("Cost", item.cost * chartAnimationProgress)
+                            )
+                            .foregroundStyle(Color.wrenchAmber.opacity(0.2).gradient)
+                            .interpolationMethod(.catmullRom)
 
-                        LineMark(
-                            x: .value("Date", item.date),
-                            y: .value("Cost", item.cost * chartAnimationProgress)
-                        )
-                        .foregroundStyle(Color.wrenchAmber)
-                        .interpolationMethod(.catmullRom)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
-                    }
-                    .chartYAxis {
-                        AxisMarks(position: .leading) { value in
-                            if let cost = value.as(Double.self) {
-                                AxisValueLabel {
-                                    Text(settings.formatCostPerDistance(cost))
-                                        .font(.caption2)
+                            LineMark(
+                                x: .value("Date", item.date),
+                                y: .value("Cost", item.cost * chartAnimationProgress)
+                            )
+                            .foregroundStyle(Color.wrenchAmber)
+                            .interpolationMethod(.catmullRom)
+                            .lineStyle(StrokeStyle(lineWidth: 2))
+                        }
+                        .chartYAxis {
+                            AxisMarks(position: .leading) { value in
+                                if let cost = value.as(Double.self) {
+                                    AxisValueLabel {
+                                        Text(settings.formatCostPerDistance(cost))
+                                            .font(.caption2)
+                                    }
                                 }
                             }
                         }
-                    }
-                    .chartXAxis {
-                        AxisMarks(values: .automatic(desiredCount: 5)) { value in
-                            if let date = value.as(Date.self) {
-                                AxisValueLabel {
-                                    Text(date, format: .dateTime.month(.abbreviated))
-                                        .font(.caption2)
+                        .chartXAxis {
+                            AxisMarks(values: .automatic(desiredCount: 5)) { value in
+                                if let date = value.as(Date.self) {
+                                    AxisValueLabel {
+                                        Text(date, format: .dateTime.month(.abbreviated))
+                                            .font(.caption2)
+                                    }
                                 }
                             }
                         }
+                        .frame(height: 160)
                     }
-                    .frame(height: 160)
                 }
-            }
 
-            // Fuel type breakdown
-            let typeBreakdown = fuelTypeBreakdown()
-            if typeBreakdown.count > 1 {
-                Section("Fuel Type Breakdown") {
-                    Chart(typeBreakdown, id: \.type) { item in
-                        SectorMark(
-                            angle: .value("Volume", item.volume * chartAnimationProgress),
-                            innerRadius: .ratio(0.6),
-                            angularInset: 2
-                        )
-                        .foregroundStyle(item.type.color)
-                    }
-                    .frame(height: 160)
+                // Fuel type breakdown — PRO
+                let typeBreakdown = fuelTypeBreakdown()
+                if typeBreakdown.count > 1 {
+                    Section("Fuel Type Breakdown") {
+                        Chart(typeBreakdown, id: \.type) { item in
+                            SectorMark(
+                                angle: .value("Volume", item.volume * chartAnimationProgress),
+                                innerRadius: .ratio(0.6),
+                                angularInset: 2
+                            )
+                            .foregroundStyle(item.type.color)
+                        }
+                        .frame(height: 160)
 
-                    ForEach(typeBreakdown, id: \.type) { item in
-                        HStack(spacing: 10) {
-                            Circle()
-                                .fill(item.type.color)
-                                .frame(width: 10, height: 10)
-                            Text(item.type.rawValue)
-                                .font(.subheadline)
-                            Spacer()
-                            Text("\(Int(item.count)) fills · \(settings.formatVolume(item.volume))")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                        ForEach(typeBreakdown, id: \.type) { item in
+                            HStack(spacing: 10) {
+                                Circle()
+                                    .fill(item.type.color)
+                                    .frame(width: 10, height: 10)
+                                Text(item.type.rawValue)
+                                    .font(.subheadline)
+                                Spacer()
+                                Text("\(Int(item.count)) fills · \(settings.formatVolume(item.volume))")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
             }
         }
         .navigationTitle("Fuel Efficiency")
+        .sheet(isPresented: $showProPrompt) {
+            ProUpgradeView()
+        }
         .onAppear {
             withAnimation(.spring(response: 0.8, dampingFraction: 0.7).delay(0.15)) {
                 chartAnimationProgress = 1.0
             }
         }
+    }
+
+    private func lockedStatCard(title: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: "lock.fill")
+                .font(.caption)
+                .foregroundStyle(color.opacity(0.5))
+            Text("Pro")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(color.opacity(0.5))
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(color.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
+        .onTapGesture { showProPrompt = true }
     }
 
     private func fuelTypeBreakdown() -> [(type: FuelType, volume: Double, count: Int)] {
@@ -445,8 +498,9 @@ struct FuelEfficiencyChartView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 2)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.15), radius: 4, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
     }

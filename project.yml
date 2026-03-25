@@ -48,6 +48,14 @@ targets:
     dependencies:
       - target: WrenchLog
 
+  WrenchLogUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: WrenchLog
+
 schemes:
   WrenchLog:
     build:
@@ -62,6 +70,7 @@ schemes:
       gatherCoverageData: false
       targets:
         - name: WrenchLogTests
+        - name: WrenchLogUITests
     profile:
       config: Release
     analyze:

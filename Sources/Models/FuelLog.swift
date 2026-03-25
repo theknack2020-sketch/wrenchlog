@@ -46,6 +46,14 @@ enum FuelType: String, Codable, CaseIterable, Identifiable {
         case .ev: "EV"
         }
     }
+
+    /// Unit label for the volume field — "kWh" for EV, otherwise the user's volume unit label.
+    func volumeLabel(fallback: VolumeUnit) -> String {
+        self == .ev ? "kWh" : fallback.label
+    }
+
+    /// Whether this fuel type represents electric charging (kWh-based).
+    var isElectric: Bool { self == .ev }
 }
 
 // MARK: - Efficiency Unit

@@ -28,24 +28,35 @@ struct VehicleDocumentsView: View {
         List {
             if sortedDocuments.isEmpty {
                 Section {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 24) {
+                        Spacer()
                         ZStack {
                             Circle()
-                                .fill(theme.accent.opacity(0.08))
-                                .frame(width: 72, height: 72)
-                            Image(systemName: "doc.badge.plus")
-                                .font(.system(size: 28))
-                                .foregroundStyle(theme.accent.opacity(0.4))
+                                .fill(theme.accent.opacity(0.1))
+                                .frame(width: 100, height: 100)
+                            Image(systemName: "doc.text.fill")
+                                .font(.system(size: 40))
+                                .foregroundStyle(theme.accent)
+                                .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
                         }
                         .accessibilityHidden(true)
-
-                        Text("No Documents Yet")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        Text("Store insurance cards, registration,\nand other vehicle documents here.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .multilineTextAlignment(.center)
+                        VStack(spacing: 8) {
+                            Text("No Documents")
+                                .font(.system(.title3, design: .rounded, weight: .bold))
+                            Text("Store insurance, registration, and receipts here.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        Button {
+                            showAddDocument = true
+                        } label: {
+                            Label("Add Document", systemImage: "plus.circle.fill")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(theme.accent)
+                        }
+                        .pressable()
+                        Spacer()
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
@@ -78,6 +89,7 @@ struct VehicleDocumentsView: View {
                     Image(systemName: "plus.circle.fill")
                         .foregroundStyle(theme.accent)
                 }
+                .accessibilityIdentifier("documentsAdd")
                 .accessibilityLabel("Add document")
             }
         }
@@ -89,7 +101,7 @@ struct VehicleDocumentsView: View {
                 DocumentPreviewView(url: url)
             }
         }
-        .alert("Delete Document?", isPresented: $showDeleteConfirm) {
+        .confirmationDialog("Delete Document?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
                 if let doc = documentToDelete {
                     photoManager.deleteDocument(named: doc.fileName)
@@ -209,6 +221,7 @@ struct AddDocumentView: View {
     @State private var fileName = ""
 
     @State private var sourceChoice: DocumentSource?
+    @FocusState private var isFocused: Bool
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -315,16 +328,19 @@ struct AddDocumentView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Add Document")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("addDocumentCancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveDocument() }
                         .fontWeight(.semibold)
                         .disabled(title.isEmpty || !hasFile)
+                        .accessibilityIdentifier("addDocumentSave")
                 }
             }
             .onChange(of: selectedPhoto) { _, item in

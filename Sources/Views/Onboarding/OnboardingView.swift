@@ -215,7 +215,7 @@ struct OnboardingView: View {
                         .foregroundStyle(.white)
 
                     Text("Your private vehicle maintenance tracker")
-                        .font(.title3)
+                        .font(.system(.title3, design: .rounded))
                         .foregroundStyle(.white.opacity(0.6))
                         .multilineTextAlignment(.center)
                 }
@@ -245,7 +245,7 @@ struct OnboardingView: View {
             VStack(spacing: 32) {
                 VStack(spacing: 10) {
                     Text("How many vehicles\ndo you have?")
-                        .font(.title.weight(.bold))
+                        .font(.system(.title, design: .rounded, weight: .bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
 
@@ -277,7 +277,7 @@ struct OnboardingView: View {
             VStack(spacing: 28) {
                 VStack(spacing: 10) {
                     Text("What matters\nmost to you?")
-                        .font(.title.weight(.bold))
+                        .font(.system(.title, design: .rounded, weight: .bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
 
@@ -317,7 +317,7 @@ struct OnboardingView: View {
             VStack(spacing: 28) {
                 VStack(spacing: 10) {
                     Text("Your garage\nis ready")
-                        .font(.title.weight(.bold))
+                        .font(.system(.title, design: .rounded, weight: .bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
 
@@ -414,7 +414,7 @@ struct OnboardingView: View {
 
                 VStack(spacing: 10) {
                     Text("Never miss\na service")
-                        .font(.title.weight(.bold))
+                        .font(.system(.title, design: .rounded, weight: .bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
 
@@ -516,6 +516,28 @@ struct OnboardingView: View {
                         .foregroundStyle(.white.opacity(0.5))
                         .multilineTextAlignment(.center)
                 }
+
+                // Trial CTA
+                if !StoreManager.shared.isPro {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "crown.fill")
+                                .font(.caption)
+                                .foregroundStyle(Color.wrenchAmber)
+                            Text("Start 7-Day Free Trial")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                        }
+                        Text("Unlock analytics, themes, and more")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 20)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: Color.wrenchAmber.opacity(0.15), radius: 8, y: 4)
+                    .accessibilityLabel("Start 7-day free trial for Pro features")
+                }
             }
 
             Spacer()
@@ -607,12 +629,13 @@ private extension OnboardingView {
             .frame(height: 130)
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? Color.wrenchAmber.opacity(0.15) : Color.white.opacity(0.05))
+                    .fill(isSelected ? AnyShapeStyle(Color.wrenchAmber.opacity(0.15)) : AnyShapeStyle(.ultraThinMaterial))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(isSelected ? Color.wrenchAmber : Color.white.opacity(0.08), lineWidth: isSelected ? 2 : 1)
             )
+            .shadow(color: isSelected ? Color.wrenchAmber.opacity(0.2) : .black.opacity(0.15), radius: 6, y: 3)
             .scaleEffect(isSelected ? 1.04 : 1.0)
         }
         .buttonStyle(.plain)

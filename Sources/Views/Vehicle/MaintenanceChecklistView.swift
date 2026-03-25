@@ -5,7 +5,9 @@ struct MaintenanceChecklistView: View {
     @Bindable var vehicle: Vehicle
     @State private var newItemTitle = ""
     @State private var showAddItem = false
+    @FocusState private var isAddFieldFocused: Bool
     @Environment(\.modelContext) private var context
+    @Environment(\.appTheme) private var theme
 
     var pendingItems: [MaintenanceChecklistItem] {
         vehicle.safeChecklistItems.filter { !$0.isCompleted }.sorted { $0.createdDate > $1.createdDate }
@@ -21,6 +23,7 @@ struct MaintenanceChecklistView: View {
             Section {
                 HStack {
                     TextField("Add checklist item...", text: $newItemTitle)
+                        .focused($isAddFieldFocused)
                         .textInputAutocapitalization(.sentences)
                         .onSubmit { addItem() }
 
@@ -34,9 +37,44 @@ struct MaintenanceChecklistView: View {
                 }
             }
 
-            // Quick-add presets
+            // Empty state + Quick-add presets
             if vehicle.safeChecklistItems.isEmpty {
-                Section("Suggested Items") {
+                Section {
+                    VStack(spacing: 24) {
+                        Spacer()
+                        ZStack {
+                            Circle()
+                                .fill(theme.accent.opacity(0.1))
+                                .frame(width: 100, height: 100)
+                            Image(systemName: "checklist")
+                                .font(.system(size: 40))
+                                .foregroundStyle(theme.accent)
+                                .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
+                        }
+                        .accessibilityHidden(true)
+                        VStack(spacing: 8) {
+                            Text("No Checklist Items")
+                                .font(.system(.title3, design: .rounded, weight: .bold))
+                            Text("Add items to track your maintenance tasks.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        Button {
+                            isAddFieldFocused = true
+                        } label: {
+                            Label("Add First Item", systemImage: "plus.circle.fill")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(theme.accent)
+                        }
+                        .pressable()
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                }
+
+                Section {
                     ForEach(presetItems, id: \.self) { preset in
                         Button {
                             addPreset(preset)
@@ -44,13 +82,17 @@ struct MaintenanceChecklistView: View {
                             HStack(spacing: 10) {
                                 Image(systemName: "plus.circle")
                                     .font(.caption)
-                                    .foregroundStyle(Color.wrenchAmber)
+                                    .foregroundStyle(theme.accent)
                                 Text(preset)
                                     .font(.subheadline)
                                     .foregroundStyle(.primary)
                             }
                         }
+                        .pressable()
                     }
+                } header: {
+                    Text("Suggested Items")
+                        .font(.system(.headline, design: .rounded))
                 }
             }
 

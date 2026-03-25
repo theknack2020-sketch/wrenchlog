@@ -43,7 +43,8 @@ struct DueSoonBadge: View {
         .foregroundStyle(color)
         .padding(.horizontal, compact ? 5 : 7)
         .padding(.vertical, 3)
-        .background(color.opacity(0.12), in: Capsule())
+        .background(.ultraThinMaterial, in: Capsule())
+        .shadow(color: color.opacity(0.15), radius: 2, y: 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Service status: \(urgency.label)")
     }
@@ -95,7 +96,8 @@ struct DueSoonDetailBadge: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .shadow(color: color.opacity(0.15), radius: 2, y: 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(serviceType): \(urgency.label). \(displayDue)")
     }

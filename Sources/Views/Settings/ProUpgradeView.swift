@@ -10,19 +10,41 @@ struct ProUpgradeView: View {
     @State private var showPurchaseErrorAlert = false
     @State private var showRestoreAlert = false
     @State private var restoreAlertMessage = ""
+    @State private var heroScale: CGFloat = 0.8
     private let store = StoreManager.shared
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.08, green: 0.06, blue: 0.04),
+                        Color(red: 0.15, green: 0.10, blue: 0.05),
+                        Color(red: 0.08, green: 0.06, blue: 0.04)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 24) {
                         // MARK: - Header
                         VStack(spacing: 12) {
                             ZStack {
-                                // Glassmorphism backdrop
+                                // Ambient radial glow
+                                RadialGradient(
+                                    colors: [
+                                        Color.wrenchAmber.opacity(0.25),
+                                        Color.wrenchAmber.opacity(0.08),
+                                        Color.clear
+                                    ],
+                                    center: .center,
+                                    startRadius: 20,
+                                    endRadius: 120
+                                )
+                                .frame(width: 240, height: 240)
+
                                 Circle()
                                     .fill(.ultraThinMaterial)
                                     .frame(width: 120, height: 120)
@@ -43,67 +65,97 @@ struct ProUpgradeView: View {
                                     )
                             }
                             .shadow(color: Color.wrenchAmber.opacity(0.25), radius: 12, x: 0, y: 4)
+                            .scaleEffect(heroScale)
+                            .onAppear {
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                                    heroScale = 1.0
+                                }
+                            }
                             .accessibilityHidden(true)
 
                             Text("WrenchLog Pro")
-                                .font(.title.weight(.bold))
+                                .font(.system(.title, design: .rounded, weight: .bold))
+                                .foregroundStyle(.white)
+                                .accessibilityAddTraits(.isHeader)
 
                             Text("Everything you need to keep\nyour vehicles in top shape")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.6))
                                 .multilineTextAlignment(.center)
                         }
                         .padding(.top, 24)
 
                         // MARK: - Social Proof
-                        HStack(spacing: 6) {
-                            ForEach(0..<5) { _ in
-                                Image(systemName: "star.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.yellow)
+                        VStack(spacing: 8) {
+                            HStack(spacing: 6) {
+                                ForEach(0..<5) { _ in
+                                    Image(systemName: "star.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.yellow)
+                                }
                             }
-                            Text("Trusted by car enthusiasts")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                            Text("Join car enthusiasts who chose Pro")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.white.opacity(0.6))
                         }
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("5 stars. Trusted by car enthusiasts")
+                        .accessibilityLabel("5 stars. Join car enthusiasts who chose Pro")
 
-                        // MARK: - Feature Comparison Table
+                        // MARK: - "What You'll Miss" Feature Comparison
                         VStack(spacing: 0) {
                             // Header row
                             HStack {
-                                Text("Feature")
-                                    .font(.caption.weight(.semibold))
+                                Text("What You Get")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 Text("Free")
                                     .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white.opacity(0.6))
                                     .frame(width: 50)
-                                Text("Pro")
+                                HStack(spacing: 3) {
+                                    Image(systemName: "crown.fill")
+                                        .font(.caption2)
+                                    Text("Pro")
+                                }
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(Color.wrenchAmber)
-                                    .frame(width: 50)
+                                    .frame(width: 55)
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
-                            .background(Color(.tertiarySystemGroupedBackground))
+                            .background(Color.white.opacity(0.08))
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Feature comparison: What you get, Free versus Pro")
+                            .accessibilityAddTraits(.isHeader)
 
                             comparisonRow("Vehicles", free: "1", pro: "∞")
                             comparisonRow("Service Logging", free: true, pro: true)
                             comparisonRow("Fuel Tracking", free: true, pro: true)
                             comparisonRow("Smart Reminders", free: true, pro: true)
+                            comparisonRow("Basic Insights", free: true, pro: true)
+                            comparisonRow("Full Analytics & Charts", free: false, pro: true)
+                            comparisonRow("Fuel Efficiency Trends", free: false, pro: true)
                             comparisonRow("Receipt Photos", free: false, pro: true)
                             comparisonRow("PDF Reports", free: false, pro: true)
-                            comparisonRow("Cost Analytics", free: false, pro: true)
-                            comparisonRow("Custom Categories", free: false, pro: true)
                             comparisonRow("CSV Export", free: false, pro: true)
+                            comparisonRow("Custom Categories", free: false, pro: true)
+                            comparisonRow("All Color Themes", free: false, pro: true)
                         }
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                        .background {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(Color.white.opacity(0.06))
+                                )
+                        }
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
                                 .strokeBorder(Color.wrenchAmber.opacity(0.15), lineWidth: 1)
                         )
-                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+                        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
                         .shadow(color: Color.wrenchAmber.opacity(0.08), radius: 12, x: 0, y: 6)
                         .padding(.horizontal, 24)
 
@@ -112,16 +164,19 @@ struct ProUpgradeView: View {
                             Image(systemName: "nosign")
                                 .font(.caption)
                                 .foregroundStyle(Color.wrenchAmber)
+                                .accessibilityHidden(true)
                             Text("WrenchLog never shows ads — Free or Pro.")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.6))
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("WrenchLog never shows ads, Free or Pro")
 
                         // MARK: - Trust Indicators
                         VStack(spacing: 10) {
                             HStack(spacing: 20) {
-                                trustBadge(icon: "lock.shield.fill", text: "Lifetime Purchase")
-                                trustBadge(icon: "arrow.clockwise.circle", text: "No Subscription Required")
+                                trustBadge(icon: "lock.shield.fill", text: "Secure Purchase")
+                                trustBadge(icon: "arrow.clockwise.circle", text: "Cancel Anytime")
                             }
                             HStack(spacing: 20) {
                                 trustBadge(icon: "iphone.and.arrow.forward", text: "Restore Anytime")
@@ -130,7 +185,7 @@ struct ProUpgradeView: View {
                         }
                         .padding(.horizontal, 24)
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Lifetime purchase, no subscription required, restore anytime, no data collection")
+                        .accessibilityLabel("Secure purchase, cancel anytime, restore anytime, no data collection")
 
                         // MARK: - Products
                         if store.isLoading {
@@ -149,24 +204,29 @@ struct ProUpgradeView: View {
                             .padding()
                         } else {
                             VStack(spacing: 12) {
+                                // Yearly with trial CTA — primary
+                                if let yearly = store.yearlyProduct {
+                                    productButton(
+                                        product: yearly,
+                                        label: "Yearly",
+                                        sublabel: "Start 7-Day Free Trial — Cancel Anytime",
+                                        recommended: true,
+                                        badge: savingsBadge
+                                    )
+                                }
+
+                                // Lifetime
                                 if let lifetime = store.lifetimeProduct {
                                     productButton(
                                         product: lifetime,
                                         label: "Lifetime",
                                         sublabel: "One-time purchase • Yours forever",
-                                        recommended: true
-                                    )
-                                }
-                                if let yearly = store.yearlyProduct {
-                                    productButton(
-                                        product: yearly,
-                                        label: "Yearly",
-                                        sublabel: "Billed annually",
-                                        recommended: false
+                                        recommended: false,
+                                        badge: nil
                                     )
                                 }
 
-                                // Savings callout if both tiers exist
+                                // Savings callout
                                 if let lifetime = store.lifetimeProduct,
                                    let yearly = store.yearlyProduct {
                                     savingsCallout(lifetime: lifetime, yearly: yearly)
@@ -218,25 +278,31 @@ struct ProUpgradeView: View {
                             }
                         }
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.6))
                         .disabled(restoring)
+                        .accessibilityLabel(restoring ? "Restoring purchases" : "Restore purchases")
+                        .accessibilityHint("Restore previously purchased Pro access")
 
                         // MARK: - Privacy & Terms
                         Text("Your data stays on your device. We don't sell your vehicle information to anyone.")
                             .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.white.opacity(0.4))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
 
                         VStack(spacing: 4) {
                             Text("Subscriptions auto-renew unless cancelled at least 24 hours before the end of the current period. Payment is charged to your Apple ID account. You can manage or cancel subscriptions anytime in Settings → Apple ID → Subscriptions.")
                                 .font(.caption2)
-                                .foregroundStyle(.quaternary)
+                                .foregroundStyle(.white.opacity(0.3))
                                 .multilineTextAlignment(.center)
 
                             HStack(spacing: 16) {
                                 Link("Privacy Policy", destination: URL(string: "https://theknack2020-sketch.github.io/wrenchlog/privacy/")!)
+                                    .accessibilityLabel("Privacy Policy")
+                                    .accessibilityHint("Opens privacy policy in browser")
                                 Link("Terms of Use", destination: URL(string: "https://theknack2020-sketch.github.io/wrenchlog/terms/")!)
+                                    .accessibilityLabel("Terms of Use")
+                                    .accessibilityHint("Opens terms of use in browser")
                             }
                             .font(.caption2)
                         }
@@ -249,13 +315,15 @@ struct ProUpgradeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") { dismiss() }
+                        .foregroundStyle(.white.opacity(0.7))
+                        .accessibilityIdentifier("proUpgradeClose")
                         .accessibilityLabel("Close Pro upgrade screen")
                 }
             }
             .disabled(purchasing)
             .alert("Purchase Failed", isPresented: $showPurchaseErrorAlert) {
                 Button("Try Again") {
-                    if let product = store.lifetimeProduct ?? store.yearlyProduct {
+                    if let product = store.yearlyProduct ?? store.lifetimeProduct {
                         Task {
                             purchasing = true
                             error = nil
@@ -311,7 +379,26 @@ struct ProUpgradeView: View {
             } message: {
                 Text(restoreAlertMessage)
             }
+            .preferredColorScheme(.dark)
         }
+    }
+
+    // MARK: - Savings Badge
+
+    private var savingsBadge: String? {
+        guard let yearly = store.yearlyProduct, let lifetime = store.lifetimeProduct else { return nil }
+        let yearlyPrice = Double(truncating: yearly.price as NSDecimalNumber)
+        let lifetimePrice = Double(truncating: lifetime.price as NSDecimalNumber)
+        guard lifetimePrice > 0, yearlyPrice > 0 else { return nil }
+        // Show savings vs lifetime if you only plan 1 year
+        let yearsToBreakEven = lifetimePrice / yearlyPrice
+        if yearsToBreakEven > 1 {
+            let savingsPercent = Int(((lifetimePrice - yearlyPrice) / lifetimePrice) * 100)
+            if savingsPercent > 0 {
+                return "Save \(savingsPercent)% vs Lifetime"
+            }
+        }
+        return nil
     }
 
     // MARK: - Feature Comparison Row (check/cross)
@@ -320,18 +407,23 @@ struct ProUpgradeView: View {
         HStack {
             Text(feature)
                 .font(.caption)
+                .foregroundStyle(.white.opacity(0.8))
                 .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: free ? "checkmark" : "xmark")
                 .font(.caption2.weight(.bold))
-                .foregroundStyle(free ? .green : Color(.tertiaryLabel))
+                .foregroundStyle(free ? .green : .white.opacity(0.25))
                 .frame(width: 50)
+                .accessibilityHidden(true)
             Image(systemName: pro ? "checkmark" : "xmark")
                 .font(.caption2.weight(.bold))
-                .foregroundStyle(pro ? Color.wrenchAmber : Color(.tertiaryLabel))
-                .frame(width: 50)
+                .foregroundStyle(pro ? Color.wrenchAmber : .white.opacity(0.25))
+                .frame(width: 55)
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(feature): Free \(free ? "yes" : "no"), Pro \(pro ? "yes" : "no")")
     }
 
     // MARK: - Feature Comparison Row (text)
@@ -340,18 +432,21 @@ struct ProUpgradeView: View {
         HStack {
             Text(feature)
                 .font(.caption)
+                .foregroundStyle(.white.opacity(0.8))
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(free)
                 .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.5))
                 .frame(width: 50)
             Text(pro)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(Color.wrenchAmber)
-                .frame(width: 50)
+                .frame(width: 55)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(feature): Free \(free), Pro \(pro)")
     }
 
     // MARK: - Savings Callout
@@ -359,7 +454,6 @@ struct ProUpgradeView: View {
     private func savingsCallout(lifetime: Product, yearly: Product) -> some View {
         let yearlyPrice = Double(truncating: yearly.price as NSDecimalNumber)
         let lifetimePrice = Double(truncating: lifetime.price as NSDecimalNumber)
-        // If lifetime costs less than 3 years of yearly, show savings
         let yearsToBreakEven = yearlyPrice > 0 ? lifetimePrice / yearlyPrice : 0.0
 
         return Group {
@@ -368,20 +462,23 @@ struct ProUpgradeView: View {
                     Image(systemName: "tag.fill")
                         .font(.caption2)
                         .foregroundStyle(Color.wrenchAmber)
+                        .accessibilityHidden(true)
                     Text("Lifetime pays for itself in \(String(format: "%.0f", ceil(yearsToBreakEven))) years")
                         .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.6))
                 }
                 .padding(.vertical, 6)
                 .padding(.horizontal, 12)
                 .background(Color.wrenchAmber.opacity(0.1), in: Capsule())
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Lifetime pays for itself in \(String(format: "%.0f", ceil(yearsToBreakEven))) years")
             }
         }
     }
 
     // MARK: - Product Button
 
-    private func productButton(product: Product, label: String, sublabel: String, recommended: Bool) -> some View {
+    private func productButton(product: Product, label: String, sublabel: String, recommended: Bool, badge: String?) -> some View {
         Button {
             Task {
                 purchasing = true
@@ -411,10 +508,10 @@ struct ProUpgradeView: View {
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack {
+                    HStack(spacing: 6) {
                         Text(label).font(.subheadline.weight(.semibold))
                         if recommended {
-                            Text("BEST VALUE")
+                            Text("RECOMMENDED")
                                 .font(.caption2.weight(.bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -422,14 +519,30 @@ struct ProUpgradeView: View {
                                 .foregroundStyle(.white)
                         }
                     }
-                    Text(sublabel).font(.caption).opacity(0.7)
+                    Text(sublabel)
+                        .font(.caption)
+                        .opacity(0.8)
+                    if let badge {
+                        Text(badge)
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(recommended ? .white.opacity(0.9) : Color.wrenchAmber)
+                            .padding(.top, 1)
+                    }
                 }
                 Spacer()
-                Text(product.displayPrice).font(.subheadline.weight(.bold))
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(product.displayPrice)
+                        .font(.subheadline.weight(.bold))
+                    if product.id == StoreManager.yearlyID {
+                        Text("/year")
+                            .font(.caption2)
+                            .opacity(0.7)
+                    }
+                }
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .foregroundStyle(recommended ? .white : .primary)
+            .foregroundStyle(recommended ? .white : .white)
             .background {
                 if recommended {
                     RoundedRectangle(cornerRadius: 14)
@@ -442,13 +555,14 @@ struct ProUpgradeView: View {
                         )
                 } else {
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(Color(.tertiarySystemGroupedBackground))
+                        .fill(Color.white.opacity(0.08))
                 }
             }
             .shadow(color: recommended ? Color.wrenchAmber.opacity(0.3) : .black.opacity(0.06), radius: recommended ? 10 : 4, x: 0, y: recommended ? 4 : 2)
         }
         .accessibilityLabel("\(label) plan, \(product.displayPrice)")
-        .accessibilityHint(recommended ? "Best value option" : "")
+        .accessibilityHint(recommended ? "Recommended option with free trial" : "")
+        .pressable()
     }
 
     // MARK: - Trust Badge
@@ -458,10 +572,13 @@ struct ProUpgradeView: View {
             Image(systemName: icon)
                 .font(.caption2)
                 .foregroundStyle(Color.wrenchAmber)
+                .accessibilityHidden(true)
             Text(text)
                 .font(.caption2.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.6))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
     }
 }

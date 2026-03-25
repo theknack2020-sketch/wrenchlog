@@ -157,7 +157,7 @@ struct VehicleTests {
         #expect(v.licensePlate == "")
         #expect(v.vin == "")
         #expect(!v.isArchived)
-        #expect(v.serviceRecords.isEmpty)
+        #expect(v.serviceRecords?.isEmpty ?? true)
         #expect(v.photoData == nil)
     }
 
@@ -260,5 +260,416 @@ struct PDFTests {
         v.serviceRecords = []
         let data = PDFExportService.generatePDF(for: v, settings: UserSettings.shared)
         #expect(data != nil)
+    }
+}
+
+// MARK: - Retention Engine Tests
+
+@MainActor
+@Suite("Retention Engine Tests")
+struct RetentionEngineTests {
+
+    /// Clean UserDefaults keys used by RetentionEngine before each test
+    private func cleanDefaults() {
+        let keys = [
+            "wl_streak", "wl_longest_streak", "wl_last_active",
+            "wl_total_opens", "wl_install_date", "wl_grace_used_date",
+            "wl_journey_notifs_scheduled"
+        ]
+        keys.forEach { UserDefaults.standard.removeObject(forKey: $0) }
+    }
+
+    @Test("Streak starts at 0 for fresh defaults")
+    func streakStartsAtZero() {
+        cleanDefaults()
+        let streak = UserDefaults.standard.integer(forKey: "wl_streak")
+        #expect(streak == 0)
+    }
+
+    @Test("recordActivity sets streak to 1 on first call")
+    func recordActivityIncrementsStreak() {
+        cleanDefaults()
+        let engine = RetentionEngine.shared
+        engine.recordActivity()
+        #expect(engine.currentStreak == 1)
+        cleanDefaults()
+    }
+
+    @Test("dailyTip returns a non-empty string")
+    func dailyTipNonEmpty() {
+        let tip = RetentionEngine.shared.dailyTip
+        #expect(!tip.isEmpty)
+        #expect(tip.count > 10) // should be a real tip, not a stub
+    }
+
+    @Test("journeyDay returns 1 for fresh install")
+    func journeyDayFreshInstall() {
+        cleanDefaults()
+        // Set install date to now — journeyDay should be 1
+        UserDefaults.standard.set(Date(), forKey: "wl_install_date")
+        let day = RetentionEngine.shared.journeyDay
+        #expect(day == 1)
+        cleanDefaults()
+    }
+
+    @Test("journeyMessage returns non-nil for day 1")
+    func journeyMessageDay1() {
+        cleanDefaults()
+        UserDefaults.standard.set(Date(), forKey: "wl_install_date")
+        let message = RetentionEngine.shared.journeyMessage
+        #expect(message != nil)
+        #expect(message!.contains("Welcome"))
+        cleanDefaults()
+    }
+
+    @Test("streakMessage returns nil for streak < 2")
+    func streakMessageNilForLowStreak() {
+        cleanDefaults()
+        // Streak is 0
+        #expect(RetentionEngine.shared.streakMessage == nil)
+        // Set streak to 1
+        UserDefaults.standard.set(1, forKey: "wl_streak")
+        #expect(RetentionEngine.shared.streakMessage == nil)
+        cleanDefaults()
+    }
+
+    @Test("streakMessage returns message for streak of 2")
+    func streakMessageForTwo() {
+        cleanDefaults()
+        UserDefaults.standard.set(2, forKey: "wl_streak")
+        let msg = RetentionEngine.shared.streakMessage
+        #expect(msg != nil)
+        #expect(msg!.contains("2-day"))
+        cleanDefaults()
+    }
+
+    @Test("isActiveToday returns false initially")
+    func isActiveTodayFalse() {
+        cleanDefaults()
+        #expect(RetentionEngine.shared.isActiveToday == false)
+        cleanDefaults()
+    }
+
+    @Test("isActiveToday returns true after recordActivity")
+    func isActiveTodayAfterRecord() {
+        cleanDefaults()
+        RetentionEngine.shared.recordActivity()
+        #expect(RetentionEngine.shared.isActiveToday == true)
+        cleanDefaults()
+    }
+
+    @Test("totalOpens increments with recordActivity")
+    func totalOpensIncrements() {
+        cleanDefaults()
+        let engine = RetentionEngine.shared
+        let before = engine.totalOpens
+        engine.recordActivity()
+        #expect(engine.totalOpens == before + 1)
+        cleanDefaults()
+    }
+}
+
+// MARK: - Soft Paywall Tests
+
+@MainActor
+@Suite("Soft Paywall Tests")
+struct SoftPaywallTests {
+
+    /// Reset UserDefaults keys used by SoftPaywallTracker
+    private func cleanDefaults() {
+        UserDefaults.standard.removeObject(forKey: "wl_lifetime_actions")
+        UserDefaults.standard.removeObject(forKey: "wl_paywall_dismissed")
+    }
+
+    @Test("Initial sessionActionCount is 0")
+    func initialSessionCount() {
+        // SoftPaywallTracker is a singleton; sessionActionCount resets per app launch.
+        // Since tests run in one process, we verify the property is accessible and non-negative.
+        let tracker = SoftPaywallTracker.shared
+        #expect(tracker.sessionActionCount >= 0)
+    }
+
+    @Test("recordAction increments sessionActionCount")
+    func recordActionIncrements() {
+        let tracker = SoftPaywallTracker.shared
+        let before = tracker.sessionActionCount
+        tracker.recordAction()
+        #expect(tracker.sessionActionCount == before + 1)
+    }
+
+    @Test("recordAction increments lifetimeActionCount")
+    func recordActionLifetime() {
+        cleanDefaults()
+        let tracker = SoftPaywallTracker.shared
+        let before = tracker.lifetimeActionCount
+        tracker.recordAction()
+        #expect(tracker.lifetimeActionCount == before + 1)
+        cleanDefaults()
+    }
+
+    @Test("markDismissed sets hasDismissedBefore to true")
+    func markDismissedSetsFlag() {
+        cleanDefaults()
+        let tracker = SoftPaywallTracker.shared
+        tracker.markDismissed()
+        #expect(tracker.hasDismissedBefore == true)
+        cleanDefaults()
+    }
+
+    @Test("hasDismissedBefore persists in UserDefaults")
+    func dismissedPersists() {
+        cleanDefaults()
+        SoftPaywallTracker.shared.markDismissed()
+        // Read directly from UserDefaults to verify persistence
+        let persisted = UserDefaults.standard.bool(forKey: "wl_paywall_dismissed")
+        #expect(persisted == true)
+        cleanDefaults()
+    }
+}
+
+// MARK: - Maintenance Score Tests
+
+@MainActor
+@Suite("Maintenance Score Tests")
+struct MaintenanceScoreTests {
+
+    @Test("Score for new vehicle with no records is 50")
+    func scoreNewVehicle() {
+        let v = Vehicle(make: "Test", model: "Car", year: 2024)
+        v.serviceRecords = []
+        let score = MaintenanceScoreEngine.score(for: v)
+        #expect(score == 50)
+    }
+
+    @Test("Score is always between 0 and 100")
+    func scoreBounds() {
+        let v = Vehicle(make: "Test", model: "Car", year: 2024)
+        v.serviceRecords = []
+        let score = MaintenanceScoreEngine.score(for: v)
+        #expect(score >= 0)
+        #expect(score <= 100)
+    }
+
+    @Test("Vehicle with records but no reminders scores 85")
+    func scoreWithRecordsNoReminders() {
+        let v = Vehicle(make: "Test", model: "Car", year: 2024, mileage: 10000)
+        let r = ServiceRecord(serviceType: .generalRepair, cost: 50)
+        r.vehicle = v
+        v.serviceRecords = [r]
+        // generalRepair has 0 default intervals, so no reminders — score should be 85
+        let score = MaintenanceScoreEngine.score(for: v)
+        #expect(score == 85)
+    }
+
+    @Test("color returns a Color for all score ranges")
+    func colorForScores() {
+        // Test representative scores from each bucket
+        let scores = [0, 20, 39, 40, 59, 60, 79, 80, 100]
+        for s in scores {
+            let _ = MaintenanceScoreEngine.color(for: s)
+            // No crash = Color returned successfully
+        }
+    }
+
+    @Test("color maps high score to wrenchGreen")
+    func colorHighScore() {
+        let c = MaintenanceScoreEngine.color(for: 90)
+        #expect(c == .wrenchGreen)
+    }
+
+    @Test("color maps low score to wrenchRed")
+    func colorLowScore() {
+        let c = MaintenanceScoreEngine.color(for: 20)
+        #expect(c == .wrenchRed)
+    }
+
+    @Test("label returns correct string for score ranges")
+    func labelForScores() {
+        #expect(MaintenanceScoreEngine.label(for: 95) == "Excellent")
+        #expect(MaintenanceScoreEngine.label(for: 80) == "Good")
+        #expect(MaintenanceScoreEngine.label(for: 65) == "Fair")
+        #expect(MaintenanceScoreEngine.label(for: 50) == "Needs Attention")
+        #expect(MaintenanceScoreEngine.label(for: 20) == "Critical")
+    }
+
+    @Test("icon returns valid SF Symbol names")
+    func iconForScores() {
+        #expect(MaintenanceScoreEngine.icon(for: 90) == "heart.fill")
+        #expect(MaintenanceScoreEngine.icon(for: 70) == "heart")
+        #expect(MaintenanceScoreEngine.icon(for: 50) == "heart.slash")
+        #expect(MaintenanceScoreEngine.icon(for: 20) == "heart.slash.fill")
+    }
+}
+
+// MARK: - Theme Tests
+
+@MainActor
+@Suite("Theme Tests")
+struct ThemeTests {
+
+    @Test("5 themes exist")
+    func themeCount() {
+        #expect(AppTheme.allCases.count == 5)
+    }
+
+    @Test("Each theme has an accent color")
+    func accentColors() {
+        for theme in AppTheme.allCases {
+            let _ = theme.accent
+            let _ = theme.accentLight
+            // No crash = colors exist
+        }
+    }
+
+    @Test("Each theme has headerGradient with 2 colors")
+    func headerGradientSize() {
+        for theme in AppTheme.allCases {
+            #expect(theme.headerGradient.count == 2)
+        }
+    }
+
+    @Test("Each theme has sectionGradient with 2 colors")
+    func sectionGradientSize() {
+        for theme in AppTheme.allCases {
+            #expect(theme.sectionGradient.count == 2)
+        }
+    }
+
+    @Test("Default theme is defaultAmber")
+    func defaultTheme() {
+        // ThemeManager defaults to .defaultAmber when no UserDefaults key is set
+        UserDefaults.standard.removeObject(forKey: "wl_theme")
+        #expect(ThemeManager.shared.current == .defaultAmber)
+    }
+
+    @Test("darkMono has dark color scheme")
+    func darkMonoScheme() {
+        #expect(AppTheme.darkMono.preferredColorScheme == .dark)
+    }
+
+    @Test("Non-dark themes have nil color scheme")
+    func nonDarkSchemes() {
+        #expect(AppTheme.defaultAmber.preferredColorScheme == nil)
+        #expect(AppTheme.oceanBlue.preferredColorScheme == nil)
+        #expect(AppTheme.forestGreen.preferredColorScheme == nil)
+        #expect(AppTheme.sunsetRose.preferredColorScheme == nil)
+    }
+
+    @Test("Each theme has an icon")
+    func themeIcons() {
+        for theme in AppTheme.allCases {
+            #expect(!theme.icon.isEmpty)
+        }
+    }
+
+    @Test("Theme rawValues are unique")
+    func uniqueRawValues() {
+        let rawValues = AppTheme.allCases.map(\.rawValue)
+        #expect(Set(rawValues).count == rawValues.count)
+    }
+
+    @Test("Theme IDs match rawValues")
+    func idsMatchRaw() {
+        for theme in AppTheme.allCases {
+            #expect(theme.id == theme.rawValue)
+        }
+    }
+}
+
+// MARK: - Fuel Efficiency Tests
+
+@Suite("Fuel Efficiency Tests")
+struct FuelEfficiencyTests {
+
+    @Test("FuelType has EV case")
+    func fuelTypeHasEV() {
+        #expect(FuelType.allCases.contains(.ev))
+    }
+
+    @Test("FuelType.ev.isElectric is true")
+    func evIsElectric() {
+        #expect(FuelType.ev.isElectric == true)
+    }
+
+    @Test("Non-EV fuel types are not electric")
+    func nonEvNotElectric() {
+        let nonEV: [FuelType] = [.regular, .midgrade, .premium, .diesel, .e85]
+        for fuel in nonEV {
+            #expect(fuel.isElectric == false)
+        }
+    }
+
+    @Test("volumeLabel returns kWh for EV")
+    func volumeLabelEV() {
+        #expect(FuelType.ev.volumeLabel(fallback: .gallons) == "kWh")
+        #expect(FuelType.ev.volumeLabel(fallback: .liters) == "kWh")
+    }
+
+    @Test("volumeLabel returns user unit for non-EV")
+    func volumeLabelNonEV() {
+        #expect(FuelType.regular.volumeLabel(fallback: .gallons) == "gal")
+        #expect(FuelType.regular.volumeLabel(fallback: .liters) == "L")
+        #expect(FuelType.diesel.volumeLabel(fallback: .gallons) == "gal")
+        #expect(FuelType.premium.volumeLabel(fallback: .liters) == "L")
+    }
+
+    @Test("All fuel types have icons")
+    func allFuelIcons() {
+        for fuel in FuelType.allCases {
+            #expect(!fuel.icon.isEmpty)
+        }
+    }
+
+    @Test("All fuel types have short labels")
+    func allFuelShortLabels() {
+        for fuel in FuelType.allCases {
+            #expect(!fuel.shortLabel.isEmpty)
+        }
+    }
+
+    @Test("FuelType count is 6")
+    func fuelTypeCount() {
+        #expect(FuelType.allCases.count == 6)
+    }
+
+    @Test("EfficiencyUnit has MPG and L/100km")
+    func efficiencyUnits() {
+        #expect(EfficiencyUnit.allCases.count == 2)
+        #expect(EfficiencyUnit.mpg.label == "MPG")
+        #expect(EfficiencyUnit.l100km.label == "L/100km")
+    }
+
+    @Test("Empty fuel logs produce no efficiency results")
+    func emptyEfficiency() {
+        let logs: [FuelLog] = []
+        #expect(logs.calculateEfficiency().isEmpty)
+    }
+
+    @Test("Single fuel log produces no efficiency results")
+    func singleLogEfficiency() {
+        let log = FuelLog(mileage: 10000, volume: 12.0, totalCost: 45.0)
+        #expect([log].calculateEfficiency().isEmpty)
+    }
+
+    @Test("Two full-tank logs produce one efficiency result")
+    func twoLogsEfficiency() {
+        let log1 = FuelLog(mileage: 10000, volume: 12.0, totalCost: 40.0, isFullTank: true)
+        let log2 = FuelLog(mileage: 10300, volume: 10.0, totalCost: 35.0, isFullTank: true)
+        let results = [log1, log2].calculateEfficiency()
+        #expect(results.count == 1)
+        #expect(results[0].distance == 300)
+        #expect(results[0].mpg > 0)
+        #expect(results[0].l100km > 0)
+    }
+
+    @Test("Non-full-tank logs are excluded from efficiency calculation")
+    func partialTankExcluded() {
+        let log1 = FuelLog(mileage: 10000, volume: 12.0, isFullTank: true)
+        let log2 = FuelLog(mileage: 10200, volume: 5.0, isFullTank: false)
+        let log3 = FuelLog(mileage: 10500, volume: 14.0, isFullTank: true)
+        let results = [log1, log2, log3].calculateEfficiency()
+        // Only full-tank logs (log1 and log3) produce a result
+        #expect(results.count == 1)
+        #expect(results[0].distance == 500)
     }
 }

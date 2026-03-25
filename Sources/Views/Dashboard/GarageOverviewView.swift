@@ -15,16 +15,26 @@ struct GarageOverviewView: View {
 
     @State private var showAddVehicle = false
     @State private var showProPrompt = false
+    @State private var showSoftPaywall = false
     @State private var selectedVehicle: Vehicle?
     @State private var showArchivedVehicles = false
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
+    @State private var isLoaded = false
+    // Quick Action sheet state
+    @State private var quickActionVehicle: Vehicle?
+    @State private var showQuickAddService = false
+    @State private var showQuickAddFuel = false
     @Environment(\.modelContext) private var context
     @Environment(\.appTheme) private var theme
+    @Environment(\.pendingQuickAction) private var pendingQuickAction
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Namespace private var heroNamespace
 
     private let store = StoreManager.shared
     private let settings = UserSettings.shared
     private let haptic = HapticManager.shared
+    private let retention = RetentionEngine.shared
 
     // Next service due across all vehicles
     var nextServiceDue: (vehicle: Vehicle, type: String, urgency: ReminderUrgency, text: String)? {
@@ -96,6 +106,7 @@ struct GarageOverviewView: View {
                         Image(systemName: "plus.circle.fill")
                             .foregroundStyle(theme.accent)
                     }
+                    .accessibilityIdentifier("garageAddVehicle")
                     .accessibilityLabel("Add vehicle")
                 }
             }
@@ -105,12 +116,33 @@ struct GarageOverviewView: View {
             .sheet(isPresented: $showProPrompt) {
                 ProUpgradeView()
             }
+            .sheet(isPresented: $showSoftPaywall) {
+                SoftPaywallSheet()
+            }
             .navigationDestination(item: $selectedVehicle) { vehicle in
                 VehicleDetailView(vehicle: vehicle)
+                    .heroZoomTransition(id: vehicle.id, in: heroNamespace)
             }
             .onAppear {
+                // Shimmer loading effect
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    withAnimation { isLoaded = true }
+                }
+                // Track retention
+                retention.recordActivity()
                 Task {
+                    await retention.resetInactivityTimer()
+                    await retention.scheduleRetentionNotifications()
                     await ReminderManager.shared.scheduleReminders(for: activeVehicles)
+                }
+                // Index vehicles for Spotlight
+                SpotlightService.indexVehicles(activeVehicles)
+                // Check soft paywall trigger
+                if SoftPaywallTracker.shared.shouldShowPaywall {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        showSoftPaywall = true
+                        SoftPaywallTracker.shared.markShown()
+                    }
                 }
             }
             .alert("Something Went Wrong", isPresented: $showErrorAlert) {
@@ -118,6 +150,51 @@ struct GarageOverviewView: View {
             } message: {
                 Text(errorMessage)
             }
+            // Quick Action sheets
+            .sheet(isPresented: $showQuickAddService) {
+                if let vehicle = quickActionVehicle {
+                    AddServiceView(vehicle: vehicle)
+                }
+            }
+            .sheet(isPresented: $showQuickAddFuel) {
+                if let vehicle = quickActionVehicle {
+                    AddFuelLogView(vehicle: vehicle)
+                }
+            }
+            .onChange(of: pendingQuickAction.wrappedValue) { _, action in
+                guard let action else { return }
+                handleQuickAction(action)
+                pendingQuickAction.wrappedValue = nil
+            }
+            .onAppear {
+                // Handle quick action that arrived before the view appeared
+                if let action = pendingQuickAction.wrappedValue {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        handleQuickAction(action)
+                        pendingQuickAction.wrappedValue = nil
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Quick Action Handler
+
+    private func handleQuickAction(_ action: String) {
+        if activeVehicles.isEmpty {
+            // No vehicles — open Add Vehicle instead
+            showAddVehicle = true
+            return
+        }
+        let vehicle = activeVehicles[0]
+        quickActionVehicle = vehicle
+        switch action {
+        case "com.theknack.wrenchlog.addService":
+            showQuickAddService = true
+        case "com.theknack.wrenchlog.addFuel":
+            showQuickAddFuel = true
+        default:
+            break
         }
     }
 
@@ -132,7 +209,7 @@ struct GarageOverviewView: View {
                     .fill(theme.accent.opacity(0.1))
                     .frame(width: 120, height: 120)
                 Image(systemName: "car.side.fill")
-                    .font(.system(size: 48))
+                    .font(.system(.largeTitle, design: .rounded))
                     .foregroundStyle(theme.accent)
                     .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
             }
@@ -140,7 +217,7 @@ struct GarageOverviewView: View {
 
             VStack(spacing: 8) {
                 Text("Your Garage is Empty")
-                    .font(.title2.weight(.bold))
+                    .font(.system(.title2, design: .rounded, weight: .bold))
 
                 Text("Add your first vehicle to start tracking\nmaintenance, fuel costs, and service history.")
                     .font(.subheadline)
@@ -170,6 +247,7 @@ struct GarageOverviewView: View {
             }
             .accessibilityLabel("Add your first vehicle")
             .accessibilityHint("Opens a form to add a new vehicle")
+            .pressable()
             .floatIn(delay: 0.3)
 
             Spacer()
@@ -191,7 +269,7 @@ struct GarageOverviewView: View {
                                 .foregroundStyle(.white)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Your Garage")
-                                    .font(.subheadline.weight(.bold))
+                                    .font(.system(.subheadline, design: .rounded, weight: .bold))
                                     .foregroundStyle(.white)
                                 Text("\(activeVehicles.count) vehicle\(activeVehicles.count == 1 ? "" : "s") · \(totalServiceCount) services")
                                     .font(.caption)
@@ -215,8 +293,15 @@ struct GarageOverviewView: View {
                         .padding(.bottom, 10)
 
                         fleetSummaryCard
+
+                        // Retention: daily tip + streak + journey
+                        RetentionBanner()
+                            .padding(.top, 8)
                     }
                     .floatIn(delay: 0.05)
+                } header: {
+                    Text("Overview")
+                        .font(.system(.headline, design: .rounded))
                 }
             }
 
@@ -227,19 +312,22 @@ struct GarageOverviewView: View {
                 }
             }
 
-            // Seasonal suggestions
+            // Seasonal suggestions (collapsed by default)
             if !seasonalSuggestions.isEmpty {
-                Section("Seasonal Tips") {
-                    ForEach(seasonalSuggestions) { suggestion in
-                        seasonalRow(suggestion)
+                Section {
+                    DisclosureGroup("Seasonal Tips") {
+                        ForEach(seasonalSuggestions) { suggestion in
+                            seasonalRow(suggestion)
+                        }
                     }
                 }
             }
 
             // Vehicles
-            Section("Vehicles") {
+            Section {
                 ForEach(Array(activeVehicles.enumerated()), id: \.element.id) { index, vehicle in
                     GarageVehicleCard(vehicle: vehicle)
+                        .heroTransitionSource(id: vehicle.id, in: heroNamespace)
                         .contentShape(Rectangle())
                         .springStaggeredAppear(index: index, offsetY: 16)
                         .scalePressEffect()
@@ -249,12 +337,38 @@ struct GarageOverviewView: View {
                             selectedVehicle = vehicle
                         }
                 }
+
+                // Pro upsell (inline)
+                if !store.isPro && activeVehicles.count >= 1 {
+                    Button { haptic.buttonTap(); showProPrompt = true } label: {
+                        HStack {
+                            Image(systemName: "crown.fill")
+                                .foregroundStyle(theme.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Free: 1 vehicle")
+                                    .font(.subheadline.weight(.medium))
+                                Text("Upgrade to Pro for unlimited vehicles, analytics, PDF export & more")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 12)
+                        .glassBackground(cornerRadius: 14)
+                    }
+                    .pressable()
+                    .accessibilityIdentifier("garageProUpsell")
+                    .accessibilityLabel("Upgrade to Pro for unlimited vehicles")
+                }
+            } header: {
+                Text("Vehicles")
+                    .font(.system(.headline, design: .rounded))
             }
 
-            // Milestones
+            // Milestones (only show when 2+ badges earned)
             let badges = MilestoneEngine.earnedBadges(for: activeVehicles)
-            if !badges.isEmpty {
-                Section("Milestones") {
+            if badges.count >= 2 {
+                Section {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             ForEach(Array(badges.enumerated()), id: \.element.id) { index, badge in
@@ -264,20 +378,56 @@ struct GarageOverviewView: View {
                         }
                         .padding(.vertical, 4)
                     }
+                } header: {
+                    Text("Milestones")
+                        .font(.system(.headline, design: .rounded))
                 }
             }
 
             // Multi-vehicle cost comparison
             if activeVehicles.count >= 2 {
-                Section("Cost Comparison") {
+                Section {
                     costComparisonChart
                         .chartReveal()
+                } header: {
+                    Text("Cost Comparison")
+                        .font(.system(.headline, design: .rounded))
                 }
             }
 
-            // Insights link
+            // Insights & Weekly Summary
             if !activeVehicles.isEmpty {
                 Section {
+                    NavigationLink {
+                        WeeklySummaryView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(theme.accent.opacity(0.12))
+                                    .frame(width: 40, height: 40)
+                                Image(systemName: "calendar.badge.clock")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(theme.accent)
+                            }
+                            .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("This Week's Summary")
+                                    .font(.subheadline.weight(.semibold))
+                                Text("Services, fuel logs, and activity digest")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 12)
+                        .glassBackground(cornerRadius: 14)
+                    }
+                    .pressable()
+                    .accessibilityIdentifier("weeklySummary")
+                    .accessibilityLabel("This week's summary")
+                    .accessibilityHint("Services, fuel logs, and activity digest")
+
                     NavigationLink {
                         InsightsView()
                     } label: {
@@ -290,6 +440,7 @@ struct GarageOverviewView: View {
                                     .font(.body.weight(.semibold))
                                     .foregroundStyle(theme.accent)
                             }
+                            .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Insights & Statistics")
                                     .font(.subheadline.weight(.semibold))
@@ -299,7 +450,15 @@ struct GarageOverviewView: View {
                             }
                         }
                         .padding(.vertical, 4)
+                        .padding(.horizontal, 12)
+                        .glassBackground(cornerRadius: 14)
                     }
+                    .pressable()
+                    .accessibilityLabel("Insights and statistics")
+                    .accessibilityHint("Spending trends, projections, and analysis")
+                } header: {
+                    Text("Insights")
+                        .font(.system(.headline, design: .rounded))
                 }
             }
 
@@ -311,6 +470,7 @@ struct GarageOverviewView: View {
                         HStack(spacing: 12) {
                             Image(systemName: "car.fill")
                                 .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(vehicle.displayName)
                                     .font(.subheadline)
@@ -332,27 +492,8 @@ struct GarageOverviewView: View {
                         }
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("Sold vehicle: \(vehicle.displayName)\(vehicle.soldDate.map { ", sold \($0, format: .dateTime.month(.abbreviated).year())" } ?? "")")
+                        .accessibilityAddTraits(.isButton)
                     }
-                }
-            }
-
-            // Pro upsell
-            if !store.isPro && activeVehicles.count >= 1 {
-                Section {
-                    Button { haptic.buttonTap(); showProPrompt = true } label: {
-                        HStack {
-                            Image(systemName: "crown.fill")
-                                .foregroundStyle(theme.accent)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Free: 1 vehicle")
-                                    .font(.subheadline.weight(.medium))
-                                Text("Upgrade to Pro for unlimited vehicles, photos, PDF export")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .accessibilityLabel("Upgrade to Pro for unlimited vehicles")
                 }
             }
 
@@ -362,15 +503,18 @@ struct GarageOverviewView: View {
                 } label: {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
+                .pressable()
                 .accessibilityLabel("Open settings")
             }
         }
+        .redacted(reason: isLoaded ? [] : .placeholder)
         .refreshable {
             haptic.refreshPull()
             await ReminderManager.shared.scheduleReminders(for: activeVehicles)
             haptic.success()
             SoundManager.playSaveSuccess()
         }
+        .listStyle(.insetGrouped)
     }
 
     // MARK: - Fleet Summary Card
@@ -417,6 +561,7 @@ struct GarageOverviewView: View {
                 .foregroundStyle(color)
             Text(value)
                 .font(.caption2.weight(.bold).monospacedDigit())
+                .contentTransition(.numericText())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(title)
@@ -425,8 +570,9 @@ struct GarageOverviewView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 2)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.15), radius: 4, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
     }
@@ -464,6 +610,8 @@ struct GarageOverviewView: View {
             DueSoonBadge(urgency: next.urgency, compact: true)
         }
         .padding(.vertical, 4)
+        .padding(.horizontal, 12)
+        .glassBackground(cornerRadius: 14)
         .contentShape(Rectangle())
         .onTapGesture {
             haptic.buttonTap()
@@ -471,6 +619,8 @@ struct GarageOverviewView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Next service due: \(next.type) for \(next.vehicle.displayName). \(next.text)")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Double tap to view vehicle details")
     }
 
     // MARK: - Seasonal Row
@@ -493,8 +643,9 @@ struct GarageOverviewView: View {
         .padding(.vertical, 2)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(.secondarySystemGroupedBackground))
-                .shadow(color: suggestion.color.opacity(0.10), radius: 4, x: 0, y: 2)
+                .fill(.ultraThinMaterial)
+                .shadow(color: suggestion.color.opacity(0.12), radius: 4, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Seasonal tip: \(suggestion.title). \(suggestion.detail)")
@@ -553,6 +704,8 @@ struct GarageOverviewView: View {
                 }
             }
             .frame(height: 180)
+            .accessibilityLabel("Cost comparison chart for \(data.map(\.name).joined(separator: " and "))")
+            .accessibilityElement(children: .combine)
         }
     }
 
@@ -624,6 +777,7 @@ struct GarageVehicleCard: View {
                     Image(systemName: "car.fill")
                         .font(.title3)
                         .foregroundStyle(healthColor)
+                        .accessibilityHidden(true)
                 }
             }
 
@@ -680,6 +834,7 @@ struct GarageVehicleCard: View {
             if count > 0 {
                 Text("\(count)")
                     .font(.caption2.weight(.bold))
+                    .contentTransition(.numericText())
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(theme.accent.opacity(0.15), in: Capsule())
@@ -695,9 +850,9 @@ struct GarageVehicleCard: View {
         .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.secondarySystemGroupedBackground))
-                .shadow(color: .black.opacity(0.06), radius: 3, x: 0, y: 1)
-                .shadow(color: healthColor.opacity(0.12), radius: 8, x: 0, y: 4)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
+                .shadow(color: healthColor.opacity(0.15), radius: 8, x: 0, y: 4)
         )
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: 12)
@@ -709,5 +864,30 @@ struct GarageVehicleCard: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(vehicle.displayName), health \(healthScore) percent, total cost \(UserSettings.shared.formatCost(totalCost))\(nextService.map { ", next service: \($0.type) \($0.urgency.label)" } ?? "")")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+// MARK: - iOS 18 Hero Transition Helpers
+
+private extension View {
+    /// Applies `.matchedTransitionSource(id:in:)` on iOS 18+, no-op on older.
+    @ViewBuilder
+    func heroTransitionSource(id: some Hashable, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            self.matchedTransitionSource(id: id, in: namespace)
+        } else {
+            self
+        }
+    }
+
+    /// Applies `.navigationTransition(.zoom(sourceID:in:))` on iOS 18+, no-op on older.
+    @ViewBuilder
+    func heroZoomTransition(id: some Hashable, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 18.0, *) {
+            self.navigationTransition(.zoom(sourceID: id, in: namespace))
+        } else {
+            self
+        }
     }
 }

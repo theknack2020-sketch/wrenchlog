@@ -7,6 +7,9 @@ struct AddVehicleView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appTheme) private var theme
 
+    @Query(filter: #Predicate<Vehicle> { !$0.isArchived })
+    private var activeVehicles: [Vehicle]
+
     @State private var make = ""
     @State private var model = ""
     @State private var year = Calendar.current.component(.year, from: .now)
@@ -15,6 +18,7 @@ struct AddVehicleView: View {
     @State private var selectedColor: VehicleColor?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoData: Data?
+    @State private var showProPrompt = false
 
     // Validation & error state
     @State private var validationError: String?
@@ -24,6 +28,10 @@ struct AddVehicleView: View {
     @State private var showDuplicateWarning = false
     @State private var saveError: String?
     @State private var isSaving = false
+    @FocusState private var isFocused: Bool
+
+    private let store = StoreManager.shared
+    private let vehiclePhotoManager = VehiclePhotoManager.shared
 
     private var isFormValid: Bool {
         let result = VehicleValidator.validate(make: make, model: model, year: year, mileage: mileage)
@@ -93,6 +101,7 @@ struct AddVehicleView: View {
                     )
                 } header: {
                     Text("Vehicle Info")
+                        .font(.system(.headline, design: .rounded))
                 }
 
                 // Vehicle Color
@@ -140,6 +149,10 @@ struct AddVehicleView: View {
                         .textInputAutocapitalization(.characters)
                         .accessibilityLabel("License plate number")
 
+                    Text("VIN decoding coming soon")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
                         HStack {
                             if let data = photoData, let img = UIImage(data: data) {
@@ -171,8 +184,10 @@ struct AddVehicleView: View {
                     .accessibilityLabel(photoData == nil ? "Add vehicle photo" : "Change vehicle photo")
                 } header: {
                     Text("Optional")
+                        .font(.system(.headline, design: .rounded))
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Add Vehicle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -181,16 +196,23 @@ struct AddVehicleView: View {
                         HapticManager.shared.light()
                         dismiss()
                     }
+                    .accessibilityIdentifier("addVehicleCancel")
                     .accessibilityLabel("Cancel adding vehicle")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         HapticManager.shared.buttonTap()
+                        // Vehicle limit check: free = 2
+                        if !store.isPro && activeVehicles.count >= 2 {
+                            showProPrompt = true
+                            return
+                        }
                         validateAndSave()
                     }
                         .disabled(!isFormValid || isSaving)
                         .fontWeight(.semibold)
                         .foregroundStyle(isFormValid ? Color.wrenchAmber : .secondary)
+                        .accessibilityIdentifier("addVehicleSave")
                         .accessibilityLabel("Save vehicle")
                         .accessibilityHint(isFormValid ? "Saves the vehicle to your garage" : "Enter make and model first")
                 }
@@ -215,6 +237,9 @@ struct AddVehicleView: View {
                 Button("OK") { saveError = nil; isSaving = false }
             } message: {
                 Text(saveError ?? "An unexpected error occurred.")
+            }
+            .sheet(isPresented: $showProPrompt) {
+                ProUpgradeView()
             }
         }
     }
@@ -276,14 +301,23 @@ struct AddVehicleView: View {
             mileage: max(0, Int(mileage) ?? 0)
         )
         vehicle.licensePlate = licensePlate
-        vehicle.photoData = photoData
         vehicle.colorRaw = selectedColor?.rawValue ?? ""
+
+        // Save photo via file-based manager (compressed, max 500KB) instead of bloating SwiftData
+        if let data = photoData {
+            if let fileName = vehiclePhotoManager.saveVehiclePhoto(data, vehicleId: vehicle.id) {
+                vehicle.vehiclePhotoFileName = fileName
+            }
+        }
+        vehicle.photoData = nil  // Never store raw blob in DB
+
         context.insert(vehicle)
 
         do {
             try DataManager.save(context)
             HapticManager.shared.saveSuccess()
             SoundManager.playSaveSuccess()
+            SoftPaywallTracker.shared.recordAction()
             dismiss()
         } catch {
             saveError = error.errorDescription

@@ -42,6 +42,10 @@ final class UserSettings {
         "\(String(format: "%.2f", volume)) \(volumeUnit.label)"
     }
 
+    func formatVolume(_ volume: Double, fuelType: FuelType) -> String {
+        "\(String(format: "%.2f", volume)) \(fuelType.volumeLabel(fallback: volumeUnit))"
+    }
+
     func formatEfficiency(_ value: Double) -> String {
         "\(String(format: "%.1f", value)) \(efficiencyUnit.label)"
     }

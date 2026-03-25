@@ -11,10 +11,13 @@ struct InsightsView: View {
 
     @Environment(\.appTheme) private var theme
     private let settings = UserSettings.shared
+    private let store = StoreManager.shared
 
     @State private var chartAnimationProgress: Double = 0
     @State private var selectedMonthlySpend: MonthlySpend?
     @State private var selectedComplianceVehicle: Vehicle?
+    @State private var showProPrompt = false
+    @State private var isLoaded = false
 
     // MARK: - Aggregated Data
 
@@ -311,6 +314,10 @@ struct InsightsView: View {
         .navigationBarTitleDisplayMode(.large)
         .onAppear {
             HapticManager.shared.light()
+            // Shimmer loading effect
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                withAnimation { isLoaded = true }
+            }
             withAnimation(.spring(response: 0.7, dampingFraction: 0.72).delay(0.1)) {
                 chartAnimationProgress = 1.0
             }
@@ -327,14 +334,14 @@ struct InsightsView: View {
                     .fill(theme.accent.opacity(0.1))
                     .frame(width: 100, height: 100)
                 Image(systemName: "chart.bar.xaxis.ascending")
-                    .font(.system(size: 40))
+                    .font(.system(.largeTitle, design: .rounded))
                     .foregroundStyle(theme.accent)
                     .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
             }
             .accessibilityHidden(true)
             VStack(spacing: 8) {
                 Text("No Insights Yet")
-                    .font(.title3.weight(.bold))
+                    .font(.system(.title3, design: .rounded, weight: .bold))
                 Text("Add services and fuel logs to unlock\nspending trends, projections, and analysis.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -353,68 +360,147 @@ struct InsightsView: View {
 
     private var insightsList: some View {
         List {
-            // Fleet summary cards
+            // Fleet summary cards — FREE
             fleetSummarySection
 
-            // Cost projection
-            if let projected = projectedAnnualCost {
-                costProjectionSection(projected)
-            }
-
-            // Year-over-year change
-            if let yoy = yearOverYearChange {
-                yearOverYearSection(yoy)
-            }
-
-            // Monthly spending chart
-            monthlySpendingSection
-
-            // Spending by category
-            if !categorySpending.isEmpty {
-                categorySection
-            }
-
-            // Cost per vehicle comparison
-            if vehicleCosts.count >= 2 {
-                vehicleComparisonSection
-            }
-
-            // Fuel efficiency comparison across vehicles
-            if vehicleEfficiencyComparison.count >= 2 {
-                fuelEfficiencyComparisonSection
-            }
-
-            // Most expensive service types
-            if !serviceTypeRanking.isEmpty {
-                serviceTypeSection
-            }
-
-            // Maintenance frequency
-            maintenanceFrequencySection
-
-            // Yearly breakdown
-            if !yearlyCosts.isEmpty {
-                yearlyBreakdownSection
-            }
-
-            // Fuel efficiency trend
-            if !fuelEfficiencyData.isEmpty {
-                fuelEfficiencySection
-            }
-
-            // Total cost of ownership
-            if !ownershipCosts.isEmpty {
-                ownershipSection
-            }
-
-            // Maintenance compliance score per vehicle
-            if !vehicleComplianceScores.isEmpty {
-                complianceScoreSection
-            }
-
-            // Service interval compliance
+            // Service interval compliance — FREE
             complianceSection
+
+            // Everything below is PRO-only
+            if store.isPro {
+                // Cost projection
+                if let projected = projectedAnnualCost {
+                    costProjectionSection(projected)
+                }
+
+                // Year-over-year change
+                if let yoy = yearOverYearChange {
+                    yearOverYearSection(yoy)
+                }
+
+                // Monthly spending chart
+                monthlySpendingSection
+
+                // Spending by category
+                if !categorySpending.isEmpty {
+                    categorySection
+                }
+
+                // Cost per vehicle comparison
+                if vehicleCosts.count >= 2 {
+                    vehicleComparisonSection
+                }
+
+                // Fuel efficiency comparison across vehicles
+                if vehicleEfficiencyComparison.count >= 2 {
+                    fuelEfficiencyComparisonSection
+                }
+
+                // Most expensive service types
+                if !serviceTypeRanking.isEmpty {
+                    serviceTypeSection
+                }
+
+                // Maintenance frequency
+                maintenanceFrequencySection
+
+                // Yearly breakdown
+                if !yearlyCosts.isEmpty {
+                    yearlyBreakdownSection
+                }
+
+                // Fuel efficiency trend
+                if !fuelEfficiencyData.isEmpty {
+                    fuelEfficiencySection
+                }
+
+                // Total cost of ownership
+                if !ownershipCosts.isEmpty {
+                    ownershipSection
+                }
+
+                // Maintenance compliance score per vehicle
+                if !vehicleComplianceScores.isEmpty {
+                    complianceScoreSection
+                }
+            } else {
+                // PRO teaser sections for free users
+                proLockedChartsSection
+            }
         }
+        .redacted(reason: isLoaded ? [] : .placeholder)
+        .sheet(isPresented: $showProPrompt) {
+            ProUpgradeView()
+        }
+    }
+
+    // MARK: - Pro Locked Charts Teaser
+
+    private var proLockedChartsSection: some View {
+        Section {
+            VStack(spacing: 16) {
+                proTeaser(title: "Monthly Spending", icon: "chart.bar.fill", description: "See 12-month spending trends")
+                proTeaser(title: "Category Breakdown", icon: "chart.pie.fill", description: "Know where your money goes")
+                proTeaser(title: "Vehicle Comparison", icon: "car.2.fill", description: "Compare costs across vehicles")
+                proTeaser(title: "Fuel Efficiency", icon: "gauge.open.with.needle.33percent", description: "Track efficiency trends")
+                proTeaser(title: "Cost of Ownership", icon: "dollarsign.circle.fill", description: "Total ownership costs")
+
+                Button {
+                    showProPrompt = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "crown.fill")
+                            .font(.caption)
+                        Text("Unlock All Charts with Pro")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .foregroundStyle(.white)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.wrenchAmber, Color(red: 0.85, green: 0.55, blue: 0.05)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+                    .shadow(color: Color.wrenchAmber.opacity(0.3), radius: 8, x: 0, y: 4)
+                }
+                .pressable()
+                .accessibilityIdentifier("insightsUnlockPro")
+            }
+            .padding(.vertical, 4)
+            .glassBackground(cornerRadius: 14)
+        } header: {
+            Label("Pro Analytics", systemImage: "lock.fill")
+        }
+    }
+
+    private func proTeaser(title: String, icon: String, description: String) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.wrenchAmber.opacity(0.1))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.wrenchAmber.opacity(0.6))
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                Text(description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "lock.fill")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { showProPrompt = true }
     }
 
     // MARK: - Fleet Summary Section
@@ -428,7 +514,7 @@ struct InsightsView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
                     Text("Fleet Overview")
-                        .font(.caption.weight(.bold))
+                        .font(.system(.caption, design: .rounded, weight: .bold))
                         .foregroundStyle(.white)
                     Spacer()
                     Text(settings.formatCost(totalCost))
@@ -669,8 +755,9 @@ struct InsightsView: View {
                 .padding(8)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.tertiarySystemGroupedBackground))
-                        .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 3)
+                        .fill(.ultraThinMaterial)
+                        .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
+                        .shadow(color: .black.opacity(0.04), radius: 2, x: 0, y: 1)
                 )
                 .chartReveal()
 
@@ -733,7 +820,8 @@ struct InsightsView: View {
             }
         }
         .padding(10)
-        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 
     // MARK: - Category Section
@@ -1346,8 +1434,9 @@ struct InsightsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 2)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.15), radius: 4, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
     }

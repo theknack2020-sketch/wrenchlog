@@ -10,6 +10,7 @@ struct ReminderSettingsView: View {
     @State private var quietStart = ReminderStore.quietHoursStart
     @State private var quietEnd = ReminderStore.quietHoursEnd
     @State private var dueSoonDays = ReminderStore.dueSoonThresholdDays
+    @FocusState private var isFocused: Bool
     @Environment(\.dismiss) private var dismiss
 
     private let settings = UserSettings.shared
@@ -138,6 +139,7 @@ struct ReminderSettingsView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Reminders")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -152,6 +154,7 @@ struct ReminderSettingsView: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
+                    .accessibilityIdentifier("reminderSettingsDone")
                     .accessibilityLabel("Save reminder settings")
                 }
             }

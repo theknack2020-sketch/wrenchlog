@@ -117,21 +117,36 @@ enum ServiceType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Default reminder interval in miles (0 = no default)
+    /// Default reminder interval in miles (0 = no default / time-only)
     var defaultMileageInterval: Int {
         switch self {
+        // Engine & Fluids
         case .oilChange: 5000
-        case .tireRotation: 7500
-        case .airFilter: 15000
-        case .cabinAirFilter: 15000
-        case .sparkPlugs: 30000
         case .transmissionFluid: 30000
         case .coolantFlush: 30000
         case .brakeFluid: 30000
+        case .powerSteeringFluid: 30000
+        // Tires & Brakes
+        case .tireRotation: 7500
+        case .tireReplacement: 40000
+        case .wheelAlignment: 15000
         case .brakePads: 25000
+        case .brakeRotors: 50000
+        // Filters & Belts
+        case .airFilter: 15000
+        case .cabinAirFilter: 15000
+        case .fuelFilter: 30000
         case .serpentineBelt: 60000
         case .timingBelt: 60000
-        default: 0
+        // Electrical
+        case .batteryReplacement: 50000
+        case .sparkPlugs: 30000
+        case .alternator: 100000
+        // Inspection & Other — time-only or no mileage default
+        case .stateInspection: 0
+        case .wiperBlades: 0
+        case .acService: 0
+        case .generalRepair: 0
         }
     }
 

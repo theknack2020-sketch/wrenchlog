@@ -4,10 +4,12 @@ import Charts
 struct CostAnalyticsView: View {
     let vehicle: Vehicle
     private let settings = UserSettings.shared
+    private let store = StoreManager.shared
 
     @Environment(\.appTheme) private var theme
     @State private var chartAnimationProgress: Double = 0
     @State private var selectedMonthIndex: Int?
+    @State private var showProPrompt = false
 
     var records: [ServiceRecord] {
         vehicle.safeServiceRecords.sorted { $0.date > $1.date }
@@ -140,35 +142,23 @@ struct CostAnalyticsView: View {
 
             ZStack {
                 Circle()
-                    .fill(Color.wrenchAmber.opacity(0.1))
+                    .fill(theme.accent.opacity(0.1))
                     .frame(width: 100, height: 100)
-
-                VStack(spacing: 4) {
-                    Image(systemName: "chart.pie.fill")
-                        .font(.system(size: 36))
-                        .foregroundStyle(Color.wrenchAmber.opacity(0.5))
-                }
+                Image(systemName: "chart.bar.xaxis.ascending")
+                    .font(.system(size: 40))
+                    .foregroundStyle(theme.accent)
+                    .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
             }
+            .accessibilityHidden(true)
 
             VStack(spacing: 8) {
                 Text("No Cost Data Yet")
-                    .font(.title3.weight(.bold))
-                Text("Log services and fuel to see\nspending breakdowns and trends.")
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                Text("Add services and fuel logs to see spending analysis.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
-
-            // Mini chart illustration
-            HStack(alignment: .bottom, spacing: 6) {
-                ForEach([0.3, 0.6, 0.4, 0.8, 0.5], id: \.self) { height in
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.wrenchAmber.opacity(0.15))
-                        .frame(width: 20, height: 60 * height)
-                }
-            }
-            .frame(height: 50)
-            .padding(.top, 4)
 
             Spacer()
         }
@@ -187,7 +177,7 @@ struct CostAnalyticsView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.white)
                         Text("Cost Overview")
-                            .font(.caption.weight(.bold))
+                            .font(.system(.caption, design: .rounded, weight: .bold))
                             .foregroundStyle(.white)
                         Spacer()
                         Text(settings.formatCost(totalCost))
@@ -543,8 +533,9 @@ struct CostAnalyticsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: color.opacity(0.12), radius: 4, x: 0, y: 2)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: color.opacity(0.15), radius: 4, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
     }

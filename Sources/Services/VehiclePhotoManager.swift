@@ -8,6 +8,15 @@ struct VehiclePhotoManager {
     private static let maxPhotoBytes = 500 * 1024 // 500KB
     private static let maxPhotoDimension: CGFloat = 1200
 
+    // MARK: - Image Cache
+
+    private nonisolated(unsafe) static let imageCache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 20
+        cache.totalCostLimit = 50 * 1024 * 1024 // 50MB
+        return cache
+    }()
+
     // MARK: - Directories
 
     private var vehiclePhotosURL: URL {
@@ -44,17 +53,24 @@ struct VehiclePhotoManager {
         }
     }
 
-    /// Loads a vehicle photo by filename.
+    /// Loads a vehicle photo by filename. Uses in-memory cache for repeated access.
     func loadVehiclePhoto(named fileName: String) -> UIImage? {
         guard !fileName.isEmpty else { return nil }
+        let key = fileName as NSString
+        if let cached = Self.imageCache.object(forKey: key) {
+            return cached
+        }
         let url = vehiclePhotosURL.appending(path: fileName)
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return UIImage(data: data)
+        guard let data = try? Data(contentsOf: url),
+              let image = UIImage(data: data) else { return nil }
+        Self.imageCache.setObject(image, forKey: key, cost: data.count)
+        return image
     }
 
-    /// Deletes a vehicle photo by filename.
+    /// Deletes a vehicle photo by filename and evicts it from cache.
     func deleteVehiclePhoto(named fileName: String) {
         guard !fileName.isEmpty else { return }
+        Self.imageCache.removeObject(forKey: fileName as NSString)
         let url = vehiclePhotosURL.appending(path: fileName)
         try? FileManager.default.removeItem(at: url)
     }
@@ -98,11 +114,17 @@ struct VehiclePhotoManager {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
-    /// Loads a document as UIImage if it's an image file.
+    /// Loads a document as UIImage if it's an image file. Uses in-memory cache.
     func loadDocumentImage(named fileName: String) -> UIImage? {
         guard let url = documentURL(named: fileName) else { return nil }
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return UIImage(data: data)
+        let key = ("doc_" + fileName) as NSString
+        if let cached = Self.imageCache.object(forKey: key) {
+            return cached
+        }
+        guard let data = try? Data(contentsOf: url),
+              let image = UIImage(data: data) else { return nil }
+        Self.imageCache.setObject(image, forKey: key, cost: data.count)
+        return image
     }
 
     /// Deletes a document file from disk.
@@ -115,6 +137,13 @@ struct VehiclePhotoManager {
     /// Whether a filename looks like a PDF.
     func isPDF(_ fileName: String) -> Bool {
         fileName.lowercased().hasSuffix(".pdf")
+    }
+
+    // MARK: - Cache Management
+
+    /// Clears the in-memory image cache. Call on memory warnings or when photos are bulk-deleted.
+    func clearCache() {
+        Self.imageCache.removeAllObjects()
     }
 
     // MARK: - Compression Helpers
