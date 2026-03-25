@@ -1,21 +1,15 @@
-🚗 Major Update — WrenchLog v1.0 Build 2
+Welcome to WrenchLog! 🔧
 
-✨ New Features:
-• Fuel tracking with MPG/L100km trends
-• iOS Calendar integration
-• Parts & oil type tracking per service
-• Service provider/shop history
-• Vehicle health score (0-100)
-• Smart service reminders with pace detection
-• Cost analytics with interactive charts
-• iCloud sync across all your devices
-• 5 color themes
-
-🎨 Premium Polish:
-• 6-step personalized onboarding
+• Track services with 22 preset types or custom categories
+• Log fuel fill-ups with MPG/L100km efficiency tracking
+• Smart reminders based on time, mileage, and driving pace
+• Vehicle health score (0–100)
+• Cost analytics with charts (Pro)
+• PDF service history export (Pro)
+• CSV export and import
+• Maintenance timeline and checklist
 • Seasonal maintenance tips
-• Milestone badges & achievements
-• Enhanced PDF reports with stats
-• CSV import/export
+• Three color themes
+• Multi-vehicle garage (Pro)
 
-🛡️ No ads. No tracking. Your data, your device.
+Your car deserves organized records. Your data deserves to stay private.
