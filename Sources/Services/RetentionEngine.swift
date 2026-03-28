@@ -298,4 +298,74 @@ final class RetentionEngine {
             trigger: trigger
         ))
     }
+
+    // MARK: - Streak At Risk Notification
+
+    /// Schedule a streak-at-risk notification for 8pm if user hasn't opened today
+    func scheduleStreakAtRiskNotification() async {
+        guard currentStreak >= 2 else { return }
+        guard !isActiveToday else { return }
+
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ["retention-streak-risk"])
+
+        let content = UNMutableNotificationContent()
+        content.title = "⚠️ Streak at risk!"
+        content.body = "Your \(currentStreak)-day streak ends at midnight. Open WrenchLog to keep it alive!"
+        content.sound = .default
+        content.threadIdentifier = "retention"
+        content.interruptionLevel = .timeSensitive
+
+        var components = DateComponents()
+        components.hour = 20
+        components.minute = 0
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        try? await center.add(UNNotificationRequest(
+            identifier: "retention-streak-risk",
+            content: content,
+            trigger: trigger
+        ))
+    }
+
+    // MARK: - Milestone Achievement Notification
+
+    /// Schedule a local notification when a milestone is newly earned
+    func notifyMilestoneEarned(_ badge: MilestoneBadge) async {
+        let center = UNUserNotificationCenter.current()
+
+        let content = UNMutableNotificationContent()
+        content.title = "🏆 Achievement Unlocked!"
+        content.body = "\(badge.title) — \(badge.detail)"
+        content.sound = .default
+        content.threadIdentifier = "achievement"
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        try? await center.add(UNNotificationRequest(
+            identifier: "achievement-\(badge.id)",
+            content: content,
+            trigger: trigger
+        ))
+    }
+
+    // MARK: - Motivational Messages
+
+    /// Context-aware motivational message for dashboard
+    var motivationalMessage: String {
+        if currentStreak >= 7 {
+            return "You're on fire! \(currentStreak)-day streak 🔥"
+        } else if currentStreak >= 3 {
+            return "Great momentum! Keep your streak going 💪"
+        } else if !isActiveToday {
+            return "Open daily to build your streak 📈"
+        } else {
+            return dailyTip
+        }
+    }
+
+    /// Achievement progress percentage (earned / total possible)
+    var achievementProgressText: String {
+        let total = 25 // Total possible badges
+        let earned = UserDefaults.standard.stringArray(forKey: "wl_earned_badges")?.count ?? 0
+        return "\(earned)/\(total) achievements"
+    }
 }
