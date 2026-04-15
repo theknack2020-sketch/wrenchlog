@@ -8,8 +8,9 @@ options:
 
 settings:
   base:
-    MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "5"
+    MARKETING_VERSION: "1.2.0"
+    CURRENT_PROJECT_VERSION: "7"
+    INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 TheKnack"
     DEVELOPMENT_TEAM: "99H9NJ6Z6J"
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "6.0"
@@ -21,12 +22,19 @@ settings:
     ENABLE_PREVIEWS: YES
     SWIFT_EMIT_LOC_STRINGS: YES
 
+packages:
+  TelemetryDeck:
+    url: https://github.com/TelemetryDeck/SwiftSDK
+    from: "2.0.0"
+
 targets:
   WrenchLog:
     type: application
     platform: iOS
     sources:
-      - Sources
+      - path: Sources
+        excludes:
+          - "Resources/GenerateAppIcon.swift"
     resources:
       - path: Sources/Resources
     settings:
@@ -39,6 +47,14 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE: NO
+    dependencies:
+      - package: TelemetryDeck
+    postBuildScripts:
+      - script: |
+          if which swiftlint > /dev/null; then
+            swiftlint
+          fi
+        name: SwiftLint
 
   WrenchLogTests:
     type: bundle.unit-test

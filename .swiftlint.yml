@@ -1,0 +1,27 @@
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  - function_body_length
+  - type_body_length
+  - file_length
+  - identifier_name
+  - large_tuple
+  - cyclomatic_complexity
+  - function_parameter_count
+  - nesting
+
+opt_in_rules:
+  - force_cast
+  - implicit_return
+  - vertical_whitespace_closing_braces
+
+force_cast:
+  severity: warning
+
+excluded:
+  - build/
+  - .build/
+  - DerivedData/
+  - Sources/Resources/GenerateAppIcon.swift
+  - Tests/
+  - UITests/
