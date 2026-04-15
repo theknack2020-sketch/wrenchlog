@@ -277,21 +277,51 @@ struct VehicleDetailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                         .accessibilityLabel("\(vehicle.displayName) photo")
                 } else {
-                    // Gradient placeholder when no photo
+                    // Gradient placeholder when no photo — rich multi-layer design
+                    let vehicleTint = vehicle.vehicleColor?.color ?? theme.accent
                     RoundedRectangle(cornerRadius: 18)
                         .fill(
                             LinearGradient(
-                                colors: [theme.accent.opacity(0.3), theme.accent.opacity(0.08)],
+                                colors: [
+                                    vehicleTint.opacity(0.55),
+                                    theme.accent.opacity(0.35),
+                                    vehicleTint.opacity(0.15),
+                                ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(height: 180)
+                        .frame(height: 200)
                         .overlay {
-                            Image(systemName: "car.side.fill")
-                                .font(.system(.largeTitle, weight: .light))
-                                .foregroundStyle(theme.accent.opacity(0.3))
+                            // Decorative blur orbs for depth
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.12))
+                                    .frame(width: 180, height: 180)
+                                    .blur(radius: 30)
+                                    .offset(x: -90, y: -50)
+                                Circle()
+                                    .fill(theme.accent.opacity(0.25))
+                                    .frame(width: 140, height: 140)
+                                    .blur(radius: 25)
+                                    .offset(x: 100, y: 60)
+                            }
                         }
+                        .overlay {
+                            // Large car silhouette
+                            Image(systemName: "car.side.fill")
+                                .font(.system(size: 100, weight: .semibold))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [Color.white.opacity(0.95), Color.white.opacity(0.7)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 4)
+                                .offset(y: -16)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
                         .accessibilityHidden(true)
                 }
 
@@ -417,66 +447,87 @@ struct VehicleDetailView: View {
     }
 
     private var dashboardSpeedometer: some View {
-        Button {
-            haptic.buttonTap()
-            showEditMileage = true
-        } label: {
-            VStack(spacing: 6) {
-                ZStack {
-                    Circle().trim(from: 0.15, to: 0.85)
-                        .stroke(theme.accent.opacity(0.12), style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                        .frame(width: 100, height: 100)
-                    Circle().trim(from: 0.15, to: 0.15 + (0.70 * mileageProgress))
-                        .stroke(
-                            LinearGradient(colors: [theme.accent, theme.accent.opacity(0.6)], startPoint: .leading, endPoint: .trailing),
-                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                        )
-                        .frame(width: 100, height: 100)
-                        .shadow(color: theme.accent.opacity(0.25), radius: 6, x: 0, y: 0)
-                    VStack(spacing: 2) {
-                        Image(systemName: "gauge.open.with.needle.33percent").font(.caption).foregroundStyle(theme.accent)
-                        Text(vehicle.currentMileage > 0 ? vehicle.currentMileage.formatted() : "—")
-                            .font(.system(.body, design: .rounded, weight: .bold).monospacedDigit())
-                        Text(settings.distanceUnit.label).font(.caption2).foregroundStyle(.secondary)
-                    }
+        let healthColor = MaintenanceScoreEngine.color(for: healthScore)
+        let healthLabel = MaintenanceScoreEngine.label(for: healthScore)
+
+        return VStack(spacing: 10) {
+            // Hero Health Score ring — dominant element
+            ZStack {
+                // Outer glow
+                Circle()
+                    .fill(healthColor.opacity(0.08))
+                    .frame(width: 140, height: 140)
+                    .blur(radius: 12)
+
+                // Track
+                Circle()
+                    .stroke(healthColor.opacity(0.12), style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                    .frame(width: 120, height: 120)
+
+                // Progress
+                Circle()
+                    .trim(from: 0, to: CGFloat(healthScore) / 100.0)
+                    .stroke(
+                        LinearGradient(colors: [healthColor, healthColor.opacity(0.7)], startPoint: .top, endPoint: .bottomTrailing),
+                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                    )
+                    .frame(width: 120, height: 120)
+                    .rotationEffect(.degrees(-90))
+                    .shadow(color: healthColor.opacity(0.35), radius: 8, x: 0, y: 0)
+
+                // Center content
+                VStack(spacing: 1) {
+                    Text("\(healthScore)")
+                        .font(.system(.largeTitle, design: .rounded, weight: .heavy).monospacedDigit())
+                        .foregroundStyle(healthColor)
+                        .contentTransition(.numericText())
+                    Text("Health")
+                        .font(.caption2.weight(.semibold))
+                        .textCase(.uppercase)
+                        .tracking(1.2)
+                        .foregroundStyle(.secondary)
                 }
-                Text("Tap to update").font(.caption2).foregroundStyle(.tertiary)
             }
-            .frame(maxWidth: .infinity).padding(.vertical, 4)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Health score: \(healthScore) out of 100, \(healthLabel)")
+
+            // Mileage — tappable to update
+            Button {
+                haptic.buttonTap()
+                showEditMileage = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "gauge.open.with.needle.33percent")
+                        .font(.caption)
+                        .foregroundStyle(theme.accent)
+                    Text(vehicle.currentMileage > 0 ? vehicle.currentMileage.formatted() : "—")
+                        .font(.system(.headline, design: .rounded, weight: .semibold).monospacedDigit())
+                    Text(settings.distanceUnit.label)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "pencil.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(theme.accent.opacity(0.15), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Current mileage: \(settings.formatMileage(vehicle.currentMileage)). Double tap to update.")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Current mileage: \(settings.formatMileage(vehicle.currentMileage)). Double tap to update.")
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
     }
 
     private var dashboardStats: some View {
         HStack(spacing: 8) {
-            // Health score with glow
-            VStack(spacing: 4) {
-                ZStack {
-                    ProgressRing(progress: Double(healthScore) / 100.0, lineWidth: 5, color: MaintenanceScoreEngine.color(for: healthScore))
-                        .frame(width: 36, height: 36)
-                        .shadow(color: MaintenanceScoreEngine.color(for: healthScore).opacity(0.4), radius: 6, x: 0, y: 0)
-                    Text("\(healthScore)")
-                        .font(.system(.caption, design: .rounded, weight: .heavy).monospacedDigit())
-                        .contentTransition(.numericText())
-                        .foregroundStyle(MaintenanceScoreEngine.color(for: healthScore))
-                }
-                Text("Health").font(.caption2.weight(.medium)).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity).padding(.vertical, 10)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(MaintenanceScoreEngine.color(for: healthScore).opacity(0.15), lineWidth: 1)
-            )
-            .shadow(color: MaintenanceScoreEngine.color(for: healthScore).opacity(0.2), radius: 6, x: 0, y: 3)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Health score: \(healthScore) percent")
-            .statPop(index: 0)
-
             statCard(title: "Total Spent", value: settings.formatCost(totalOwnershipCost), icon: "dollarsign.circle.fill", color: theme.accent)
-                .statPop(index: 1)
+                .statPop(index: 0)
             statCard(title: "Services", value: "\(vehicle.safeServiceRecords.count)", icon: "wrench.fill", color: .catEngine)
+                .statPop(index: 1)
+            statCard(title: "Age", value: "\(max(0, Calendar.current.component(.year, from: .now) - vehicle.year)) yr", icon: "calendar", color: .catElectrical)
                 .statPop(index: 2)
         }
     }

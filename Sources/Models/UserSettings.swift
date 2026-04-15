@@ -30,7 +30,8 @@ final class UserSettings {
     }
 
     func formatCost(_ amount: Double) -> String {
-        "\(currency.symbol)\(String(format: "%.2f", amount))"
+        let formatted = amount.formatted(.number.precision(.fractionLength(2)).grouping(.automatic))
+        return "\(currency.symbol)\(formatted)"
     }
 
     func formatMileage(_ miles: Int) -> String {
@@ -51,7 +52,8 @@ final class UserSettings {
     }
 
     func formatCostPerDistance(_ value: Double) -> String {
-        "\(currency.symbol)\(String(format: "%.2f", value))/\(distanceUnit.label)"
+        let formatted = value.formatted(.number.precision(.fractionLength(2)).grouping(.automatic))
+        return "\(currency.symbol)\(formatted)/\(distanceUnit.label)"
     }
 
     private init() {}
