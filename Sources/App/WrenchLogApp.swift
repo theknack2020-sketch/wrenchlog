@@ -6,7 +6,7 @@ import TipKit
 
 @main
 struct WrenchLogApp: App {
-    @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "wl_onboarding_complete")
+    @State private var showOnboarding: Bool
     @State private var showWhatsNew = false
     @State private var themeManager = ThemeManager.shared
     @Environment(\.scenePhase) private var scenePhase
@@ -19,6 +19,9 @@ struct WrenchLogApp: App {
     @State private var showDataError = false
 
     init() {
+        // Initialize onboarding state first; will be re-evaluated after seeder (if DEBUG)
+        _showOnboarding = State(initialValue: !UserDefaults.standard.bool(forKey: "wl_onboarding_complete"))
+
         let schema = Schema(versionedSchema: WrenchLogSchemaV4.self)
 
         // Crash-safe container initialization with migration plan
@@ -60,6 +63,15 @@ struct WrenchLogApp: App {
         // Enable autosave for crash safety
         modelContainer.mainContext.autosaveEnabled = true
 
+        #if DEBUG
+            // Seed mock data for App Store screenshot capture (DEBUG only)
+            if ScreenshotSeeder.shouldSeed {
+                MainActor.assumeIsolated {
+                    ScreenshotSeeder.seed(context: modelContainer.mainContext)
+                }
+            }
+        #endif
+
         // Initialize TelemetryDeck analytics
         TelemetryService.initialize()
         TelemetryService.appLaunched()
@@ -69,6 +81,10 @@ struct WrenchLogApp: App {
 
         // Register Home Screen Quick Actions
         Self.registerQuickActions()
+
+        // Re-evaluate onboarding AFTER seeder may have set UserDefaults (DEBUG path).
+        // For normal release launches this is a no-op with the same result.
+        _showOnboarding = State(initialValue: !UserDefaults.standard.bool(forKey: "wl_onboarding_complete"))
     }
 
     var body: some Scene {

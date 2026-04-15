@@ -20,6 +20,19 @@ final class StoreManager {
         Task { await listenForTransactions() }
     }
 
+    #if DEBUG
+        /// Sticky flag that prevents `checkEntitlements()` from overriding `isPro`.
+        /// ⚠️ DEBUG-ONLY — never included in Release builds.
+        private var screenshotProOverride = false
+
+        /// Override Pro state for App Store screenshot capture.
+        /// ⚠️ DEBUG-ONLY — never included in Release builds.
+        func setProForScreenshots(_ value: Bool) {
+            screenshotProOverride = value
+            isPro = value
+        }
+    #endif
+
     func loadProducts() async {
         loadError = nil
         do {
@@ -35,6 +48,11 @@ final class StoreManager {
     }
 
     func checkEntitlements() async {
+        #if DEBUG
+            // Screenshot override: skip entitlement check if sticky flag is set
+            if screenshotProOverride { return }
+        #endif
+
         var foundPro = false
         for await result in Transaction.currentEntitlements {
             guard case let .verified(transaction) = result else { continue }
