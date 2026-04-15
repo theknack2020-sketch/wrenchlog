@@ -1,15 +1,30 @@
-Welcome to WrenchLog! 🔧
+v1.2.0 — A major quality update. Every screen polished, paywall reimagined, and under-the-hood reliability improved.
 
-• Track services with 22 preset types or custom categories
-• Log fuel fill-ups with MPG/L100km efficiency tracking
-• Smart reminders based on time, mileage, and driving pace
-• Vehicle health score (0–100)
-• Cost analytics with charts (Pro)
-• PDF service history export (Pro)
-• CSV export and import
-• Maintenance timeline and checklist
-• Seasonal maintenance tips
-• Three color themes
-• Multi-vehicle garage (Pro)
+Beautiful New Design
+Every screen now uses premium haptics, springy animations, and layered depth. Sell a vehicle, edit a service, or review reminders — all redesigned from scratch with the same world-class finish.
 
-Your car deserves organized records. Your data deserves to stay private.
+Prominent Health Score
+Your car's 0-100 health score now lives front and center on the detail view, with a full color-coded ring. Know at a glance whether your ride is on track or needs attention.
+
+Smarter Empty States
+Upcoming services, checklists, and timelines now use polished empty-state screens so you always know what to do next.
+
+Better Paywall Experience
+The Pro upgrade presents as a full-screen experience — no accidental swipe dismisses. Cleaner comparison tables, tappable "Restore Purchases" that actually works, and Terms + Privacy always one tap away.
+
+2 Free Vehicles
+We've doubled the free tier. Track two vehicles without going Pro. Gate, comparison table, and upgrade prompts all say the same thing.
+
+Helpful Tips
+Discover features as you use the app. Built on Apple TipKit so tips only appear when you're ready for them.
+
+Full Dynamic Type
+Every hardcoded font size has been replaced with Dynamic Type. Crank up your accessibility text — the whole app scales with you.
+
+Crash Protection
+24 unsafe Calendar paths hardened. Zero force-unwraps in production code. If anything ever fails, the app falls back gracefully instead of crashing.
+
+Faster, Cleaner Release
+Migrated deprecated colors to the new design system. Currency values now display with thousand separators. Onboarding skips correctly for returning users. Dozens of small polish fixes.
+
+No ads. No tracking. Your maintenance data stays on your device and in iCloud.

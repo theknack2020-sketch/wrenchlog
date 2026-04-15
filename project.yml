@@ -9,7 +9,7 @@ options:
 settings:
   base:
     MARKETING_VERSION: "1.2.0"
-    CURRENT_PROJECT_VERSION: "7"
+    CURRENT_PROJECT_VERSION: "8"
     INFOPLIST_KEY_NSHumanReadableCopyright: "© 2026 TheKnack"
     DEVELOPMENT_TEAM: "99H9NJ6Z6J"
     CODE_SIGN_STYLE: Automatic

@@ -2,35 +2,62 @@ WrenchLog is the private, ad-free vehicle maintenance tracker that keeps your ca
 
 No account. No ads. No tracking. Your data stays on your device — period.
 
+▸ VIN DECODER
+Enter your 17-digit VIN and WrenchLog auto-fills make, model, and year from the official NHTSA database. No manual entry needed.
+
+▸ SAFETY RECALL ALERTS
+WrenchLog checks your vehicle against the NHTSA recall database and alerts you to any open safety recalls. Stay safe without lifting a finger.
+
 ▸ TRACK EVERY SERVICE
-Log oil changes, tire rotations, brake work, battery replacements, and 22 preset service types — or create your own custom categories. Record date, mileage, cost, notes, and attach receipt photos to every entry.
+Log oil changes, tire rotations, brake work, battery replacements, and 20+ preset service types across 6 categories. Record date, mileage, cost, notes, and attach receipt photos to every entry.
 
 ▸ FUEL TRACKING & EFFICIENCY
-Log every fill-up with fuel type, volume, cost, and station name. WrenchLog automatically calculates your MPG (or L/100km), cost per mile, and tracks efficiency trends over time with interactive charts. Supports Regular, Mid-Grade, Premium, Diesel, E85, and Electric vehicles.
+Log every fill-up with fuel type, volume, cost, and station name. WrenchLog calculates your MPG (or L/100km), cost per mile, and tracks efficiency trends over time with interactive charts. Supports Regular, Mid-Grade, Premium, Diesel, E85, and Electric vehicles.
 
 ▸ SMART REMINDERS
-Never miss another oil change. WrenchLog sends intelligent reminders based on time intervals, mileage thresholds, and your actual driving pace.
+Never miss another oil change. WrenchLog sends intelligent reminders based on time intervals, mileage thresholds, and your actual driving pace. Each reminder learns how fast you drive and notifies you at the right moment — not too early, not too late.
 
 ▸ VEHICLE HEALTH SCORE
-See your car's maintenance health at a glance with a 0–100 score.
+See your car's maintenance health at a glance with a 0–100 score. The score weighs critical services (engine, brakes) heavier and updates in real time as you complete services or fall behind.
 
 ▸ COST ANALYTICS (Pro)
-Category breakdowns, monthly spending trends, yearly cost of ownership, and per-mile cost tracking.
+Donut charts for service-vs-fuel split, category breakdowns, monthly spending trends, yearly cost of ownership, and per-mile cost tracking. Know exactly where your money goes.
 
 ▸ PDF EXPORT (Pro)
-Generate professional service history reports in PDF format. Perfect for selling your car or sharing with your mechanic.
+Generate clean, professional service history reports in PDF format. Perfect for selling your car, insurance claims, or sharing with your mechanic.
 
 ▸ CSV EXPORT & IMPORT
-Export all your data as CSV files for backup or analysis.
+Export all your data as CSV files for backup or analysis in a spreadsheet. Import service records from CSV to migrate from other apps or paper logs.
 
 ▸ MULTI-VEHICLE GARAGE (Pro)
-Manage your entire fleet. Each vehicle gets its own dashboard, timeline, health score, and reminders.
+Manage your entire fleet — cars, trucks, motorcycles, anything with wheels. Each vehicle gets its own dashboard, timeline, health score, and reminders. Compare costs across vehicles with side-by-side charts.
+
+▸ MAINTENANCE TIMELINE
+See every service and fill-up on a chronological timeline, grouped by month. A visual history of your car's entire life.
+
+▸ MAINTENANCE CHECKLIST
+Create custom to-do lists for each vehicle. Pre-loaded suggestions for common checks like tire pressure, oil level, and brake inspection.
+
+▸ SEASONAL TIPS
+Maintenance suggestions based on the current season — winterize in December, check A/C before summer.
+
+▸ MILESTONE BADGES
+Earn badges as you build your history — First Service, Dedicated, Road Warrior, Fleet Owner, and more.
+
+▸ CUSTOMIZABLE UNITS
+Miles or kilometers. Gallons or liters. MPG or L/100km. WrenchLog speaks your language.
+
+▸ FIVE COLOR THEMES
+Default Amber, Ocean Blue, Dark Mono, Forest Green, or Sunset Rose. Pick what looks right to you.
 
 ▸ PRIVACY FIRST
-Zero personal data collected. No account signup. No analytics SDKs. No third-party tracking. No ads — ever.
+WrenchLog collects zero personal data. No account signup. No analytics SDKs. No third-party tracking. No ads — ever. Your vehicle data never leaves your device. We don't sell your information to data brokers, insurance companies, or anyone else.
 
-FREE: 1 vehicle, service logging, fuel tracking, smart reminders, checklist, timeline.
-PRO: Unlimited vehicles, receipt photos, PDF reports, cost analytics, CSV export, custom categories.
+▸ BUILT FOR CAR PEOPLE
+Weekend wrenchers, families with multiple cars, or sellers needing proof of maintenance — WrenchLog gives you a complete ownership record without the bloat.
+
+FREE: 2 vehicles, service logging, fuel tracking, smart reminders, VIN decoder, recall alerts, health score, checklist, timeline, milestone badges.
+PRO: Unlimited vehicles, receipt photos, PDF reports, cost analytics, CSV export, spending projections, all color themes.
 
 Questions? theknack2020@gmail.com
 Privacy Policy: https://theknack2020-sketch.github.io/wrenchlog/privacy/
