@@ -1,8 +1,8 @@
-import SwiftUI
-import SwiftData
 import PhotosUI
-import UniformTypeIdentifiers
 import QuickLook
+import SwiftData
+import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Vehicle Documents View
 
@@ -27,40 +27,21 @@ struct VehicleDocumentsView: View {
     var body: some View {
         List {
             if sortedDocuments.isEmpty {
-                Section {
-                    VStack(spacing: 24) {
-                        Spacer()
-                        ZStack {
-                            Circle()
-                                .fill(theme.accent.opacity(0.1))
-                                .frame(width: 100, height: 100)
-                            Image(systemName: "doc.text.fill")
-                                .font(.system(size: 40))
-                                .foregroundStyle(theme.accent)
-                                .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
-                        }
-                        .accessibilityHidden(true)
-                        VStack(spacing: 8) {
-                            Text("No Documents")
-                                .font(.system(.title3, design: .rounded, weight: .bold))
-                            Text("Store insurance, registration, and receipts here.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        Button {
-                            showAddDocument = true
-                        } label: {
-                            Label("Add Document", systemImage: "plus.circle.fill")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(theme.accent)
-                        }
-                        .pressable()
-                        Spacer()
+                ContentUnavailableView {
+                    Label("No Documents Yet", systemImage: "doc.text")
+                } description: {
+                    Text("Store insurance, registration, and other vehicle documents.")
+                } actions: {
+                    Button {
+                        showAddDocument = true
+                    } label: {
+                        Label("Add Document", systemImage: "plus.circle.fill")
+                            .font(.subheadline.weight(.medium))
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+                    .pressable()
                 }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             } else {
                 // Group by document type
                 let grouped = Dictionary(grouping: sortedDocuments, by: { $0.documentType })
@@ -118,9 +99,9 @@ struct VehicleDocumentsView: View {
         }
     }
 
-    @ViewBuilder
     private func documentRow(_ doc: VehicleDocument) -> some View {
         Button {
+            haptic.light()
             if let url = photoManager.documentURL(named: doc.fileName) {
                 previewURL = url
                 showPreview = true
@@ -132,6 +113,7 @@ struct VehicleDocumentsView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(doc.documentType.color.opacity(0.1))
                         .frame(width: 44, height: 44)
+                        .shadow(color: doc.documentType.color.opacity(0.15), radius: 4, y: 2)
 
                     if photoManager.isPDF(doc.fileName) {
                         Image(systemName: "doc.text.fill")
@@ -187,6 +169,8 @@ struct VehicleDocumentsView: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(doc.documentType.rawValue): \(doc.title)")
+        .accessibilityHint("Double tap to preview document")
+        .accessibilityAddTraits(.isButton)
     }
 
     private func formattedFileSize(_ bytes: Int) -> String {
@@ -232,7 +216,9 @@ struct AddDocumentView: View {
     enum DocumentSource: String, CaseIterable, Identifiable {
         case photo = "Photo"
         case file = "File"
-        var id: String { rawValue }
+        var id: String {
+            rawValue
+        }
     }
 
     private var hasFile: Bool {
@@ -279,7 +265,7 @@ struct AddDocumentView: View {
                             Text("Choose from Photos")
                                 .font(.subheadline)
                             Spacer()
-                            if photoData != nil && fileData == nil {
+                            if photoData != nil, fileData == nil {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
                             }
@@ -335,12 +321,15 @@ struct AddDocumentView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .accessibilityIdentifier("addDocumentCancel")
+                        .accessibilityLabel("Cancel adding document")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveDocument() }
                         .fontWeight(.semibold)
                         .disabled(title.isEmpty || !hasFile)
                         .accessibilityIdentifier("addDocumentSave")
+                        .accessibilityLabel("Save document")
+                        .accessibilityHint(title.isEmpty || !hasFile ? "Enter a title and attach a file first" : "Saves the document to this vehicle")
                 }
             }
             .onChange(of: selectedPhoto) { _, item in
@@ -401,7 +390,9 @@ struct AddDocumentView: View {
 struct DocumentPickerView: UIViewControllerRepresentable {
     let onPick: (Data, String) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onPick: onPick)
+    }
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let types: [UTType] = [.pdf, .image, .jpeg, .png, .heic]
@@ -411,13 +402,15 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         return picker
     }
 
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+    func updateUIViewController(_: UIDocumentPickerViewController, context _: Context) {}
 
     class Coordinator: NSObject, UIDocumentPickerDelegate {
         let onPick: (Data, String) -> Void
-        init(onPick: @escaping (Data, String) -> Void) { self.onPick = onPick }
+        init(onPick: @escaping (Data, String) -> Void) {
+            self.onPick = onPick
+        }
 
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        func documentPicker(_: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             guard let url = urls.first else { return }
             guard url.startAccessingSecurityScopedResource() else { return }
             defer { url.stopAccessingSecurityScopedResource() }
@@ -432,7 +425,9 @@ struct DocumentPickerView: UIViewControllerRepresentable {
 struct DocumentPreviewView: UIViewControllerRepresentable {
     let url: URL
 
-    func makeCoordinator() -> Coordinator { Coordinator(url: url) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(url: url)
+    }
 
     func makeUIViewController(context: Context) -> UINavigationController {
         let ql = QLPreviewController()
@@ -440,14 +435,19 @@ struct DocumentPreviewView: UIViewControllerRepresentable {
         return UINavigationController(rootViewController: ql)
     }
 
-    func updateUIViewController(_ uiViewController: UINavigationController, context: Context) {}
+    func updateUIViewController(_: UINavigationController, context _: Context) {}
 
     class Coordinator: NSObject, QLPreviewControllerDataSource {
         let url: URL
-        init(url: URL) { self.url = url }
+        init(url: URL) {
+            self.url = url
+        }
 
-        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
-        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+        func numberOfPreviewItems(in _: QLPreviewController) -> Int {
+            1
+        }
+
+        func previewController(_: QLPreviewController, previewItemAt _: Int) -> QLPreviewItem {
             url as QLPreviewItem
         }
     }

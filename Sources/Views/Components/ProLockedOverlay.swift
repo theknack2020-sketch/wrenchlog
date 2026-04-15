@@ -5,6 +5,7 @@ import SwiftUI
 struct ProLockedOverlay: View {
     var message: String = "Unlock with Pro"
     var action: () -> Void
+    @Environment(\.appTheme) private var theme
 
     var body: some View {
         ZStack {
@@ -16,10 +17,12 @@ struct ProLockedOverlay: View {
             VStack(spacing: 8) {
                 Image(systemName: "lock.fill")
                     .font(.title2)
-                    .foregroundStyle(Color.wrenchAmber)
+                    .foregroundStyle(theme.accent)
+                    .accessibilityHidden(true)
                 Text(message)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Button {
                     action()
                 } label: {
@@ -34,15 +37,17 @@ struct ProLockedOverlay: View {
                     .foregroundStyle(.white)
                     .background(
                         LinearGradient(
-                            colors: [Color.wrenchAmber, Color(red: 0.85, green: 0.55, blue: 0.05)],
+                            colors: [theme.accent, theme.accent.opacity(0.75)],
                             startPoint: .leading,
                             endPoint: .trailing
                         ),
                         in: Capsule()
                     )
-                    .shadow(color: Color.wrenchAmber.opacity(0.3), radius: 6, x: 0, y: 3)
+                    .shadow(color: theme.accent.opacity(0.3), radius: 6, x: 0, y: 3)
                 }
+                .frame(minWidth: 44, minHeight: 44)
                 .accessibilityLabel("Upgrade to Pro")
+                .accessibilityHint("Unlocks this Pro feature")
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))

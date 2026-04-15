@@ -1,11 +1,13 @@
-import SwiftUI
-import SwiftData
 import PhotosUI
+import SwiftData
+import SwiftUI
+import TipKit
 
 struct AddVehicleView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @Query(filter: #Predicate<Vehicle> { !$0.isArchived })
     private var activeVehicles: [Vehicle]
@@ -19,6 +21,12 @@ struct AddVehicleView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoData: Data?
     @State private var showProPrompt = false
+    @State private var vin = ""
+
+    // VIN decode state
+    @State private var isDecodingVIN = false
+    @State private var vinDecodeError: String?
+    @State private var vinDecodeSuccess = false
 
     // Validation & error state
     @State private var validationError: String?
@@ -32,6 +40,7 @@ struct AddVehicleView: View {
 
     private let store = StoreManager.shared
     private let vehiclePhotoManager = VehiclePhotoManager.shared
+    private let nhtsaService = NHTSAService.shared
 
     private var isFormValid: Bool {
         let result = VehicleValidator.validate(make: make, model: model, year: year, mileage: mileage)
@@ -76,7 +85,7 @@ struct AddVehicleView: View {
                             : Color(.secondarySystemGroupedBackground)
                     )
                     Picker("Year", selection: $year) {
-                        ForEach((1950...Calendar.current.component(.year, from: .now) + 1).reversed(), id: \.self) { y in
+                        ForEach((1950 ... Calendar.current.component(.year, from: .now) + 1).reversed(), id: \.self) { y in
                             Text(String(y)).tag(y)
                         }
                     }
@@ -149,33 +158,109 @@ struct AddVehicleView: View {
                         .textInputAutocapitalization(.characters)
                         .accessibilityLabel("License plate number")
 
-                    Text("VIN decoding coming soon")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                    // VIN field with decode button
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 10) {
+                            TextField("VIN (17 characters)", text: $vin)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .accessibilityLabel("Vehicle identification number")
+                                .accessibilityHint("Enter 17-character VIN to auto-fill vehicle details")
+                                .onChange(of: vin) { _, _ in
+                                    vinDecodeError = nil
+                                    vinDecodeSuccess = false
+                                }
+
+                            Button {
+                                Task { await decodeVIN() }
+                            } label: {
+                                Group {
+                                    if isDecodingVIN {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    } else {
+                                        Label("Decode", systemImage: "barcode.viewfinder")
+                                            .font(.caption.weight(.semibold))
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(
+                                    vinDecodeButtonEnabled
+                                        ? theme.accent.opacity(0.15)
+                                        : Color.secondary.opacity(0.08),
+                                    in: Capsule()
+                                )
+                                .foregroundStyle(vinDecodeButtonEnabled ? theme.accent : .secondary)
+                            }
+                            .disabled(!vinDecodeButtonEnabled)
+                            .accessibilityLabel("Decode VIN")
+                            .accessibilityHint(vinDecodeButtonEnabled ? "Looks up vehicle details from the VIN" : "Enter a valid 17-character VIN first")
+                        }
+
+                        if vinDecodeSuccess {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.green)
+                                Text("Vehicle details filled from VIN")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .accessibilityLabel("VIN decoded successfully. Vehicle details auto-filled.")
+                        }
+
+                        if let error = vinDecodeError {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                                Text(error)
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .accessibilityLabel("VIN decode error: \(error)")
+                        }
+                    }
 
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                        HStack {
+                        HStack(spacing: 14) {
                             if let data = photoData, let img = UIImage(data: data) {
                                 Image(uiImage: img)
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: 60, height: 60)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
                                     .accessibilityLabel("Selected vehicle photo")
                             } else {
                                 ZStack {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(theme.accent.opacity(0.1))
-                                        .frame(width: 60, height: 60)
-                                    Image(systemName: "camera.fill")
-                                        .foregroundStyle(theme.accent)
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [theme.accent.opacity(0.15), theme.accent.opacity(0.05)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 80, height: 80)
+                                    VStack(spacing: 4) {
+                                        Image(systemName: "camera.fill")
+                                            .font(.title3)
+                                            .foregroundStyle(theme.accent)
+                                        Text("Add")
+                                            .font(.caption2.weight(.medium))
+                                            .foregroundStyle(theme.accent)
+                                    }
                                 }
                                 .accessibilityHidden(true)
                             }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(photoData == nil ? "Add Photo" : "Change Photo")
-                                    .font(.subheadline)
-                                Text("A photo of your vehicle")
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(photoData == nil ? "Vehicle Photo" : "Change Photo")
+                                    .font(.subheadline.weight(.medium))
+                                Text("Helps identify your vehicle at a glance")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -188,6 +273,8 @@ struct AddVehicleView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
+            .formStyle(.grouped)
+            .frame(maxWidth: sizeClass == .regular ? 500 : .infinity)
             .navigationTitle("Add Vehicle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -203,18 +290,19 @@ struct AddVehicleView: View {
                     Button("Save") {
                         HapticManager.shared.buttonTap()
                         // Vehicle limit check: free = 2
-                        if !store.isPro && activeVehicles.count >= 2 {
+                        if !store.isPro, activeVehicles.count >= 2 {
+                            TelemetryService.paywallShown(source: "add_vehicle_limit")
                             showProPrompt = true
                             return
                         }
                         validateAndSave()
                     }
-                        .disabled(!isFormValid || isSaving)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(isFormValid ? Color.wrenchAmber : .secondary)
-                        .accessibilityIdentifier("addVehicleSave")
-                        .accessibilityLabel("Save vehicle")
-                        .accessibilityHint(isFormValid ? "Saves the vehicle to your garage" : "Enter make and model first")
+                    .disabled(!isFormValid || isSaving)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(isFormValid ? theme.accent : .secondary)
+                    .accessibilityIdentifier("addVehicleSave")
+                    .accessibilityLabel("Save vehicle")
+                    .accessibilityHint(isFormValid ? "Saves the vehicle to your garage" : "Enter make and model first")
                 }
             }
             .onChange(of: selectedPhoto) { _, item in
@@ -238,7 +326,7 @@ struct AddVehicleView: View {
             } message: {
                 Text(saveError ?? "An unexpected error occurred.")
             }
-            .sheet(isPresented: $showProPrompt) {
+            .fullScreenCover(isPresented: $showProPrompt) {
                 ProUpgradeView()
             }
         }
@@ -272,7 +360,7 @@ struct AddVehicleView: View {
         if let m = Int(mileage), m < 0 {
             mileageError = "Mileage cannot be negative."
             hasError = true
-        } else if !mileage.isEmpty && Int(mileage) == nil {
+        } else if !mileage.isEmpty, Int(mileage) == nil {
             mileageError = "Mileage must be a whole number."
             hasError = true
         }
@@ -301,6 +389,7 @@ struct AddVehicleView: View {
             mileage: max(0, Int(mileage) ?? 0)
         )
         vehicle.licensePlate = licensePlate
+        vehicle.vin = vin.trimmingCharacters(in: .whitespaces).uppercased()
         vehicle.colorRaw = selectedColor?.rawValue ?? ""
 
         // Save photo via file-based manager (compressed, max 500KB) instead of bloating SwiftData
@@ -309,12 +398,14 @@ struct AddVehicleView: View {
                 vehicle.vehiclePhotoFileName = fileName
             }
         }
-        vehicle.photoData = nil  // Never store raw blob in DB
+        vehicle.photoData = nil // Never store raw blob in DB
 
         context.insert(vehicle)
 
         do {
             try DataManager.save(context)
+            LogServiceTip.vehicleAdded = true
+            TelemetryService.vehicleAdded()
             HapticManager.shared.saveSuccess()
             SoundManager.playSaveSuccess()
             SoftPaywallTracker.shared.recordAction()
@@ -324,5 +415,36 @@ struct AddVehicleView: View {
             HapticManager.shared.error()
             SoundManager.playError()
         }
+    }
+
+    // MARK: - VIN Decode
+
+    private var vinDecodeButtonEnabled: Bool {
+        !isDecodingVIN && nhtsaService.isValidVIN(vin)
+    }
+
+    private func decodeVIN() async {
+        isDecodingVIN = true
+        vinDecodeError = nil
+        vinDecodeSuccess = false
+
+        do {
+            let result = try await nhtsaService.decodeVIN(vin)
+
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                if !result.make.isEmpty { make = result.make }
+                if !result.model.isEmpty { model = result.model }
+                if result.year > 0 { year = result.year }
+                vinDecodeSuccess = true
+            }
+
+            HapticManager.shared.success()
+            SoundManager.playSaveSuccess()
+        } catch {
+            vinDecodeError = error.localizedDescription
+            HapticManager.shared.error()
+        }
+
+        isDecodingVIN = false
     }
 }

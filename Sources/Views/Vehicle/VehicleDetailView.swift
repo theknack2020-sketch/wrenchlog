@@ -1,5 +1,6 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
+import TipKit
 
 // MARK: - Sort Options
 
@@ -10,7 +11,9 @@ enum ServiceSortOption: String, CaseIterable, Identifiable {
     case costLowest = "Cost (Lowest)"
     case type = "Service Type"
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 }
 
 // MARK: - Vehicle Detail
@@ -40,6 +43,11 @@ struct VehicleDetailView: View {
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
 
+    // Recalls
+    @State private var recalls: [RecallInfo] = []
+    @State private var isLoadingRecalls = false
+    @State private var recallError: String?
+
     // Search & Filter & Sort
     @State private var searchText = ""
     @State private var filterCategory: ServiceCategory?
@@ -47,6 +55,7 @@ struct VehicleDetailView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
     private let settings = UserSettings.shared
     private let store = StoreManager.shared
     private let photoManager = ServicePhotoManager.shared
@@ -61,8 +70,8 @@ struct VehicleDetailView: View {
             let query = searchText.lowercased()
             records = records.filter {
                 $0.displayServiceType.lowercased().contains(query) ||
-                $0.notes.lowercased().contains(query) ||
-                $0.categoryRaw.lowercased().contains(query)
+                    $0.notes.lowercased().contains(query) ||
+                    $0.categoryRaw.lowercased().contains(query)
             }
         }
         if let cat = filterCategory {
@@ -78,9 +87,17 @@ struct VehicleDetailView: View {
         return records
     }
 
-    var totalCost: Double { vehicle.safeServiceRecords.reduce(0) { $0 + $1.cost } }
-    var totalFuelCost: Double { vehicle.safeFuelLogs.reduce(0) { $0 + $1.totalCost } }
-    var totalOwnershipCost: Double { totalCost + totalFuelCost }
+    var totalCost: Double {
+        vehicle.safeServiceRecords.reduce(0) { $0 + $1.cost }
+    }
+
+    var totalFuelCost: Double {
+        vehicle.safeFuelLogs.reduce(0) { $0 + $1.totalCost }
+    }
+
+    var totalOwnershipCost: Double {
+        totalCost + totalFuelCost
+    }
 
     var latestEfficiency: String? {
         let results = vehicle.safeFuelLogs.calculateEfficiency()
@@ -88,7 +105,9 @@ struct VehicleDetailView: View {
         return settings.formatEfficiency(latest.efficiency(for: settings.efficiencyUnit))
     }
 
-    var healthScore: Int { MaintenanceScoreEngine.score(for: vehicle) }
+    var healthScore: Int {
+        MaintenanceScoreEngine.score(for: vehicle)
+    }
 
     var upcomingReminders: [(type: String, icon: String, dueText: String, isOverdue: Bool)] {
         var reminders: [(String, String, String, Bool)] = []
@@ -113,7 +132,7 @@ struct VehicleDetailView: View {
 
     private var mileageProgress: Double {
         let m = Double(vehicle.currentMileage)
-        let milestone = ceil(m / 50_000) * 50_000
+        let milestone = ceil(m / 50000) * 50000
         return milestone > 0 ? m / milestone : 0
     }
 
@@ -159,6 +178,7 @@ struct VehicleDetailView: View {
                 .floatIn(delay: 0.05)
             miniStatCardsSection
             vehicleInfoSection
+            recallsSection
             documentsSection
             toolsSection
             remindersSection
@@ -172,7 +192,7 @@ struct VehicleDetailView: View {
         .sheet(isPresented: $showAddService) { AddServiceView(vehicle: vehicle) }
         .sheet(isPresented: $showAddFuel) { AddFuelLogView(vehicle: vehicle) }
         .sheet(isPresented: $showEditVehicle) { EditVehicleView(vehicle: vehicle) }
-        .sheet(isPresented: $showProPrompt) { ProUpgradeView() }
+        .fullScreenCover(isPresented: $showProPrompt) { ProUpgradeView() }
         .sheet(isPresented: $showSellVehicle) { SellVehicleView(vehicle: vehicle) }
         .sheet(isPresented: $showPDFShare) {
             if let data = pdfData { ShareSheetView(items: [data]) }
@@ -208,6 +228,9 @@ struct VehicleDetailView: View {
         } message: {
             Text(errorMessage)
         }
+        .task {
+            await loadRecalls()
+        }
         .overlay(alignment: .bottom) {
             if showUndoBanner {
                 undoBanner
@@ -237,43 +260,67 @@ struct VehicleDetailView: View {
             }
             .accessibilityIdentifier("vehicleDetailAdd")
             .accessibilityLabel("Add record")
+            .accessibilityHint("Log a new service or fuel fill-up")
         }
     }
 
     // MARK: - Photo Header
 
-    @ViewBuilder
     private var photoHeaderSection: some View {
-        if let img = vehicleImage {
-            Section {
-                ZStack(alignment: .bottomLeading) {
+        Section {
+            ZStack(alignment: .bottomLeading) {
+                if let img = vehicleImage {
                     Image(uiImage: img)
                         .resizable().scaledToFill()
-                        .frame(maxWidth: .infinity).frame(height: 200)
+                        .frame(maxWidth: .infinity).frame(height: 240)
                         .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
                         .accessibilityLabel("\(vehicle.displayName) photo")
-                    LinearGradient(
-                        colors: [.clear, .clear, .black.opacity(0.3), .black.opacity(0.65)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(vehicle.displayName).font(.title3.weight(.bold)).foregroundStyle(.white)
-                        if !vehicle.licensePlate.isEmpty {
-                            Text(vehicle.licensePlate)
-                                .font(.caption.weight(.medium).monospacedDigit())
-                                .foregroundStyle(.white.opacity(0.8))
+                } else {
+                    // Gradient placeholder when no photo
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(
+                            LinearGradient(
+                                colors: [theme.accent.opacity(0.3), theme.accent.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(height: 180)
+                        .overlay {
+                            Image(systemName: "car.side.fill")
+                                .font(.system(.largeTitle, weight: .light))
+                                .foregroundStyle(theme.accent.opacity(0.3))
                         }
-                    }
-                    .padding(12)
-                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+                        .accessibilityHidden(true)
                 }
+
+                LinearGradient(
+                    colors: [.clear, .clear, .black.opacity(0.35), .black.opacity(0.72)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(vehicle.displayName)
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.white)
+                    if !vehicle.licensePlate.isEmpty {
+                        Text(vehicle.licensePlate)
+                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.85))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(.white.opacity(0.15), in: Capsule())
+                    }
+                }
+                .padding(16)
+                .shadow(color: .black.opacity(0.35), radius: 6, x: 0, y: 2)
             }
-            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            .shadow(color: theme.accent.opacity(0.2), radius: 12, x: 0, y: 6)
         }
+        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
     }
 
     // MARK: - Dashboard
@@ -403,23 +450,30 @@ struct VehicleDetailView: View {
 
     private var dashboardStats: some View {
         HStack(spacing: 8) {
+            // Health score with glow
             VStack(spacing: 4) {
                 ZStack {
-                    ProgressRing(progress: Double(healthScore) / 100.0, lineWidth: 4, color: MaintenanceScoreEngine.color(for: healthScore))
-                        .frame(width: 32, height: 32)
-                    Text("\(healthScore)").font(.caption2.weight(.bold).monospacedDigit())
+                    ProgressRing(progress: Double(healthScore) / 100.0, lineWidth: 5, color: MaintenanceScoreEngine.color(for: healthScore))
+                        .frame(width: 36, height: 36)
+                        .shadow(color: MaintenanceScoreEngine.color(for: healthScore).opacity(0.4), radius: 6, x: 0, y: 0)
+                    Text("\(healthScore)")
+                        .font(.system(.caption, design: .rounded, weight: .heavy).monospacedDigit())
                         .contentTransition(.numericText())
                         .foregroundStyle(MaintenanceScoreEngine.color(for: healthScore))
                 }
-                Text("Health").font(.caption2).foregroundStyle(.secondary)
+                Text("Health").font(.caption2.weight(.medium)).foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity).padding(.vertical, 8)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-            .shadow(color: MaintenanceScoreEngine.color(for: healthScore).opacity(0.15), radius: 4, x: 0, y: 2)
-            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+            .frame(maxWidth: .infinity).padding(.vertical, 10)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(MaintenanceScoreEngine.color(for: healthScore).opacity(0.15), lineWidth: 1)
+            )
+            .shadow(color: MaintenanceScoreEngine.color(for: healthScore).opacity(0.2), radius: 6, x: 0, y: 3)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Health score: \(healthScore) percent")
             .statPop(index: 0)
+
             statCard(title: "Total Spent", value: settings.formatCost(totalOwnershipCost), icon: "dollarsign.circle.fill", color: theme.accent)
                 .statPop(index: 1)
             statCard(title: "Services", value: "\(vehicle.safeServiceRecords.count)", icon: "wrench.fill", color: .catEngine)
@@ -442,39 +496,70 @@ struct VehicleDetailView: View {
     private var miniStatCardsSection: some View {
         Section {
             VStack(spacing: 10) {
-                HStack(spacing: 8) {
-                    miniStatCard(
-                        title: "Total Spent",
-                        value: settings.formatCost(totalOwnershipCost),
-                        icon: "dollarsign.circle.fill",
-                        color: theme.accent
-                    )
-                    miniStatCard(
-                        title: "Avg/Service",
-                        value: averageCostPerService > 0 ? settings.formatCost(averageCostPerService) : "—",
-                        icon: "equal.circle.fill",
-                        color: .catFilters
-                    )
-                }
-                HStack(spacing: 8) {
-                    miniStatCard(
-                        title: "Services",
-                        value: "\(vehicle.safeServiceRecords.count)",
-                        icon: "wrench.fill",
-                        color: .catEngine
-                    )
-                    miniStatCard(
-                        title: "Last Service",
-                        value: lastServiceDateLabel,
-                        icon: "calendar.badge.clock",
-                        color: lastServiceColor
-                    )
+                if sizeClass == .regular {
+                    // iPad: 4 cards in one row
+                    HStack(spacing: 8) {
+                        miniStatCard(
+                            title: "Total Spent",
+                            value: settings.formatCost(totalOwnershipCost),
+                            icon: "dollarsign.circle.fill",
+                            color: theme.accent
+                        )
+                        miniStatCard(
+                            title: "Avg/Service",
+                            value: averageCostPerService > 0 ? settings.formatCost(averageCostPerService) : "—",
+                            icon: "equal.circle.fill",
+                            color: .catFilters
+                        )
+                        miniStatCard(
+                            title: "Services",
+                            value: "\(vehicle.safeServiceRecords.count)",
+                            icon: "wrench.fill",
+                            color: .catEngine
+                        )
+                        miniStatCard(
+                            title: "Last Service",
+                            value: lastServiceDateLabel,
+                            icon: "calendar.badge.clock",
+                            color: lastServiceColor
+                        )
+                    }
+                } else {
+                    // iPhone: 2x2 grid
+                    HStack(spacing: 8) {
+                        miniStatCard(
+                            title: "Total Spent",
+                            value: settings.formatCost(totalOwnershipCost),
+                            icon: "dollarsign.circle.fill",
+                            color: theme.accent
+                        )
+                        miniStatCard(
+                            title: "Avg/Service",
+                            value: averageCostPerService > 0 ? settings.formatCost(averageCostPerService) : "—",
+                            icon: "equal.circle.fill",
+                            color: .catFilters
+                        )
+                    }
+                    HStack(spacing: 8) {
+                        miniStatCard(
+                            title: "Services",
+                            value: "\(vehicle.safeServiceRecords.count)",
+                            icon: "wrench.fill",
+                            color: .catEngine
+                        )
+                        miniStatCard(
+                            title: "Last Service",
+                            value: lastServiceDateLabel,
+                            icon: "calendar.badge.clock",
+                            color: lastServiceColor
+                        )
+                    }
                 }
                 if let expensive = mostExpensiveService, expensive.cost > 0 {
                     HStack(spacing: 10) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.caption)
-                            .foregroundStyle(Color.wrenchRed)
+                            .foregroundStyle(Color.Status.error.shade500)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Most Expensive")
                                 .font(.caption2)
@@ -522,40 +607,48 @@ struct VehicleDetailView: View {
 
     private var lastServiceColor: Color {
         guard let days = daysSinceLastService else { return .secondary }
-        if days <= 90 { return .wrenchGreen }
-        if days <= 180 { return .wrenchYellow }
-        return .wrenchRed
+        if days <= 90 { return Color.Status.success.shade500 }
+        if days <= 180 { return Color.Status.warning.shade500 }
+        return Color.Status.error.shade500
     }
 
-    @ViewBuilder
     private func miniStatCard(title: String, value: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(color.opacity(0.12))
-                    .frame(width: 32, height: 32)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(
+                        LinearGradient(
+                            colors: [color.opacity(0.18), color.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 36, height: 36)
                 Image(systemName: icon)
-                    .font(.caption)
+                    .font(.system(.caption, weight: .semibold))
                     .foregroundStyle(color)
             }
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(value)
-                    .font(.caption.weight(.bold).monospacedDigit())
+                    .font(.system(.subheadline, design: .rounded, weight: .bold).monospacedDigit())
                     .contentTransition(.numericText())
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text(title)
-                    .font(.caption2)
+                    .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: color.opacity(0.15), radius: 4, x: 0, y: 2)
-        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(color.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: color.opacity(0.12), radius: 4, x: 0, y: 2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
     }
@@ -604,7 +697,7 @@ struct VehicleDetailView: View {
             HStack {
                 Label("Depreciation", systemImage: "arrow.down.right").font(.subheadline).foregroundStyle(.secondary)
                 Spacer()
-                Text("-\(settings.formatCost(depreciation))").font(.caption.weight(.medium).monospacedDigit()).foregroundStyle(Color.wrenchRed)
+                Text("-\(settings.formatCost(depreciation))").font(.caption.weight(.medium).monospacedDigit()).foregroundStyle(Color.Status.error.shade500)
             }
             if vehicle.yearsOwned > 0 {
                 HStack {
@@ -615,6 +708,146 @@ struct VehicleDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Safety Recalls
+
+    @ViewBuilder
+    private var recallsSection: some View {
+        if isLoadingRecalls || !recalls.isEmpty || recallError != nil {
+            Section {
+                if isLoadingRecalls {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Checking for recalls…")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                    .accessibilityLabel("Checking for safety recalls")
+                } else if let error = recallError {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Button {
+                            Task { await loadRecalls() }
+                        } label: {
+                            Label("Try Again", systemImage: "arrow.clockwise")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(theme.accent)
+                        }
+                        .pressable()
+                        .accessibilityLabel("Retry recall check")
+                        .accessibilityHint("Tries to load safety recalls again")
+                    }
+                    .padding(.vertical, 2)
+                } else if recalls.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.shield.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(.green)
+                        Text("No open recalls")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                    .accessibilityLabel("No open safety recalls found")
+                } else {
+                    ForEach(recalls) { recall in
+                        DisclosureGroup {
+                            VStack(alignment: .leading, spacing: 10) {
+                                if !recall.component.isEmpty {
+                                    recallDetailRow(label: "Component", value: recall.component)
+                                }
+                                if !recall.summary.isEmpty {
+                                    recallDetailRow(label: "Summary", value: recall.summary)
+                                }
+                                if !recall.consequence.isEmpty {
+                                    recallDetailRow(label: "Risk", value: recall.consequence)
+                                }
+                                if !recall.remedy.isEmpty {
+                                    recallDetailRow(label: "Remedy", value: recall.remedy)
+                                }
+                                if !recall.reportReceivedDate.isEmpty {
+                                    recallDetailRow(label: "Reported", value: recall.reportReceivedDate)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.Status.error.shade500)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(recall.campaignNumber)
+                                        .font(.subheadline.weight(.semibold))
+                                    if !recall.component.isEmpty {
+                                        Text(recall.component)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                            }
+                        }
+                        .accessibilityLabel("Recall \(recall.campaignNumber), \(recall.component)")
+                        .accessibilityHint("Expand to see recall details")
+                    }
+                }
+            } header: {
+                HStack(spacing: 6) {
+                    Image(systemName: "shield.lefthalf.filled.badge.checkmark")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: recalls.isEmpty ? [.green, .green.opacity(0.7)] : [Color.Status.error.shade500, Color.Status.error.shade500.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    Text("Safety Recalls")
+                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: recalls.isEmpty ? [.green, .green.opacity(0.7)] : [Color.Status.error.shade500, Color.Status.error.shade500.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    if !recalls.isEmpty {
+                        Text("\(recalls.count)")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.Status.error.shade500, in: Capsule())
+                            .foregroundStyle(.white)
+                            .accessibilityLabel("\(recalls.count) open recalls")
+                    }
+                }
+            }
+        }
+    }
+
+    private func recallDetailRow(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 
     // MARK: - Documents
@@ -649,7 +882,7 @@ struct VehicleDetailView: View {
                     if let expiry = doc.expirationDate {
                         HStack(spacing: 8) {
                             Image(systemName: "exclamationmark.triangle.fill").font(.caption)
-                                .foregroundStyle(expiry < Date() ? Color.wrenchRed : Color.wrenchAmber)
+                                .foregroundStyle(expiry < Date() ? Color.Status.error.shade500 : theme.accent)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(doc.title).font(.caption.weight(.medium))
@@ -667,6 +900,9 @@ struct VehicleDetailView: View {
 
     private var toolsSection: some View {
         Section {
+            TipView(LogServiceTip())
+                .tipBackground(theme.accent.opacity(0.08))
+
             VStack(spacing: 0) {
                 NavigationLink { MaintenanceTimelineView(vehicle: vehicle) } label: {
                     Label("Maintenance Timeline", systemImage: "clock.arrow.circlepath").foregroundStyle(theme.accent)
@@ -680,7 +916,7 @@ struct VehicleDetailView: View {
                     HStack {
                         Label("Maintenance Checklist", systemImage: "checklist")
                         Spacer()
-                        let pending = vehicle.safeChecklistItems.filter { !$0.isCompleted }.count
+                        let pending = vehicle.safeChecklistItems.count(where: { !$0.isCompleted })
                         if pending > 0 {
                             Text("\(pending)")
                                 .font(.caption2.weight(.bold))
@@ -692,7 +928,7 @@ struct VehicleDetailView: View {
                     .foregroundStyle(theme.accent)
                 }
                 .pressable()
-                .accessibilityLabel("Maintenance checklist, \(vehicle.safeChecklistItems.filter { !$0.isCompleted }.count) pending items")
+                .accessibilityLabel("Maintenance checklist, \(vehicle.safeChecklistItems.count(where: { !$0.isCompleted })) pending items")
 
                 Divider().padding(.leading, 36).accessibilityHidden(true)
 
@@ -719,7 +955,7 @@ struct VehicleDetailView: View {
                 ForEach(upcomingReminders.prefix(6), id: \.type) { reminder in
                     HStack(spacing: 10) {
                         Image(systemName: reminder.icon).font(.caption)
-                            .foregroundStyle(reminder.isOverdue ? Color.wrenchRed : Color.wrenchGreen)
+                            .foregroundStyle(reminder.isOverdue ? Color.Status.error.shade500 : Color.Status.success.shade500)
                             .frame(width: 22)
                             .accessibilityHidden(true)
                         Text(reminder.type).font(.subheadline)
@@ -822,17 +1058,22 @@ struct VehicleDetailView: View {
     private var serviceHistorySubtitle: String {
         let count = vehicle.safeServiceRecords.count
         switch count {
-        case 1...4: return "\(count) logged — off to a great start!"
-        case 5...14: return "\(count) logged — solid record keeping 👍"
-        case 15...49: return "\(count) logged — your car thanks you!"
+        case 1 ... 4: return "\(count) logged — off to a great start!"
+        case 5 ... 14: return "\(count) logged — solid record keeping 👍"
+        case 15 ... 49: return "\(count) logged — your car thanks you!"
         default: return "\(count) logged — maintenance pro 🏆"
         }
     }
 
     private var serviceSearchBar: some View {
         HStack {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Search services...", text: $searchText).font(.subheadline)
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            TextField("Search services...", text: $searchText)
+                .font(.subheadline)
+                .accessibilityLabel("Search services")
+                .accessibilityIdentifier("serviceSearchField")
         }
     }
 
@@ -860,6 +1101,8 @@ struct VehicleDetailView: View {
                     .background(theme.accent.opacity(0.12), in: Capsule())
                     .foregroundStyle(theme.accent)
                 }
+                .accessibilityLabel("Sort by \(sortOption.rawValue)")
+                .accessibilityHint("Double tap to change sort order")
                 filterChip(label: "All", isSelected: filterCategory == nil) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { filterCategory = nil }
                     haptic.selection()
@@ -893,12 +1136,14 @@ struct VehicleDetailView: View {
                             .font(.caption).foregroundStyle(.tertiary).multilineTextAlignment(.center)
                     } else {
                         Image(systemName: "magnifyingglass").font(.title2).foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
                         Text("No matching services").font(.subheadline).foregroundStyle(.secondary)
                         Button("Clear Filters") {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { searchText = ""; filterCategory = nil }
                             haptic.light()
                         }
-                            .font(.caption.weight(.medium)).foregroundStyle(theme.accent)
+                        .font(.caption.weight(.medium)).foregroundStyle(theme.accent)
+                        .accessibilityLabel("Clear search filters")
                     }
                 }
                 .padding(.vertical, 20)
@@ -959,44 +1204,127 @@ struct VehicleDetailView: View {
         Section {
             Button {
                 haptic.buttonTap()
-                if store.isPro { showCostAnalytics = true } else { showProPrompt = true }
+                if store.isPro {
+                    showCostAnalytics = true
+                } else {
+                    TelemetryService.paywallShown(source: "vehicle_detail_cost_analytics")
+                    showProPrompt = true
+                }
             } label: {
-                HStack {
-                    Label("Cost Analytics", systemImage: "chart.bar.fill")
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [theme.accent.opacity(0.2), theme.accent.opacity(0.08)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "chart.bar.fill")
+                            .font(.system(.caption, weight: .semibold))
+                            .foregroundStyle(theme.accent)
+                    }
+                    Text("Cost Analytics")
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
                     if !store.isPro {
-                        Spacer()
                         Image(systemName: "crown.fill").font(.caption).foregroundStyle(theme.accent)
                     }
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.tertiary)
                 }
-                .foregroundStyle(theme.accent)
+                .foregroundStyle(.primary)
             }
             .pressable()
             .accessibilityLabel("Cost analytics\(store.isPro ? "" : ", Pro feature")")
+
             Button {
                 haptic.buttonTap()
-                if store.isPro { exportPDF() } else { showProPrompt = true }
+                if store.isPro {
+                    exportPDF()
+                } else {
+                    TelemetryService.paywallShown(source: "vehicle_detail_pdf_export")
+                    showProPrompt = true
+                }
             } label: {
-                HStack {
-                    Label("Export PDF Report", systemImage: "doc.text.fill")
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [theme.accent.opacity(0.2), theme.accent.opacity(0.08)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "doc.text.fill")
+                            .font(.system(.caption, weight: .semibold))
+                            .foregroundStyle(theme.accent)
+                    }
+                    Text("Export PDF Report")
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
                     if !store.isPro {
-                        Spacer()
                         Image(systemName: "crown.fill").font(.caption).foregroundStyle(theme.accent)
                     }
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.tertiary)
                 }
+                .foregroundStyle(.primary)
             }
             .pressable()
             .accessibilityLabel("Export PDF report\(store.isPro ? "" : ", Pro feature")")
+
             ShareLink(item: vehicleSummaryShareText) {
-                Label("Share Vehicle Summary", systemImage: "square.and.arrow.up")
-                    .foregroundStyle(theme.accent)
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [theme.accent.opacity(0.2), theme.accent.opacity(0.08)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(.caption, weight: .semibold))
+                            .foregroundStyle(theme.accent)
+                    }
+                    Text("Share Vehicle Summary")
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .foregroundStyle(.primary)
             }
             .pressable()
             .accessibilityLabel("Share vehicle summary")
+
             Button(role: .destructive) {
                 haptic.warning()
                 showSellVehicle = true
             } label: {
-                Label("Mark as Sold", systemImage: "tag.fill")
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.Status.error.shade500.opacity(0.12))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "tag.fill")
+                            .font(.system(.caption, weight: .semibold))
+                            .foregroundStyle(.red)
+                    }
+                    Text("Mark as Sold")
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                }
             }
             .pressable()
             .accessibilityLabel("Mark vehicle as sold")
@@ -1032,6 +1360,35 @@ struct VehicleDetailView: View {
         showErrorAlert = true
         haptic.error()
         SoundManager.playError()
+    }
+
+    // MARK: - Recall Loading
+
+    private func loadRecalls() async {
+        let trimmedMake = vehicle.make.trimmingCharacters(in: .whitespaces)
+        let trimmedModel = vehicle.model.trimmingCharacters(in: .whitespaces)
+        guard !trimmedMake.isEmpty, !trimmedModel.isEmpty, vehicle.year > 0 else { return }
+
+        isLoadingRecalls = true
+        recallError = nil
+
+        do {
+            let results = try await NHTSAService.shared.fetchRecalls(
+                make: trimmedMake,
+                model: trimmedModel,
+                year: vehicle.year
+            )
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                recalls = results
+            }
+            if !results.isEmpty {
+                haptic.warning()
+            }
+        } catch {
+            recallError = error.localizedDescription
+        }
+
+        isLoadingRecalls = false
     }
 
     // MARK: - Share Text Helpers
@@ -1142,18 +1499,17 @@ struct VehicleDetailView: View {
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .background(.ultraThinMaterial)
-        .background(Color.wrenchCharcoal.opacity(0.85))
+        .background(Color.Neutral.shade800.opacity(0.85))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
     }
 
     private func undoDeleteService() {
         guard let snapshot = DeletionUndoManager.shared.reconstructService() else { return }
-        let record: ServiceRecord
-        if let serviceType = ServiceType(rawValue: snapshot.serviceTypeRaw) {
-            record = ServiceRecord(serviceType: serviceType, date: snapshot.date, mileage: snapshot.mileage, cost: snapshot.cost, notes: snapshot.notes)
+        let record = if let serviceType = ServiceType(rawValue: snapshot.serviceTypeRaw) {
+            ServiceRecord(serviceType: serviceType, date: snapshot.date, mileage: snapshot.mileage, cost: snapshot.cost, notes: snapshot.notes)
         } else {
-            record = ServiceRecord(customType: snapshot.serviceTypeRaw, category: ServiceCategory(rawValue: snapshot.categoryRaw) ?? .custom, date: snapshot.date, mileage: snapshot.mileage, cost: snapshot.cost, notes: snapshot.notes)
+            ServiceRecord(customType: snapshot.serviceTypeRaw, category: ServiceCategory(rawValue: snapshot.categoryRaw) ?? .custom, date: snapshot.date, mileage: snapshot.mileage, cost: snapshot.cost, notes: snapshot.notes)
         }
         record.photoFileNames = snapshot.photoFileNames
         record.vehicle = vehicle
@@ -1185,17 +1541,24 @@ struct VehicleDetailView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    @ViewBuilder
     private func statCard(title: String, value: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon).font(.caption).foregroundStyle(color)
-            Text(value).font(.caption2.weight(.bold).monospacedDigit()).contentTransition(.numericText()).lineLimit(1).minimumScaleFactor(0.7)
-            Text(title).font(.caption2).foregroundStyle(.secondary)
+        VStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.12))
+                    .frame(width: 28, height: 28)
+                Image(systemName: icon).font(.system(.caption2, weight: .semibold)).foregroundStyle(color)
+            }
+            Text(value).font(.system(.caption, design: .rounded, weight: .bold).monospacedDigit()).contentTransition(.numericText()).lineLimit(1).minimumScaleFactor(0.7)
+            Text(title).font(.caption2.weight(.medium)).foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity).padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: color.opacity(0.15), radius: 4, x: 0, y: 2)
-        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .frame(maxWidth: .infinity).padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(color.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: color.opacity(0.12), radius: 4, x: 0, y: 2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
     }
@@ -1210,39 +1573,59 @@ struct ServiceRecordRow: View {
     private let photoManager = ServicePhotoManager.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 12) {
-                Image(systemName: record.icon).font(.body).foregroundStyle(record.color).frame(width: 28)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(record.displayServiceType).font(.subheadline.weight(.medium))
-                    HStack(spacing: 8) {
-                        Text(record.date, format: .dateTime.month(.abbreviated).day().year()).font(.caption).foregroundStyle(.secondary)
-                        if record.mileage > 0 {
-                            Text("· \(settings.formatMileage(record.mileage))").font(.caption).foregroundStyle(.secondary)
-                        }
+        HStack(spacing: 0) {
+            // Color-coded left accent bar by category
+            RoundedRectangle(cornerRadius: 2)
+                .fill(record.color)
+                .frame(width: 4)
+                .padding(.vertical, 4)
+                .padding(.trailing, 10)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(record.color.opacity(0.12))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: record.icon)
+                            .font(.system(.caption, weight: .semibold))
+                            .foregroundStyle(record.color)
                     }
-                }
-                Spacer()
-                if record.cost > 0 {
-                    Text(settings.formatCost(record.cost)).font(.subheadline.weight(.semibold).monospacedDigit()).foregroundStyle(theme.accent)
-                }
-            }
-            if !record.notes.isEmpty {
-                Text(record.notes).font(.caption).foregroundStyle(.tertiary).lineLimit(2).padding(.leading, 40)
-            }
-            if !record.photoFileNames.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(record.photoFileNames, id: \.self) { fileName in
-                            if let img = photoManager.loadPhoto(named: fileName) {
-                                Image(uiImage: img).resizable().scaledToFill()
-                                    .frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 6))
+                    .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(record.displayServiceType).font(.subheadline.weight(.semibold))
+                        HStack(spacing: 8) {
+                            Text(record.date, format: .dateTime.month(.abbreviated).day().year()).font(.caption).foregroundStyle(.secondary)
+                            if record.mileage > 0 {
+                                Text("· \(settings.formatMileage(record.mileage))").font(.caption).foregroundStyle(.secondary)
                             }
                         }
                     }
+                    Spacer()
+                    if record.cost > 0 {
+                        Text(settings.formatCost(record.cost))
+                            .font(.system(.subheadline, design: .rounded, weight: .bold).monospacedDigit())
+                            .foregroundStyle(theme.accent)
+                    }
                 }
-                .padding(.leading, 40)
+                if !record.notes.isEmpty {
+                    Text(record.notes).font(.caption).foregroundStyle(.tertiary).lineLimit(2).padding(.leading, 44)
+                }
+                if !record.photoFileNames.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(record.photoFileNames, id: \.self) { fileName in
+                                if let img = photoManager.loadPhoto(named: fileName) {
+                                    Image(uiImage: img).resizable().scaledToFill()
+                                        .frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                            }
+                        }
+                    }
+                    .padding(.leading, 44)
+                }
             }
         }
         .padding(.vertical, 2)
@@ -1255,10 +1638,11 @@ struct ServiceRecordRow: View {
 
 struct ShareSheetView: UIViewControllerRepresentable {
     let items: [Any]
-    func makeUIViewController(context: Context) -> UIActivityViewController {
+    func makeUIViewController(context _: Context) -> UIActivityViewController {
         let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
         vc.popoverPresentationController?.sourceView = UIView()
         return vc
     }
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+
+    func updateUIViewController(_: UIActivityViewController, context _: Context) {}
 }

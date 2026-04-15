@@ -13,8 +13,7 @@ struct MilestoneBadge: Identifiable {
 
 // MARK: - Milestone Engine
 
-struct MilestoneEngine {
-
+enum MilestoneEngine {
     // MARK: - All Badges (earned + locked)
 
     @MainActor
@@ -43,7 +42,7 @@ struct MilestoneEngine {
         ))
         badges.append(MilestoneBadge(
             id: "svc_10", title: "Dedicated", icon: "star.fill",
-            color: .wrenchAmber, detail: "10 services logged",
+            color: Color.amber.shade500, detail: "10 services logged",
             isEarned: totalServices >= 10
         ))
         badges.append(MilestoneBadge(
@@ -53,12 +52,12 @@ struct MilestoneEngine {
         ))
         badges.append(MilestoneBadge(
             id: "svc_50", title: "Mechanic", icon: "trophy.fill",
-            color: .wrenchAmberLight, detail: "50 services logged",
+            color: Color.amber.shade400, detail: "50 services logged",
             isEarned: totalServices >= 50
         ))
         badges.append(MilestoneBadge(
             id: "svc_100", title: "Master Mechanic", icon: "crown.fill",
-            color: .wrenchAmber, detail: "100 services — legendary",
+            color: Color.amber.shade500, detail: "100 services — legendary",
             isEarned: totalServices >= 100
         ))
 
@@ -112,17 +111,17 @@ struct MilestoneEngine {
 
         badges.append(MilestoneBadge(
             id: "cost_100", title: "Cost Tracker", icon: "dollarsign.circle.fill",
-            color: .wrenchAmber, detail: "Tracked $100+ in expenses",
+            color: Color.amber.shade500, detail: "Tracked $100+ in expenses",
             isEarned: totalCost >= 100
         ))
         badges.append(MilestoneBadge(
             id: "cost_500", title: "Budget Conscious", icon: "chart.pie.fill",
-            color: .wrenchAmber, detail: "Tracked $500+ in expenses",
+            color: Color.amber.shade500, detail: "Tracked $500+ in expenses",
             isEarned: totalCost >= 500
         ))
         badges.append(MilestoneBadge(
             id: "cost_1000", title: "Big Spender", icon: "banknote.fill",
-            color: .wrenchAmberLight, detail: "Tracked $1,000+ in expenses",
+            color: Color.amber.shade400, detail: "Tracked $1,000+ in expenses",
             isEarned: totalCost >= 1000
         ))
 
@@ -171,7 +170,7 @@ struct MilestoneEngine {
         let hasHealthScore100 = vehicles.contains { MaintenanceScoreEngine.score(for: $0) == 100 }
         badges.append(MilestoneBadge(
             id: "perfect_health", title: "Perfect Health", icon: "heart.text.square.fill",
-            color: .wrenchGreen, detail: "100% health score on a vehicle",
+            color: Color.Status.success.shade500, detail: "100% health score on a vehicle",
             isEarned: hasHealthScore100
         ))
 

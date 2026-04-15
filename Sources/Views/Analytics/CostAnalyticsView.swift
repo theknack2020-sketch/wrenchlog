@@ -1,5 +1,5 @@
-import SwiftUI
 import Charts
+import SwiftUI
 
 struct CostAnalyticsView: View {
     let vehicle: Vehicle
@@ -7,7 +7,9 @@ struct CostAnalyticsView: View {
     private let store = StoreManager.shared
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var chartAnimationProgress: Double = 0
+    @State private var donutScale: CGFloat = 0.4
     @State private var selectedMonthIndex: Int?
     @State private var showProPrompt = false
 
@@ -31,7 +33,7 @@ struct CostAnalyticsView: View {
         totalServiceCost + totalFuelCost
     }
 
-    // Cost by category (services only)
+    /// Cost by category (services only)
     var categoryBreakdown: [(category: ServiceCategory, total: Double, color: Color)] {
         var map: [String: Double] = [:]
         for record in records {
@@ -43,7 +45,7 @@ struct CostAnalyticsView: View {
         }.sorted { $0.total > $1.total }
     }
 
-    // Service vs Fuel split for donut
+    /// Service vs Fuel split for donut
     var costSplit: [(label: String, total: Double, color: Color)] {
         var result: [(String, Double, Color)] = []
         if totalServiceCost > 0 { result.append(("Services", totalServiceCost, .catEngine)) }
@@ -51,21 +53,21 @@ struct CostAnalyticsView: View {
         return result
     }
 
-    // Monthly spending (services + fuel, last 12 months)
+    /// Monthly spending (services + fuel, last 12 months)
     var monthlySpending: [(month: Date, services: Double, fuel: Double)] {
         let calendar = Calendar.current
         let now = Date()
-        return (0..<12).reversed().map { monthsAgo in
-            let month = calendar.date(byAdding: .month, value: -monthsAgo, to: now)!
-            let start = calendar.date(from: calendar.dateComponents([.year, .month], from: month))!
-            let end = calendar.date(byAdding: .month, value: 1, to: start)!
+        return (0 ..< 12).reversed().map { monthsAgo in
+            let month = calendar.safeDate(byAdding: .month, value: -monthsAgo, to: now)
+            let start = calendar.safeDate(from: calendar.dateComponents([.year, .month], from: month))
+            let end = calendar.safeDate(byAdding: .month, value: 1, to: start)
             let svcTotal = records.filter { $0.date >= start && $0.date < end }.reduce(0) { $0 + $1.cost }
             let fuelTotal = fuelLogs.filter { $0.date >= start && $0.date < end }.reduce(0) { $0 + $1.totalCost }
             return (month: start, services: svcTotal, fuel: fuelTotal)
         }
     }
 
-    // Yearly cost of ownership
+    /// Yearly cost of ownership
     var yearlyCosts: [(year: Int, services: Double, fuel: Double)] {
         let calendar = Calendar.current
         var yearMap: [Int: (services: Double, fuel: Double)] = [:]
@@ -85,7 +87,7 @@ struct CostAnalyticsView: View {
             .sorted { $0.year > $1.year }
     }
 
-    // Year-over-year comparison
+    /// Year-over-year comparison
     var yearOverYear: (currentYear: Int, currentTotal: Double, previousTotal: Double, changePercent: Double)? {
         guard yearlyCosts.count >= 2 else { return nil }
         let sorted = yearlyCosts.sorted { $0.year > $1.year }
@@ -98,7 +100,7 @@ struct CostAnalyticsView: View {
         return (currentYear: current.year, currentTotal: currentTotal, previousTotal: previousTotal, changePercent: change)
     }
 
-    // Fuel efficiency summary
+    /// Fuel efficiency summary
     var efficiencyResults: [FuelEfficiencyResult] {
         vehicle.safeFuelLogs.calculateEfficiency()
     }
@@ -119,7 +121,7 @@ struct CostAnalyticsView: View {
 
     var body: some View {
         Group {
-            if records.isEmpty && fuelLogs.isEmpty {
+            if records.isEmpty, fuelLogs.isEmpty {
                 costAnalyticsEmptyState
             } else {
                 costAnalyticsList
@@ -130,6 +132,9 @@ struct CostAnalyticsView: View {
             HapticManager.shared.light()
             withAnimation(.spring(response: 0.7, dampingFraction: 0.72).delay(0.1)) {
                 chartAnimationProgress = 1.0
+            }
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.65).delay(0.2)) {
+                donutScale = 1.0
             }
         }
     }
@@ -145,7 +150,7 @@ struct CostAnalyticsView: View {
                     .fill(theme.accent.opacity(0.1))
                     .frame(width: 100, height: 100)
                 Image(systemName: "chart.bar.xaxis.ascending")
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
                     .foregroundStyle(theme.accent)
                     .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
             }
@@ -199,29 +204,38 @@ struct CostAnalyticsView: View {
                     .accessibilityLabel("Cost overview: total \(settings.formatCost(totalCost))")
 
                     HStack(spacing: 8) {
-                    ProgressRing(
-                        progress: min(totalCost / max(totalCost * 1.2, 1), 1.0),
-                        lineWidth: 6,
-                        color: .wrenchAmber
-                    )
-                    .frame(width: 48, height: 48)
-                    .overlay {
-                        Image(systemName: "dollarsign")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(Color.wrenchAmber)
+                        ProgressRing(
+                            progress: min(totalCost / max(totalCost * 1.2, 1), 1.0),
+                            lineWidth: 6,
+                            color: theme.accent
+                        )
+                        .frame(width: 48, height: 48)
+                        .overlay {
+                            Image(systemName: "dollarsign")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(theme.accent)
+                        }
+                        .shadow(color: theme.accent.opacity(0.2), radius: 6, x: 0, y: 0)
+
+                        if sizeClass == .regular {
+                            // iPad: all stat cards in one row
+                            statCard(title: "Total Cost", value: settings.formatCost(totalCost), color: theme.accent)
+                                .statPop(index: 0)
+                            statCard(title: "Services", value: settings.formatCost(totalServiceCost), color: .catEngine)
+                                .statPop(index: 1)
+                            statCard(title: "Fuel", value: settings.formatCost(totalFuelCost), color: .catFuel)
+                                .statPop(index: 2)
+                        } else {
+                            statCard(title: "Total Cost", value: settings.formatCost(totalCost), color: theme.accent)
+                                .statPop(index: 0)
+                            statCard(title: "Services", value: settings.formatCost(totalServiceCost), color: .catEngine)
+                                .statPop(index: 1)
+                            statCard(title: "Fuel", value: settings.formatCost(totalFuelCost), color: .catFuel)
+                                .statPop(index: 2)
+                        }
                     }
-                    .shadow(color: Color.wrenchAmber.opacity(0.2), radius: 6, x: 0, y: 0)
-
-                    statCard(title: "Total Cost", value: settings.formatCost(totalCost), color: .wrenchAmber)
-                        .statPop(index: 0)
-                    statCard(title: "Services", value: settings.formatCost(totalServiceCost), color: .catEngine)
-                        .statPop(index: 1)
-                    statCard(title: "Fuel", value: settings.formatCost(totalFuelCost), color: .catFuel)
-                        .statPop(index: 2)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Total cost \(settings.formatCost(totalCost)), services \(settings.formatCost(totalServiceCost)), fuel \(settings.formatCost(totalFuelCost))")
-
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Total cost \(settings.formatCost(totalCost)), services \(settings.formatCost(totalServiceCost)), fuel \(settings.formatCost(totalFuelCost))")
                 }
 
                 if averageEfficiency != nil || averageCostPerDistance != nil {
@@ -230,7 +244,7 @@ struct CostAnalyticsView: View {
                             statCard(title: "Avg \(settings.efficiencyUnit.label)", value: String(format: "%.1f", avg), color: .catTires)
                         }
                         if let cpd = averageCostPerDistance {
-                            statCard(title: "Cost/\(settings.distanceUnit.label)", value: settings.formatCostPerDistance(cpd), color: .wrenchYellow)
+                            statCard(title: "Cost/\(settings.distanceUnit.label)", value: settings.formatCostPerDistance(cpd), color: Color.Status.warning.shade500)
                         }
                         if let avgSvc = averageServiceCost {
                             statCard(title: "Avg/Service", value: settings.formatCost(avgSvc), color: .catFilters)
@@ -246,14 +260,14 @@ struct CostAnalyticsView: View {
                         ZStack {
                             Circle()
                                 .fill(yoy.changePercent >= 0
-                                      ? Color.wrenchRed.opacity(0.12)
-                                      : Color.wrenchGreen.opacity(0.12))
+                                    ? Color.Status.error.shade500.opacity(0.12)
+                                    : Color.Status.success.shade500.opacity(0.12))
                                 .frame(width: 40, height: 40)
                             Image(systemName: yoy.changePercent >= 0
-                                  ? "arrow.up.right"
-                                  : "arrow.down.right")
+                                ? "arrow.up.right"
+                                : "arrow.down.right")
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(yoy.changePercent >= 0 ? Color.wrenchRed : Color.wrenchGreen)
+                                .foregroundStyle(yoy.changePercent >= 0 ? Color.Status.error.shade500 : Color.Status.success.shade500)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
@@ -262,11 +276,11 @@ struct CostAnalyticsView: View {
                                     .font(.subheadline.weight(.semibold))
                                 Text(String(format: "%+.1f%%", yoy.changePercent))
                                     .font(.caption.weight(.bold).monospacedDigit())
-                                    .foregroundStyle(yoy.changePercent >= 0 ? Color.wrenchRed : Color.wrenchGreen)
+                                    .foregroundStyle(yoy.changePercent >= 0 ? Color.Status.error.shade500 : Color.Status.success.shade500)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(
-                                        (yoy.changePercent >= 0 ? Color.wrenchRed : Color.wrenchGreen).opacity(0.12),
+                                        (yoy.changePercent >= 0 ? Color.Status.error.shade500 : Color.Status.success.shade500).opacity(0.12),
                                         in: Capsule()
                                     )
                             }
@@ -297,7 +311,7 @@ struct CostAnalyticsView: View {
 
             // Service vs Fuel split
             if costSplit.count == 2 {
-                Section("Services vs Fuel") {
+                Section {
                     Chart(costSplit, id: \.label) { item in
                         SectorMark(
                             angle: .value("Cost", item.total * chartAnimationProgress),
@@ -308,33 +322,51 @@ struct CostAnalyticsView: View {
                         .annotation(position: .overlay) {
                             if item.total / totalCost > 0.05 {
                                 Text("\(Int(item.total / totalCost * 100))%")
-                                    .font(.caption2.weight(.bold))
+                                    .font(.system(.caption2, design: .rounded, weight: .bold))
                                     .foregroundStyle(.white)
                             }
                         }
                     }
-                    .frame(height: 180)
+                    .frame(height: sizeClass == .regular ? 220 : 180)
+                    .scaleEffect(donutScale)
                     .chartReveal()
 
                     ForEach(costSplit, id: \.label) { item in
                         HStack(spacing: 10) {
-                            Circle()
-                                .fill(item.color)
-                                .frame(width: 10, height: 10)
+                            ZStack {
+                                Circle()
+                                    .fill(item.color.opacity(0.15))
+                                    .frame(width: 28, height: 28)
+                                Circle()
+                                    .fill(item.color)
+                                    .frame(width: 12, height: 12)
+                            }
                             Text(item.label)
-                                .font(.subheadline)
+                                .font(.subheadline.weight(.medium))
                             Spacer()
-                            Text(settings.formatCost(item.total))
-                                .font(.subheadline.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                            VStack(alignment: .trailing, spacing: 1) {
+                                Text(settings.formatCost(item.total))
+                                    .font(.system(.subheadline, design: .rounded, weight: .semibold).monospacedDigit())
+                                Text("\(Int(item.total / totalCost * 100))%")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
+                    }
+                } header: {
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.catEngine)
+                            .frame(width: 3, height: 16)
+                        Text("Services vs Fuel")
+                            .font(.system(.headline, design: .rounded))
                     }
                 }
             }
 
             // Category breakdown donut (services)
             if !categoryBreakdown.isEmpty {
-                Section("Service Spending by Category") {
+                Section {
                     Chart(categoryBreakdown, id: \.category) { item in
                         SectorMark(
                             angle: .value("Cost", item.total * chartAnimationProgress),
@@ -345,28 +377,43 @@ struct CostAnalyticsView: View {
                         .annotation(position: .overlay) {
                             if item.total / totalServiceCost > 0.1 {
                                 Text("\(Int(item.total / totalServiceCost * 100))%")
-                                    .font(.caption2.weight(.bold))
+                                    .font(.system(.caption2, design: .rounded, weight: .bold))
                                     .foregroundStyle(.white)
                             }
                         }
                     }
-                    .frame(height: 200)
+                    .frame(height: sizeClass == .regular ? 240 : 200)
+                    .scaleEffect(donutScale)
 
                     ForEach(categoryBreakdown, id: \.category) { item in
                         HStack(spacing: 10) {
-                            ProgressRing(
-                                progress: totalServiceCost > 0 ? (item.total / totalServiceCost) * chartAnimationProgress : 0,
-                                lineWidth: 3,
-                                color: item.color
-                            )
-                            .frame(width: 22, height: 22)
+                            ZStack {
+                                Circle()
+                                    .fill(item.color.opacity(0.15))
+                                    .frame(width: 28, height: 28)
+                                Image(systemName: item.category.icon)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(item.color)
+                            }
                             Text(item.category.rawValue)
                                 .font(.subheadline)
                             Spacer()
-                            Text(settings.formatCost(item.total))
-                                .font(.subheadline.monospacedDigit())
-                                .foregroundStyle(.secondary)
+                            VStack(alignment: .trailing, spacing: 1) {
+                                Text(settings.formatCost(item.total))
+                                    .font(.system(.subheadline, design: .rounded, weight: .semibold).monospacedDigit())
+                                Text("\(Int(item.total / totalServiceCost * 100))%")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
+                    }
+                } header: {
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.catFilters)
+                            .frame(width: 3, height: 16)
+                        Text("Service Spending by Category")
+                            .font(.system(.headline, design: .rounded))
                     }
                 }
             }
@@ -397,7 +444,7 @@ struct CostAnalyticsView: View {
                     }
                     .chartForegroundStyleScale([
                         "Services": Color.catEngine,
-                        "Fuel": Color.catFuel
+                        "Fuel": Color.catFuel,
                     ])
                     .chartXAxis {
                         AxisMarks(values: .stride(by: .month, count: 2)) { value in
@@ -448,7 +495,7 @@ struct CostAnalyticsView: View {
                         }
                         .chartForegroundStyleScale([
                             "Services": Color.catEngine,
-                            "Fuel": Color.catFuel
+                            "Fuel": Color.catFuel,
                         ])
                         .chartYAxis {
                             AxisMarks(position: .leading) { value in
@@ -473,7 +520,7 @@ struct CostAnalyticsView: View {
                             VStack(alignment: .trailing, spacing: 2) {
                                 Text(settings.formatCost(item.services + item.fuel))
                                     .font(.subheadline.weight(.bold).monospacedDigit())
-                                    .foregroundStyle(Color.wrenchAmber)
+                                    .foregroundStyle(theme.accent)
 
                                 HStack(spacing: 8) {
                                     if item.services > 0 {
@@ -524,7 +571,7 @@ struct CostAnalyticsView: View {
     private func statCard(title: String, value: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.subheadline.weight(.bold).monospacedDigit())
+                .font(.system(.subheadline, design: .rounded, weight: .bold).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(title)
@@ -533,7 +580,14 @@ struct CostAnalyticsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(color.opacity(0.15), lineWidth: 0.5)
+                )
+        )
         .shadow(color: color.opacity(0.15), radius: 4, x: 0, y: 2)
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .accessibilityElement(children: .combine)

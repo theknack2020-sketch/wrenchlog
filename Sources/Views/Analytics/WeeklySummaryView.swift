@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Weekly Summary View
 
@@ -9,6 +9,7 @@ struct WeeklySummaryView: View {
     private var vehicles: [Vehicle]
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
     private let settings = UserSettings.shared
     @State private var isLoaded = false
 
@@ -62,24 +63,24 @@ struct WeeklySummaryView: View {
     private var streakDays: Int {
         let calendar = Calendar.current
         let allDates: [Date] = (vehicles.flatMap(\.safeServiceRecords).map(\.date)
-                                + vehicles.flatMap(\.safeFuelLogs).map(\.date))
+            + vehicles.flatMap(\.safeFuelLogs).map(\.date))
             .map { calendar.startOfDay(for: $0) }
         let uniqueDays = Set(allDates).sorted(by: >)
         guard !uniqueDays.isEmpty else { return 0 }
 
         let today = calendar.startOfDay(for: Date())
-        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+        let yesterday = calendar.safeDate(byAdding: .day, value: -1, to: today)
 
         // Streak must start from today or yesterday
         guard let first = uniqueDays.first,
               first == today || first == yesterday else { return 0 }
 
         var streak = 1
-        var expected = calendar.date(byAdding: .day, value: -1, to: first)!
+        var expected = calendar.safeDate(byAdding: .day, value: -1, to: first)
         for day in uniqueDays.dropFirst() {
             if day == expected {
                 streak += 1
-                expected = calendar.date(byAdding: .day, value: -1, to: day)!
+                expected = calendar.safeDate(byAdding: .day, value: -1, to: day)
             } else {
                 break
             }
@@ -137,7 +138,7 @@ struct WeeklySummaryView: View {
         switch totalActions {
         case 0:
             "Quiet week! Check if any services are due."
-        case 1...2:
+        case 1 ... 2:
             "Staying on track! Your vehicles appreciate it."
         default:
             "Amazing week! You're a maintenance pro. 🏆"
@@ -157,8 +158,13 @@ struct WeeklySummaryView: View {
             Section {
                 quickStatsGrid
             } header: {
-                Label("Quick Stats", systemImage: "chart.bar.fill")
-                    .sectionHeaderStyle()
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(theme.accent)
+                        .frame(width: 3, height: 16)
+                    Label("Quick Stats", systemImage: "chart.bar.fill")
+                        .font(.system(.headline, design: .rounded))
+                }
             }
 
             // Activity Timeline
@@ -171,8 +177,13 @@ struct WeeklySummaryView: View {
                     }
                 }
             } header: {
-                Label("Activity", systemImage: "clock.fill")
-                    .sectionHeaderStyle()
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.catEngine)
+                        .frame(width: 3, height: 16)
+                    Label("Activity", systemImage: "clock.fill")
+                        .font(.system(.headline, design: .rounded))
+                }
             }
 
             // Maintenance Health
@@ -182,8 +193,13 @@ struct WeeklySummaryView: View {
                         healthRow(vehicle, index: index)
                     }
                 } header: {
-                    Label("Maintenance Health", systemImage: "heart.fill")
-                        .sectionHeaderStyle()
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.Status.success.shade500)
+                            .frame(width: 3, height: 16)
+                        Label("Maintenance Health", systemImage: "heart.fill")
+                            .font(.system(.headline, design: .rounded))
+                    }
                 }
             }
 
@@ -194,8 +210,13 @@ struct WeeklySummaryView: View {
                         reminderRow(reminder, index: index)
                     }
                 } header: {
-                    Label("Next Up", systemImage: "bell.badge.fill")
-                        .sectionHeaderStyle()
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(theme.accent)
+                            .frame(width: 3, height: 16)
+                        Label("Next Up", systemImage: "bell.badge.fill")
+                            .font(.system(.headline, design: .rounded))
+                    }
                 }
             }
 
@@ -272,54 +293,59 @@ struct WeeklySummaryView: View {
     // MARK: - Quick Stats Grid (2x2)
 
     private var quickStatsGrid: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                quickStatCard(
-                    title: "Services",
-                    value: "\(weekServices.count)",
-                    icon: "wrench.fill",
-                    color: .catEngine,
-                    index: 0
-                )
-                quickStatCard(
-                    title: "Fuel Logs",
-                    value: "\(weekFuelLogs.count)",
-                    icon: "fuelpump.fill",
-                    color: .catFuel,
-                    index: 1
-                )
-            }
-            HStack(spacing: 8) {
-                quickStatCard(
-                    title: "Spent",
-                    value: settings.formatCost(totalSpent),
-                    icon: "dollarsign.circle.fill",
-                    color: .wrenchAmber,
-                    index: 2
-                )
-                quickStatCard(
-                    title: "Streak",
-                    value: "\(streakDays) day\(streakDays == 1 ? "" : "s")",
-                    icon: "flame.fill",
-                    color: streakDays >= 3 ? .wrenchGreen : .wrenchYellow,
-                    index: 3
-                )
-            }
+        let columns = sizeClass == .regular
+            ? [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+            : [GridItem(.flexible()), GridItem(.flexible())]
+
+        return LazyVGrid(columns: columns, spacing: 8) {
+            quickStatCard(
+                title: "Services",
+                value: "\(weekServices.count)",
+                icon: "wrench.fill",
+                color: .catEngine,
+                index: 0
+            )
+            quickStatCard(
+                title: "Fuel Logs",
+                value: "\(weekFuelLogs.count)",
+                icon: "fuelpump.fill",
+                color: .catFuel,
+                index: 1
+            )
+            quickStatCard(
+                title: "Spent",
+                value: settings.formatCost(totalSpent),
+                icon: "dollarsign.circle.fill",
+                color: theme.accent,
+                index: 2
+            )
+            quickStatCard(
+                title: "Streak",
+                value: "\(streakDays) day\(streakDays == 1 ? "" : "s")",
+                icon: "flame.fill",
+                color: streakDays >= 3 ? Color.Status.success.shade500 : Color.Status.warning.shade500,
+                index: 3
+            )
         }
     }
 
     private func quickStatCard(title: String, value: String, icon: String, color: Color, index: Int) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(color)
-                .frame(width: 28)
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(color)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(value)
-                    .font(.subheadline.weight(.bold).monospacedDigit())
+                    .font(.system(.title3, design: .rounded, weight: .bold).monospacedDigit())
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.6)
+                    .foregroundStyle(.primary)
                 Text(title)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -327,8 +353,15 @@ struct WeeklySummaryView: View {
 
             Spacer()
         }
-        .padding(10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(color.opacity(0.1), lineWidth: 0.5)
+                )
+        )
         .shadow(color: color.opacity(0.15), radius: 4, x: 0, y: 2)
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .statPop(index: index)
@@ -382,7 +415,7 @@ struct WeeklySummaryView: View {
 
             if item.cost > 0 {
                 Text(settings.formatCost(item.cost))
-                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .font(.system(.caption, design: .rounded, weight: .bold).monospacedDigit())
                     .foregroundStyle(item.color)
             }
         }
@@ -424,7 +457,7 @@ struct WeeklySummaryView: View {
             Spacer()
 
             Text("\(score)%")
-                .font(.subheadline.weight(.bold).monospacedDigit())
+                .font(.system(.subheadline, design: .rounded, weight: .bold).monospacedDigit())
                 .foregroundStyle(color)
         }
         .padding(.vertical, 4)
@@ -476,10 +509,10 @@ struct WeeklySummaryView: View {
 
     private func colorForUrgency(_ urgency: ReminderUrgency) -> Color {
         switch urgency {
-        case .ok: .wrenchGreen
-        case .dueSoon: .wrenchYellow
-        case .due: .wrenchAmber
-        case .overdue: .wrenchRed
+        case .ok: Color.Status.success.shade500
+        case .dueSoon: Color.Status.warning.shade500
+        case .due: theme.accent
+        case .overdue: Color.Status.error.shade500
         }
     }
 }

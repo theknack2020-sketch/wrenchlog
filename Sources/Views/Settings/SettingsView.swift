@@ -1,6 +1,6 @@
-import SwiftUI
-import SwiftData
 import StoreKit
+import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 import UserNotifications
 
@@ -29,11 +29,13 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.requestReview) private var requestReview
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
     private let store = StoreManager.shared
 
     var body: some View {
         Form {
             // MARK: - Header Banner
+
             Section {
                 HStack(spacing: 10) {
                     Image(systemName: "gearshape.2.fill")
@@ -65,6 +67,7 @@ struct SettingsView: View {
             .listRowBackground(Color.clear)
 
             // MARK: - Units
+
             Section {
                 Picker("Distance", selection: $distanceUnit) {
                     Text("Miles").tag(DistanceUnit.miles)
@@ -104,14 +107,21 @@ struct SettingsView: View {
                     UserSettings.shared.currency = val
                 }
             } header: {
-                Text("Units")
-                    .font(.system(.headline, design: .rounded))
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(LinearGradient(colors: theme.headerGradient, startPoint: .top, endPoint: .bottom))
+                        .frame(width: 3, height: 14)
+                    Text("Units")
+                        .font(.system(.headline, design: .rounded))
+                }
             }
 
             // MARK: - Appearance
+
             appearanceSection
 
             // MARK: - Sound & Haptics
+
             Section {
                 Toggle("Sound & Haptics", isOn: Binding(
                     get: { !UserDefaults.standard.bool(forKey: "wl_sounds_disabled") },
@@ -126,6 +136,7 @@ struct SettingsView: View {
             }
 
             // MARK: - Notifications
+
             Section {
                 Toggle("Service Reminders", isOn: $remindersEnabled)
                     .accessibilityLabel("Service reminders")
@@ -182,6 +193,7 @@ struct SettingsView: View {
             }
 
             // MARK: - Calendar Sync
+
             Section {
                 Toggle("Add Services to Calendar", isOn: $calendarSync)
                     .accessibilityLabel("Calendar sync")
@@ -252,6 +264,7 @@ struct SettingsView: View {
             }
 
             // MARK: - iCloud Sync
+
             Section {
                 HStack(spacing: 12) {
                     Image(systemName: "cloud.fill")
@@ -280,6 +293,7 @@ struct SettingsView: View {
             }
 
             // MARK: - Premium
+
             Section {
                 if store.isPro {
                     HStack(spacing: 10) {
@@ -319,6 +333,7 @@ struct SettingsView: View {
                     }
                 } else {
                     Button {
+                        TelemetryService.paywallShown(source: "settings_upgrade_button")
                         showPro = true
                     } label: {
                         HStack(spacing: 10) {
@@ -355,14 +370,21 @@ struct SettingsView: View {
                     .listRowBackground(Color.clear)
                 }
             } header: {
-                Text("Premium")
-                    .font(.system(.headline, design: .rounded))
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(LinearGradient(colors: [Color(red: 0.91, green: 0.64, blue: 0.09), Color(red: 0.85, green: 0.55, blue: 0.05)], startPoint: .top, endPoint: .bottom))
+                        .frame(width: 3, height: 14)
+                    Text("Premium")
+                        .font(.system(.headline, design: .rounded))
+                }
             }
 
             // MARK: - Data Management
+
             dataManagementSection
 
             // MARK: - Share & Rate
+
             Section {
                 // Share App
                 ShareLink(
@@ -383,18 +405,46 @@ struct SettingsView: View {
                 .pressable()
                 .accessibilityLabel("Rate WrenchLog on the App Store")
             } header: {
-                Text("Spread the Word")
-                    .font(.system(.headline, design: .rounded))
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(LinearGradient(colors: theme.headerGradient, startPoint: .top, endPoint: .bottom))
+                        .frame(width: 3, height: 14)
+                    Text("Spread the Word")
+                        .font(.system(.headline, design: .rounded))
+                }
             }
 
             // MARK: - About
+
             Section {
-                HStack {
-                    Text("Version")
+                // App version card with icon
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: theme.headerGradient,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 52, height: 52)
+                        Image(systemName: "wrench.and.screwdriver.fill")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .shadow(color: theme.accent.opacity(0.25), radius: 6, x: 0, y: 3)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("WrenchLog")
+                            .font(.subheadline.weight(.bold))
+                        Text("Version \(appVersion)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
-                    Text(appVersion)
-                        .foregroundStyle(.secondary)
                 }
+                .padding(.vertical, 4)
 
                 // Contact Support
                 Link(destination: URL(string: "mailto:theknack2020@gmail.com?subject=WrenchLog%20Support%20(\(appVersion))")!) {
@@ -413,8 +463,13 @@ struct SettingsView: View {
                 .accessibilityLabel("Replay onboarding")
                 .accessibilityHint("Shows the welcome screens again on next app launch")
             } header: {
-                Text("About")
-                    .font(.system(.headline, design: .rounded))
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(LinearGradient(colors: theme.headerGradient, startPoint: .top, endPoint: .bottom))
+                        .frame(width: 3, height: 14)
+                    Text("About")
+                        .font(.system(.headline, design: .rounded))
+                }
             } footer: {
                 if !onboardingComplete {
                     Text("Onboarding will show on next app launch.")
@@ -422,6 +477,7 @@ struct SettingsView: View {
             }
 
             // MARK: - More Apps
+
             Section {
                 Link(destination: URL(string: "https://apps.apple.com/app/lumifaste/id6760971357")!) {
                     HStack(spacing: 12) {
@@ -435,8 +491,13 @@ struct SettingsView: View {
                     }
                 }
             } header: {
-                Text("More Apps")
-                    .font(.system(.headline, design: .rounded))
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(LinearGradient(colors: theme.headerGradient, startPoint: .top, endPoint: .bottom))
+                        .frame(width: 3, height: 14)
+                    Text("More Apps")
+                        .font(.system(.headline, design: .rounded))
+                }
             }
         }
         .navigationTitle("Settings")
@@ -446,7 +507,7 @@ struct SettingsView: View {
                 updateCalendarStatus()
             }
         }
-        .sheet(isPresented: $showPro) {
+        .fullScreenCover(isPresented: $showPro) {
             ProUpgradeView()
         }
         .sheet(isPresented: $showExportShare) {
@@ -499,6 +560,7 @@ struct SettingsView: View {
                 if store.isPro {
                     exportData()
                 } else {
+                    TelemetryService.paywallShown(source: "settings_feature_locked")
                     showPro = true
                 }
             } label: {
@@ -563,67 +625,85 @@ struct SettingsView: View {
 
     private var appearanceSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 Text("Color Theme")
-                    .font(.subheadline)
+                    .font(.subheadline.weight(.semibold))
 
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     ForEach(AppTheme.allCases) { appTheme in
                         let isFreeTheme = appTheme == .defaultAmber || appTheme == .darkMono
                         let isLocked = !store.isPro && !isFreeTheme
+                        let isSelected = selectedTheme == appTheme
                         Button {
                             if isLocked {
+                                TelemetryService.paywallShown(source: "settings_theme_locked")
                                 showPro = true
                             } else {
-                                withAnimation(.easeInOut(duration: 0.25)) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                                     selectedTheme = appTheme
                                     ThemeManager.shared.current = appTheme
                                 }
+                                TelemetryService.themeChanged(theme: appTheme.rawValue)
                                 HapticManager.shared.selection()
                             }
                         } label: {
-                            VStack(spacing: 6) {
+                            VStack(spacing: 8) {
                                 ZStack {
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(appTheme.accent.opacity(isLocked ? 0.08 : 0.15))
-                                        .frame(width: 56, height: 56)
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [appTheme.accent.opacity(isLocked ? 0.06 : 0.2), appTheme.accent.opacity(isLocked ? 0.03 : 0.08)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 60, height: 60)
                                     if isLocked {
                                         Image(systemName: "lock.fill")
-                                            .font(.body)
-                                            .foregroundStyle(appTheme.accent.opacity(0.4))
+                                            .font(.body.weight(.medium))
+                                            .foregroundStyle(appTheme.accent.opacity(0.35))
                                     } else {
                                         Image(systemName: appTheme.icon)
-                                            .font(.title3)
+                                            .font(.title3.weight(.medium))
                                             .foregroundStyle(appTheme.accent)
                                     }
                                 }
                                 .overlay {
-                                    if selectedTheme == appTheme {
-                                        RoundedRectangle(cornerRadius: 10)
+                                    if isSelected {
+                                        RoundedRectangle(cornerRadius: 14)
                                             .strokeBorder(appTheme.accent, lineWidth: 2.5)
-                                            .frame(width: 56, height: 56)
+                                            .frame(width: 60, height: 60)
+                                            .shadow(color: appTheme.accent.opacity(0.4), radius: 6, x: 0, y: 0)
                                     }
                                 }
+                                .scaleEffect(isSelected ? 1.05 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.65), value: isSelected)
 
                                 Text(appTheme.rawValue)
-                                    .font(.caption2.weight(.medium))
-                                    .foregroundStyle(selectedTheme == appTheme ? AnyShapeStyle(appTheme.accent) : isLocked ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(isSelected ? AnyShapeStyle(appTheme.accent) : isLocked ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
                                     .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
+                                    .minimumScaleFactor(0.75)
                             }
                             .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("\(appTheme.rawValue) theme\(isLocked ? ", Pro only" : "")")
-                        .accessibilityAddTraits(selectedTheme == appTheme ? .isSelected : [])
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
                     }
                 }
-                .padding(10)
-                .glassBackground(cornerRadius: 14)
+                .padding(12)
+                .glassBackground(cornerRadius: 16)
             }
             .padding(.vertical, 4)
         } header: {
-            Text("Appearance")
+            HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(LinearGradient(colors: theme.headerGradient, startPoint: .top, endPoint: .bottom))
+                    .frame(width: 3, height: 14)
+                Text("Appearance")
+                    .font(.system(.headline, design: .rounded))
+            }
         }
     }
 
@@ -672,7 +752,7 @@ struct SettingsView: View {
 
     private func handleImport(_ result: Result<[URL], Error>) {
         switch result {
-        case .success(let urls):
+        case let .success(urls):
             guard let url = urls.first else { return }
 
             // Start accessing security-scoped resource
@@ -698,7 +778,7 @@ struct SettingsView: View {
             }
             showImportResult = true
 
-        case .failure(let error):
+        case let .failure(error):
             importResult = "Import failed: \(error.localizedDescription)"
             showImportResult = true
         }
@@ -718,13 +798,19 @@ struct SettingsView: View {
 
             // Delete any orphaned records/logs
             let records = try DataManager.fetch(FetchDescriptor<ServiceRecord>(), from: context)
-            for record in records { context.delete(record) }
+            for record in records {
+                context.delete(record)
+            }
 
             let fuelLogs = try DataManager.fetch(FetchDescriptor<FuelLog>(), from: context)
-            for log in fuelLogs { context.delete(log) }
+            for log in fuelLogs {
+                context.delete(log)
+            }
 
             let checklistItems = try DataManager.fetch(FetchDescriptor<MaintenanceChecklistItem>(), from: context)
-            for item in checklistItems { context.delete(item) }
+            for item in checklistItems {
+                context.delete(item)
+            }
 
             try DataManager.save(context)
 

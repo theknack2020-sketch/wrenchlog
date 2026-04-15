@@ -1,10 +1,12 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct AddFuelLogView: View {
     let vehicle: Vehicle
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var date = Date.now
     @State private var mileage = ""
@@ -32,15 +34,50 @@ struct AddFuelLogView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Fuel Type") {
-                    Picker("Type", selection: $fuelType) {
-                        ForEach(FuelType.allCases) { type in
-                            Label(type.rawValue, systemImage: type.icon)
-                                .tag(type)
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Select fuel type")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        FlowLayout(spacing: 8) {
+                            ForEach(FuelType.allCases) { type in
+                                Button {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        fuelType = type
+                                    }
+                                    HapticManager.shared.selection()
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: type.icon)
+                                            .font(.caption.weight(.semibold))
+                                        Text(type.rawValue)
+                                            .font(.caption.weight(.medium))
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        fuelType == type
+                                            ? AnyShapeStyle(type.color.opacity(0.18))
+                                            : AnyShapeStyle(Color(.systemGray6)),
+                                        in: Capsule()
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(fuelType == type ? type.color.opacity(0.4) : .clear, lineWidth: 1.5)
+                                    )
+                                    .foregroundStyle(fuelType == type ? type.color : .primary)
+                                    .scaleEffect(fuelType == type ? 1.03 : 1.0)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(type.rawValue)
+                                .accessibilityAddTraits(fuelType == type ? .isSelected : [])
+                            }
                         }
                     }
-                    .accessibilityLabel("Fuel type: \(fuelType.rawValue)")
-                    .onChange(of: fuelType) { _, _ in HapticManager.shared.selection() }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Fuel Type")
                 }
 
                 Section {
@@ -54,6 +91,8 @@ struct AddFuelLogView: View {
                                 .keyboardType(.numberPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 120)
+                                .accessibilityLabel("Odometer reading")
+                                .accessibilityIdentifier("addFuelMileage")
                                 .onChange(of: mileage) { _, _ in validationError = nil; mileageError = nil }
                         }
                         if let err = mileageError {
@@ -77,6 +116,8 @@ struct AddFuelLogView: View {
                                     .keyboardType(.decimalPad)
                                     .multilineTextAlignment(.trailing)
                                     .frame(width: 80)
+                                    .accessibilityLabel("Fuel volume")
+                                    .accessibilityIdentifier("addFuelVolume")
                                     .onChange(of: volume) { _, _ in
                                         validationError = nil
                                         volumeError = nil
@@ -106,10 +147,13 @@ struct AddFuelLogView: View {
                         HStack {
                             Image(systemName: "info.circle")
                                 .foregroundStyle(.orange)
+                                .accessibilityHidden(true)
                             Text("Partial fills can't calculate efficiency accurately")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Note: Partial fills can't calculate efficiency accurately")
                     }
                 } header: {
                     Text("Fill-Up Details")
@@ -173,14 +217,20 @@ struct AddFuelLogView: View {
 
                 Section("Station (optional)") {
                     TextField("Gas station name", text: $station)
+                        .accessibilityLabel("Gas station name")
+                        .accessibilityIdentifier("addFuelStation")
                 }
 
                 Section("Notes (optional)") {
                     TextField("Any additional details...", text: $notes, axis: .vertical)
-                        .lineLimit(3...6)
+                        .lineLimit(3 ... 6)
+                        .accessibilityLabel("Fuel log notes")
+                        .accessibilityIdentifier("addFuelNotes")
                 }
             }
+            .formStyle(.grouped)
             .scrollDismissesKeyboard(.interactively)
+            .frame(maxWidth: sizeClass == .regular ? 500 : .infinity)
             .navigationTitle("Log Fuel")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -197,19 +247,19 @@ struct AddFuelLogView: View {
                         HapticManager.shared.buttonTap()
                         saveFuelLog()
                     }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color.wrenchAmber, Color(red: 0.85, green: 0.55, blue: 0.05)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                    .fontWeight(.semibold)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [theme.accent, theme.accent.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
                         )
-                        .disabled(isSaving)
-                        .shake(trigger: shakeTrigger)
-                        .accessibilityIdentifier("addFuelLogSave")
-                        .accessibilityLabel("Save fuel log")
-                        .accessibilityHint("Logs this fuel fill-up")
+                    )
+                    .disabled(isSaving)
+                    .shake(trigger: shakeTrigger)
+                    .accessibilityIdentifier("addFuelLogSave")
+                    .accessibilityLabel("Save fuel log")
+                    .accessibilityHint("Logs this fuel fill-up")
                 }
             }
             .onAppear {
@@ -224,6 +274,7 @@ struct AddFuelLogView: View {
                 Text(saveError ?? "An unexpected error occurred.")
             }
         }
+        .smoothSheetTransition()
     }
 
     private func recalcPricePerUnit() {
@@ -281,7 +332,7 @@ struct AddFuelLogView: View {
             if m < 0 {
                 mileageError = "Mileage cannot be negative."
                 hasFieldError = true
-            } else if m > 0 && m < vehicle.currentMileage && vehicle.currentMileage > 0 {
+            } else if m > 0, m < vehicle.currentMileage, vehicle.currentMileage > 0 {
                 mileageError = "Mileage is less than current odometer (\(vehicle.currentMileage.formatted()))."
                 hasFieldError = true
             }
@@ -340,6 +391,7 @@ struct AddFuelLogView: View {
             HapticManager.shared.saveSuccess()
             SoundManager.playSaveSuccess()
             SoftPaywallTracker.shared.recordAction()
+            TelemetryService.fuelLogged()
             dismiss()
         } catch {
             saveError = error.errorDescription

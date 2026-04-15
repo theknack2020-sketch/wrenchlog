@@ -1,6 +1,7 @@
-import SwiftUI
-import SwiftData
 import Charts
+import SwiftData
+import SwiftUI
+import TipKit
 
 // MARK: - Garage Overview Dashboard
 
@@ -36,7 +37,7 @@ struct GarageOverviewView: View {
     private let haptic = HapticManager.shared
     private let retention = RetentionEngine.shared
 
-    // Next service due across all vehicles
+    /// Next service due across all vehicles
     var nextServiceDue: (vehicle: Vehicle, type: String, urgency: ReminderUrgency, text: String)? {
         for vehicle in activeVehicles {
             if let next = ServiceReminderEngine.nextServiceSummary(for: vehicle) {
@@ -74,11 +75,11 @@ struct GarageOverviewView: View {
 
     var overdueCount: Int {
         activeVehicles.reduce(0) { total, v in
-            total + ServiceReminderEngine.reminders(for: v).filter { $0.urgency == .overdue }.count
+            total + ServiceReminderEngine.reminders(for: v).count(where: { $0.urgency == .overdue })
         }
     }
 
-    // Seasonal suggestions
+    /// Seasonal suggestions
     var seasonalSuggestions: [SeasonalSuggestion] {
         SeasonalSuggestionEngine.suggestions(for: activeVehicles)
     }
@@ -86,7 +87,7 @@ struct GarageOverviewView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if activeVehicles.isEmpty && archivedVehicles.isEmpty {
+                if activeVehicles.isEmpty, archivedVehicles.isEmpty {
                     emptyState
                 } else {
                     dashboardList
@@ -97,7 +98,8 @@ struct GarageOverviewView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         haptic.light()
-                        if !store.isPro && activeVehicles.count >= 1 {
+                        if !store.isPro, activeVehicles.count >= 2 {
+                            TelemetryService.paywallShown(source: "garage_add_limit")
                             showProPrompt = true
                         } else {
                             showAddVehicle = true
@@ -113,7 +115,7 @@ struct GarageOverviewView: View {
             .sheet(isPresented: $showAddVehicle) {
                 AddVehicleView()
             }
-            .sheet(isPresented: $showProPrompt) {
+            .fullScreenCover(isPresented: $showProPrompt) {
                 ProUpgradeView()
             }
             .sheet(isPresented: $showSoftPaywall) {
@@ -198,24 +200,56 @@ struct GarageOverviewView: View {
         }
     }
 
-    // MARK: - Empty State
+    // MARK: - Empty State (Premium)
 
     private var emptyState: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 28) {
             Spacer()
 
+            // Large pulsing glow icon
             ZStack {
+                // Outer glow ring — animated pulse
                 Circle()
-                    .fill(theme.accent.opacity(0.1))
+                    .fill(
+                        RadialGradient(
+                            colors: [theme.accent.opacity(0.25), theme.accent.opacity(0.0)],
+                            center: .center,
+                            startRadius: 30,
+                            endRadius: 80
+                        )
+                    )
+                    .frame(width: 160, height: 160)
+                    .scaleEffect(isLoaded ? 1.08 : 0.92)
+                    .opacity(isLoaded ? 0.8 : 0.4)
+                    .animation(
+                        .easeInOut(duration: 2.0).repeatForever(autoreverses: true),
+                        value: isLoaded
+                    )
+
+                // Solid background circle
+                Circle()
+                    .fill(theme.accent.opacity(0.12))
                     .frame(width: 120, height: 120)
+
+                // Inner highlight
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.white.opacity(0.15), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+
                 Image(systemName: "car.side.fill")
-                    .font(.system(.largeTitle, design: .rounded))
+                    .font(.system(.largeTitle, design: .rounded, weight: .medium))
                     .foregroundStyle(theme.accent)
                     .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
             }
             .accessibilityHidden(true)
 
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 Text("Your Garage is Empty")
                     .font(.system(.title2, design: .rounded, weight: .bold))
 
@@ -223,6 +257,7 @@ struct GarageOverviewView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .lineSpacing(2)
 
                 Text("No account needed — your data stays on this device.")
                     .font(.caption)
@@ -231,19 +266,29 @@ struct GarageOverviewView: View {
                     .padding(.top, 2)
             }
 
+            TipView(AddFirstVehicleTip())
+                .padding(.horizontal, 8)
+                .tipBackground(theme.accent.opacity(0.08))
+
+            // Gradient CTA button with shadow
             Button {
                 haptic.buttonTap()
                 showAddVehicle = true
             } label: {
-                Label("Add Vehicle", systemImage: "plus")
+                Label("Add Your First Vehicle", systemImage: "plus")
                     .font(.headline)
-                    .frame(width: 200, height: 50)
+                    .frame(maxWidth: 260, minHeight: 52)
                     .foregroundStyle(.white)
                     .background(
-                        LinearGradient(colors: [theme.accent, theme.accent.opacity(0.8)], startPoint: .leading, endPoint: .trailing),
-                        in: RoundedRectangle(cornerRadius: 14)
+                        LinearGradient(
+                            colors: theme.headerGradient + [theme.accent.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                     )
-                    .shadow(color: theme.accent.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .shadow(color: theme.accent.opacity(0.35), radius: 12, x: 0, y: 6)
+                    .shadow(color: theme.accent.opacity(0.15), radius: 4, x: 0, y: 2)
             }
             .accessibilityLabel("Add your first vehicle")
             .accessibilityHint("Opens a form to add a new vehicle")
@@ -252,6 +297,7 @@ struct GarageOverviewView: View {
 
             Spacer()
         }
+        .padding(.horizontal, 32)
     }
 
     // MARK: - Dashboard List
@@ -262,35 +308,9 @@ struct GarageOverviewView: View {
             if !activeVehicles.isEmpty {
                 Section {
                     VStack(spacing: 0) {
-                        // Gradient header banner
-                        HStack(spacing: 10) {
-                            Image(systemName: "car.2.fill")
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(.white)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Your Garage")
-                                    .font(.system(.subheadline, design: .rounded, weight: .bold))
-                                    .foregroundStyle(.white)
-                                Text("\(activeVehicles.count) vehicle\(activeVehicles.count == 1 ? "" : "s") · \(totalServiceCount) services")
-                                    .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.8))
-                            }
-                            Spacer()
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            LinearGradient(
-                                colors: theme.headerGradient,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .shadow(color: theme.accent.opacity(0.25), radius: 8, x: 0, y: 4)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Your garage: \(activeVehicles.count) vehicles, \(totalServiceCount) services")
-                        .padding(.bottom, 10)
+                        // Premium gradient header banner — 3-color with radial glow
+                        premiumHeaderBanner
+                            .padding(.bottom, 12)
 
                         fleetSummaryCard
 
@@ -320,32 +340,26 @@ struct GarageOverviewView: View {
                             seasonalRow(suggestion)
                         }
                     }
+                    .accessibilityLabel("Seasonal maintenance tips, \(seasonalSuggestions.count) suggestions")
                 }
             }
 
-            // Vehicles
+            // Vehicles — adaptive grid for iPad
             Section {
-                ForEach(Array(activeVehicles.enumerated()), id: \.element.id) { index, vehicle in
-                    GarageVehicleCard(vehicle: vehicle)
-                        .heroTransitionSource(id: vehicle.id, in: heroNamespace)
-                        .contentShape(Rectangle())
-                        .springStaggeredAppear(index: index, offsetY: 16)
-                        .scalePressEffect()
-                        .onTapGesture {
-                            haptic.cardPress()
-                            SoundManager.playTransition()
-                            selectedVehicle = vehicle
-                        }
-                }
+                vehicleCardGrid
 
                 // Pro upsell (inline)
-                if !store.isPro && activeVehicles.count >= 1 {
-                    Button { haptic.buttonTap(); showProPrompt = true } label: {
+                if !store.isPro, activeVehicles.count >= 2 {
+                    Button {
+                        haptic.buttonTap()
+                        TelemetryService.paywallShown(source: "garage_inline_upsell")
+                        showProPrompt = true
+                    } label: {
                         HStack {
                             Image(systemName: "crown.fill")
                                 .foregroundStyle(theme.accent)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Free: 1 vehicle")
+                                Text("Free: 2 vehicles")
                                     .font(.subheadline.weight(.medium))
                                 Text("Upgrade to Pro for unlimited vehicles, analytics, PDF export & more")
                                     .font(.caption)
@@ -463,7 +477,7 @@ struct GarageOverviewView: View {
             }
 
             // Archived vehicles
-            let soldVehicles = archivedVehicles.filter { $0.isSold }
+            let soldVehicles = archivedVehicles.filter(\.isSold)
             if !soldVehicles.isEmpty {
                 Section("Sold Vehicles") {
                     ForEach(soldVehicles) { vehicle in
@@ -517,64 +531,219 @@ struct GarageOverviewView: View {
         .listStyle(.insetGrouped)
     }
 
-    // MARK: - Fleet Summary Card
+    // MARK: - Premium Header Banner
+
+    private var premiumHeaderBanner: some View {
+        ZStack {
+            // 3-color gradient background
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            theme.headerGradient[0],
+                            theme.headerGradient.count > 1 ? theme.headerGradient[1] : theme.accent,
+                            theme.accent.opacity(0.6),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            // Subtle radial glow overlay
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    RadialGradient(
+                        colors: [.white.opacity(0.15), .clear],
+                        center: .topLeading,
+                        startRadius: 0,
+                        endRadius: 180
+                    )
+                )
+
+            // Inner highlight at top edge
+            VStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.white.opacity(0.08))
+                    .frame(height: 1)
+                    .padding(.horizontal, 1)
+                Spacer()
+            }
+
+            // Content
+            HStack(spacing: 12) {
+                // Icon with circle background
+                ZStack {
+                    Circle()
+                        .fill(.white.opacity(0.15))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: "car.2.fill")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Your Garage")
+                        .font(.system(.headline, design: .rounded, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("\(activeVehicles.count) vehicle\(activeVehicles.count == 1 ? "" : "s") · \(totalServiceCount) services")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+        }
+        .frame(minHeight: 64)
+        .shadow(color: theme.accent.opacity(0.3), radius: 10, x: 0, y: 5)
+        .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Your garage: \(activeVehicles.count) vehicles, \(totalServiceCount) services")
+    }
+
+    // MARK: - Fleet Summary Card (Premium Stats)
 
     private var fleetSummaryCard: some View {
-        HStack(spacing: 8) {
-            summaryStatCard(
+        let compactCount = overdueCount > 0 ? 4 : 3
+        let regularCount = overdueCount > 0 ? 4 : 4
+        let columns: [GridItem] = Array(
+            repeating: GridItem(.flexible(), spacing: sizeClass == .regular ? 12 : 8),
+            count: sizeClass == .regular ? regularCount : compactCount
+        )
+
+        return LazyVGrid(columns: columns, spacing: 8) {
+            premiumStatCard(
                 title: "Vehicles",
                 value: "\(activeVehicles.count)",
                 icon: "car.2.fill",
-                color: .wrenchAmber
+                color: theme.accent
             )
             .statPop(index: 0)
-            summaryStatCard(
+
+            premiumStatCard(
                 title: "Services",
                 value: "\(totalServiceCount)",
                 icon: "wrench.fill",
                 color: .catEngine
             )
             .statPop(index: 1)
-            summaryStatCard(
+
+            premiumStatCard(
                 title: "Total Cost",
                 value: settings.formatCost(totalCost),
                 icon: "dollarsign.circle.fill",
                 color: .catTires
             )
             .statPop(index: 2)
+
             if overdueCount > 0 {
-                summaryStatCard(
+                premiumStatCard(
                     title: "Overdue",
                     value: "\(overdueCount)",
                     icon: "exclamationmark.triangle.fill",
-                    color: .wrenchRed
+                    color: Color.Status.error.shade500
                 )
                 .statPop(index: 3)
             }
         }
     }
 
-    private func summaryStatCard(title: String, value: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundStyle(color)
+    private func premiumStatCard(title: String, value: String, icon: String, color: Color) -> some View {
+        VStack(spacing: 6) {
+            // Icon in circle background
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.12))
+                    .frame(width: 28, height: 28)
+                Image(systemName: icon)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(color)
+            }
+
             Text(value)
-                .font(.caption2.weight(.bold).monospacedDigit())
+                .font(.system(.callout, design: .rounded, weight: .bold).monospacedDigit())
                 .contentTransition(.numericText())
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.6)
+
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: color.opacity(0.15), radius: 4, x: 0, y: 2)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
+        .background {
+            // Double-layer depth: outer material + inner shadow
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.ultraThinMaterial)
+
+                // Inner shadow for depth
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(.black.opacity(0.04), lineWidth: 1)
+
+                // Top inner highlight
+                VStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(.white.opacity(0.08))
+                        .frame(height: 0.5)
+                        .padding(.horizontal, 1)
+                    Spacer()
+                }
+            }
+        }
+        .shadow(color: color.opacity(0.12), radius: 6, x: 0, y: 3)
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
+    }
+
+    // MARK: - Vehicle Card Grid (iPad Adaptive)
+
+    @ViewBuilder
+    private var vehicleCardGrid: some View {
+        if sizeClass == .regular, activeVehicles.count > 1 {
+            // iPad: 2-column grid
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12),
+                ],
+                spacing: 12
+            ) {
+                ForEach(Array(activeVehicles.enumerated()), id: \.element.id) { index, vehicle in
+                    Button {
+                        haptic.cardPress()
+                        SoundManager.playTransition()
+                        selectedVehicle = vehicle
+                    } label: {
+                        GarageVehicleCard(vehicle: vehicle)
+                            .heroTransitionSource(id: vehicle.id, in: heroNamespace)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressableButtonStyle())
+                    .springStaggeredAppear(index: index, offsetY: 16)
+                    .accessibilityHint("Double tap to view vehicle details")
+                }
+            }
+        } else {
+            // iPhone: single-column
+            ForEach(Array(activeVehicles.enumerated()), id: \.element.id) { index, vehicle in
+                Button {
+                    haptic.cardPress()
+                    SoundManager.playTransition()
+                    selectedVehicle = vehicle
+                } label: {
+                    GarageVehicleCard(vehicle: vehicle)
+                        .heroTransitionSource(id: vehicle.id, in: heroNamespace)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableButtonStyle())
+                .springStaggeredAppear(index: index, offsetY: 16)
+                .accessibilityHint("Double tap to view vehicle details")
+            }
+        }
     }
 
     // MARK: - Next Service Banner
@@ -680,7 +849,7 @@ struct GarageOverviewView: View {
             }
             .chartForegroundStyleScale([
                 "Services": Color.catEngine,
-                "Fuel": Color.catFuel
+                "Fuel": Color.catFuel,
             ])
             .chartYAxis {
                 AxisMarks(position: .leading) { value in
@@ -711,19 +880,20 @@ struct GarageOverviewView: View {
 
     private func colorForUrgency(_ urgency: ReminderUrgency) -> Color {
         switch urgency {
-        case .ok: .wrenchGreen
-        case .dueSoon: .wrenchYellow
-        case .due: .wrenchAmber
-        case .overdue: .wrenchRed
+        case .ok: Color.Status.success.shade500
+        case .dueSoon: Color.Status.warning.shade500
+        case .due: theme.accent
+        case .overdue: Color.Status.error.shade500
         }
     }
 }
 
-// MARK: - Garage Vehicle Card
+// MARK: - Garage Vehicle Card (Premium Double-Bezel)
 
 struct GarageVehicleCard: View {
     let vehicle: Vehicle
     @Environment(\.appTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     private let settings = UserSettings.shared
     private let vehiclePhotoManager = VehiclePhotoManager.shared
 
@@ -737,7 +907,7 @@ struct GarageVehicleCard: View {
 
     var totalCost: Double {
         vehicle.safeServiceRecords.reduce(0) { $0 + $1.cost } +
-        vehicle.safeFuelLogs.reduce(0) { $0 + $1.totalCost }
+            vehicle.safeFuelLogs.reduce(0) { $0 + $1.totalCost }
     }
 
     var nextService: (type: String, urgency: ReminderUrgency, text: String)? {
@@ -756,69 +926,59 @@ struct GarageVehicleCard: View {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            // Vehicle image / health ring
-            ZStack {
-                ProgressRing(
-                    progress: Double(healthScore) / 100.0,
-                    lineWidth: 4,
-                    color: healthColor
-                )
-                .frame(width: 56, height: 56)
-
-                if let uiImage = vehicleImage {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 44, height: 44)
-                        .clipShape(Circle())
-                        .accessibilityLabel("\(vehicle.displayName) photo")
-                } else {
-                    Image(systemName: "car.fill")
-                        .font(.title3)
-                        .foregroundStyle(healthColor)
-                        .accessibilityHidden(true)
-                }
+        // Outer shell — the "tray"
+        VStack(spacing: 0) {
+            // Hero image section or vehicle icon header
+            if let uiImage = vehicleImage {
+                vehicleHeroImage(uiImage)
+            } else {
+                vehicleIconHeader
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(vehicle.displayName)
-                    .font(.subheadline.weight(.semibold))
+            // Inner core — vehicle details
+            VStack(alignment: .leading, spacing: 8) {
+                // Name + health ring row
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(vehicle.displayName)
+                            .font(.system(.subheadline, design: .rounded, weight: .bold))
 
-                HStack(spacing: 8) {
-                    Text(settings.formatMileage(vehicle.currentMileage))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            Text(settings.formatMileage(vehicle.currentMileage))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
 
-                    // Health badge
-                    HStack(spacing: 3) {
-                        Image(systemName: healthScore >= 80 ? "heart.fill" : healthScore >= 50 ? "heart" : "heart.slash")
-                            .font(.caption2)
-                        Text("\(healthScore)%")
-                            .font(.caption2.weight(.medium).monospacedDigit())
+                            if !vehicle.licensePlate.isEmpty {
+                                Text("· \(vehicle.licensePlate)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
                     }
-                    .foregroundStyle(healthColor)
 
-                    // License plate
-                    if !vehicle.licensePlate.isEmpty {
-                        Text("· \(vehicle.licensePlate)")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
+                    Spacer()
+
+                    // Prominent health score ring
+                    healthRing
                 }
 
                 // Cost summary
                 if totalCost > 0 {
-                    Text("Total: \(settings.formatCost(totalCost))")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                    HStack(spacing: 6) {
+                        Image(systemName: "creditcard.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text("Total: \(settings.formatCost(totalCost))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 // Service urgency badge
                 if let next = nextService {
                     HStack(spacing: 4) {
                         DueSoonBadge(urgency: next.urgency)
-                        if !next.text.isEmpty && next.urgency != .ok {
+                        if !next.text.isEmpty, next.urgency != .ok {
                             Text("· \(next.type)")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -827,44 +987,167 @@ struct GarageVehicleCard: View {
                     }
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
 
-            Spacer()
+            // Footer bar — service count + chevron
+            HStack {
+                let count = vehicle.safeServiceRecords.count
+                if count > 0 {
+                    Text("\(count) service\(count == 1 ? "" : "s")")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(theme.accent)
+                }
 
-            let count = vehicle.safeServiceRecords.count
-            if count > 0 {
-                Text("\(count)")
-                    .font(.caption2.weight(.bold))
-                    .contentTransition(.numericText())
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(theme.accent.opacity(0.15), in: Capsule())
-                    .foregroundStyle(theme.accent)
-                    .accessibilityLabel("\(count) services")
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
-
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .accessibilityHidden(true)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 10)
         }
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
-                .shadow(color: healthColor.opacity(0.15), radius: 8, x: 0, y: 4)
+        // Outer shell styling — double-bezel architecture
+        .background {
+            ZStack {
+                // Outer shell background
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(colorScheme == .dark
+                        ? Color(.systemGray6).opacity(0.5)
+                        : Color(.systemBackground))
+
+                // Inner highlight — top edge light
+                VStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.white.opacity(colorScheme == .dark ? 0.06 : 0.8))
+                        .frame(height: 0.5)
+                        .padding(.horizontal, 0.5)
+                    Spacer()
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        // Outer border — hairline
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(
+                    colorScheme == .dark
+                        ? .white.opacity(0.08)
+                        : .black.opacity(0.06),
+                    lineWidth: 0.5
+                )
         )
+        // Health-colored accent line on left
         .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 2)
                 .fill(
-                    LinearGradient(colors: [healthColor.opacity(0.5), healthColor.opacity(0.15)], startPoint: .top, endPoint: .bottom)
+                    LinearGradient(
+                        colors: [healthColor.opacity(0.6), healthColor.opacity(0.15)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                 )
                 .frame(width: 3)
-                .padding(.vertical, 8)
+                .padding(.vertical, 12)
+                .padding(.leading, 2)
         }
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 8, x: 0, y: 4)
+        .shadow(color: healthColor.opacity(0.1), radius: 12, x: 0, y: 6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(vehicle.displayName), health \(healthScore) percent, total cost \(UserSettings.shared.formatCost(totalCost))\(nextService.map { ", next service: \($0.type) \($0.urgency.label)" } ?? "")")
         .accessibilityAddTraits(.isButton)
+    }
+
+    // MARK: - Hero Image (when photo exists)
+
+    private func vehicleHeroImage(_ uiImage: UIImage) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFill()
+                .frame(height: 120)
+                .frame(maxWidth: .infinity)
+                .clipped()
+
+            // Gradient overlay for text readability
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.5)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 16,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 16,
+                style: .continuous
+            )
+        )
+        .accessibilityLabel("\(vehicle.displayName) photo")
+    }
+
+    // MARK: - Vehicle Icon Header (when no photo)
+
+    private var vehicleIconHeader: some View {
+        ZStack {
+            // Branded gradient background
+            LinearGradient(
+                colors: [
+                    healthColor.opacity(0.15),
+                    theme.accent.opacity(0.08),
+                    Color(.systemBackground).opacity(0.01),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(height: 56)
+
+            // Large vehicle icon
+            Image(systemName: "car.fill")
+                .font(.system(.title2, weight: .medium))
+                .foregroundStyle(healthColor.opacity(0.5))
+        }
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 16,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 16,
+                style: .continuous
+            )
+        )
+        .accessibilityHidden(true)
+    }
+
+    // MARK: - Health Score Ring (Prominent)
+
+    private var healthRing: some View {
+        ZStack {
+            // Outer glow
+            Circle()
+                .fill(healthColor.opacity(0.08))
+                .frame(width: 56, height: 56)
+
+            ProgressRing(
+                progress: Double(healthScore) / 100.0,
+                lineWidth: 4.5,
+                color: healthColor
+            )
+            .frame(width: 48, height: 48)
+
+            VStack(spacing: 0) {
+                Text("\(healthScore)")
+                    .font(.system(.caption, design: .rounded, weight: .bold).monospacedDigit())
+                    .foregroundStyle(healthColor)
+                Text("%")
+                    .font(.system(.caption2, design: .rounded, weight: .medium))
+                    .foregroundStyle(healthColor.opacity(0.7))
+            }
+        }
+        .accessibilityLabel("Health score \(healthScore) percent")
     }
 }
 
@@ -875,7 +1158,7 @@ private extension View {
     @ViewBuilder
     func heroTransitionSource(id: some Hashable, in namespace: Namespace.ID) -> some View {
         if #available(iOS 18.0, *) {
-            self.matchedTransitionSource(id: id, in: namespace)
+            matchedTransitionSource(id: id, in: namespace)
         } else {
             self
         }
@@ -885,7 +1168,7 @@ private extension View {
     @ViewBuilder
     func heroZoomTransition(id: some Hashable, in namespace: Namespace.ID) -> some View {
         if #available(iOS 18.0, *) {
-            self.navigationTransition(.zoom(sourceID: id, in: namespace))
+            navigationTransition(.zoom(sourceID: id, in: namespace))
         } else {
             self
         }

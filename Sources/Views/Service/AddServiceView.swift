@@ -1,7 +1,8 @@
-import SwiftUI
-import SwiftData
 import PhotosUI
 import StoreKit
+import SwiftData
+import SwiftUI
+import TipKit
 
 struct AddServiceView: View {
     let vehicle: Vehicle
@@ -9,6 +10,7 @@ struct AddServiceView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var selectedType: ServiceType = .oilChange
     @State private var customTypeName = ""
@@ -49,385 +51,396 @@ struct AddServiceView: View {
         NavigationStack {
             ZStack {
                 Form {
-                // MARK: - Service Type (Grouped by Category)
-                Section {
-                    customServiceToggleRow
+                    // MARK: - Service Type (Grouped by Category)
 
-                    if isCustom {
+                    Section {
+                        customServiceToggleRow
+
+                        if isCustom {
+                            VStack(alignment: .leading, spacing: 4) {
+                                TextField("Service name", text: $customTypeName)
+                                    .accessibilityLabel("Custom service name")
+                                    .onChange(of: customTypeName) { _, _ in serviceTypeError = nil; validationError = nil }
+                                if let err = serviceTypeError {
+                                    Text(err)
+                                        .font(.caption2)
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                            .listRowBackground(
+                                serviceTypeError != nil
+                                    ? Color.red.opacity(0.06)
+                                    : Color(.secondarySystemGroupedBackground)
+                            )
+                        } else {
+                            // Service type button with category preview
+                            Button {
+                                showTypePicker = true
+                            } label: {
+                                HStack(spacing: 0) {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(selectedType.color)
+                                        .frame(width: 4, height: 36)
+                                        .padding(.trailing, 10)
+                                    Image(systemName: selectedType.uniqueIcon)
+                                        .foregroundStyle(selectedType.color)
+                                        .frame(width: 24)
+                                        .accessibilityHidden(true)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(selectedType.rawValue)
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(.primary)
+                                        Text(selectedType.category.rawValue)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .padding(.leading, 8)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                        .accessibilityHidden(true)
+                                }
+                            }
+                            .accessibilityLabel("Service type: \(selectedType.rawValue)")
+                            .accessibilityHint("Double tap to choose a different service type")
+                            .pressable()
+                        }
+                    } header: {
+                        Text("Service Type")
+                            .font(.system(.headline, design: .rounded))
+                    }
+
+                    // MARK: - Details
+
+                    Section {
+                        DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date)
+                            .accessibilityLabel("Service date")
+                            .accessibilityHint("When the service was performed")
+                            .accessibilityIdentifier("addServiceDate")
+
                         VStack(alignment: .leading, spacing: 4) {
-                            TextField("Service name", text: $customTypeName)
-                                .accessibilityLabel("Custom service name")
-                                .onChange(of: customTypeName) { _, _ in serviceTypeError = nil; validationError = nil }
-                            if let err = serviceTypeError {
+                            HStack {
+                                Text("Mileage")
+                                Spacer()
+                                TextField(UserSettings.shared.distanceUnit.label, text: $mileage)
+                                    .keyboardType(.numberPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 120)
+                                    .accessibilityLabel("Odometer reading at service")
+                                    .accessibilityHint("Enter mileage when service was done")
+                                    .onChange(of: mileage) { _, _ in mileageFieldError = nil; validationError = nil }
+                            }
+                            if let err = mileageFieldError {
                                 Text(err)
                                     .font(.caption2)
                                     .foregroundStyle(.red)
                             }
                         }
                         .listRowBackground(
-                            serviceTypeError != nil
+                            mileageFieldError != nil
                                 ? Color.red.opacity(0.06)
                                 : Color(.secondarySystemGroupedBackground)
                         )
-                    } else {
-                        // Service type button with category preview
-                        Button {
-                            showTypePicker = true
-                        } label: {
-                            HStack(spacing: 0) {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(selectedType.color)
-                                    .frame(width: 4, height: 36)
-                                    .padding(.trailing, 10)
-                                Image(systemName: selectedType.uniqueIcon)
-                                    .foregroundStyle(selectedType.color)
-                                    .frame(width: 24)
-                                    .accessibilityHidden(true)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(selectedType.rawValue)
-                                        .font(.subheadline.weight(.medium))
-                                        .foregroundStyle(.primary)
-                                    Text(selectedType.category.rawValue)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.leading, 8)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                                    .accessibilityHidden(true)
-                            }
-                        }
-                        .accessibilityLabel("Service type: \(selectedType.rawValue)")
-                        .accessibilityHint("Double tap to choose a different service type")
-                        .pressable()
-                    }
-                } header: {
-                    Text("Service Type")
-                        .font(.system(.headline, design: .rounded))
-                }
 
-                // MARK: - Details
-                Section {
-                    DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date)
-                        .accessibilityLabel("Service date")
-                        .accessibilityHint("When the service was performed")
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Mileage")
-                            Spacer()
-                            TextField(UserSettings.shared.distanceUnit.label, text: $mileage)
-                                .keyboardType(.numberPad)
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 120)
-                                .accessibilityLabel("Odometer reading at service")
-                                .accessibilityHint("Enter mileage when service was done")
-                                .onChange(of: mileage) { _, _ in mileageFieldError = nil; validationError = nil }
-                        }
-                        if let err = mileageFieldError {
-                            Text(err)
-                                .font(.caption2)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    .listRowBackground(
-                        mileageFieldError != nil
-                            ? Color.red.opacity(0.06)
-                            : Color(.secondarySystemGroupedBackground)
-                    )
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Cost")
-                            Spacer()
-                            HStack(spacing: 2) {
-                                Text(UserSettings.shared.currency.symbol)
-                                    .foregroundStyle(.secondary)
-                                TextField("0.00", text: $cost)
-                                    .keyboardType(.decimalPad)
-                                    .multilineTextAlignment(.trailing)
-                                    .frame(width: 100)
-                                    .accessibilityLabel("Service cost in \(UserSettings.shared.currency.symbol)")
-                                    .onChange(of: cost) { _, _ in costFieldError = nil; validationError = nil }
-                            }
-                        }
-                        if let err = costFieldError {
-                            Text(err)
-                                .font(.caption2)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    .listRowBackground(
-                        costFieldError != nil
-                            ? Color.red.opacity(0.06)
-                            : Color(.secondarySystemGroupedBackground)
-                    )
-                }
-
-                // MARK: - Notes
-                Section("Notes (optional)") {
-                    TextField("Any additional details...", text: $notes, axis: .vertical)
-                        .lineLimit(3...6)
-                        .accessibilityLabel("Service notes")
-                }
-
-                // MARK: - Shop / Service Provider
-                Section {
-                    HStack {
-                        Image(systemName: "building.2.fill")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 24)
-                            .accessibilityHidden(true)
-                        TextField("Shop or mechanic name", text: $shopName)
-                            .accessibilityLabel("Service provider name")
-                            .accessibilityHint("Who performed the service")
-                    }
-
-                    if !recentShops.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(recentShops, id: \.self) { shop in
-                                    Button {
-                                        shopName = shop
-                                    } label: {
-                                        Text(shop)
-                                            .font(.caption)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 5)
-                                            .background(shopName == shop ? theme.accent.opacity(0.2) : Color(.systemGray6))
-                                            .foregroundStyle(shopName == shop ? theme.accent : .primary)
-                                            .clipShape(Capsule())
-                                    }
-                                    .accessibilityLabel("Select \(shop)")
-                                    .accessibilityAddTraits(shopName == shop ? .isSelected : [])
-                                }
-                            }
-                            .padding(.vertical, 2)
-                        }
-                    }
-                } header: {
-                    Text("Service Provider")
-                }
-
-                // MARK: - Parts Used
-                Section {
-                    // Suggested parts chips (from service type)
-                    if !isCustom {
-                        let suggestions = selectedType.recommendedParts.filter { !partsUsed.contains($0) }
-                        if !suggestions.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Suggested parts")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                FlowLayout(spacing: 6) {
-                                    ForEach(suggestions, id: \.self) { part in
-                                        Button {
-                                            withAnimation(.snappy(duration: 0.2)) {
-                                                partsUsed.append(part)
-                                            }
-                                        } label: {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "plus.circle.fill")
-                                                    .font(.caption2)
-                                                Text(part)
-                                                    .font(.caption)
-                                            }
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 5)
-                                            .background(Color(.systemGray6))
-                                            .foregroundStyle(.primary)
-                                            .clipShape(Capsule())
-                                        }
-                                        .accessibilityLabel("Add \(part)")
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Added parts
-                    ForEach(partsUsed, id: \.self) { part in
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                                .font(.caption)
-                            Text(part)
-                                .font(.subheadline)
-                            Spacer()
-                            Button {
-                                withAnimation(.snappy(duration: 0.2)) {
-                                    partsUsed.removeAll { $0 == part }
-                                }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
-                                    .font(.caption)
-                            }
-                            .accessibilityLabel("Remove \(part)")
-                        }
-                    }
-
-                    // Custom part entry
-                    HStack {
-                        Image(systemName: "wrench.fill")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 24)
-                            .accessibilityHidden(true)
-                        TextField("Add custom part...", text: $newPartText)
-                            .onSubmit { addCustomPart() }
-                            .accessibilityLabel("Custom part name")
-                        if !newPartText.trimmingCharacters(in: .whitespaces).isEmpty {
-                            Button {
-                                addCustomPart()
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .foregroundStyle(theme.accent)
-                            }
-                            .accessibilityLabel("Add part")
-                        }
-                    }
-                } header: {
-                    Text("Parts Used")
-                } footer: {
-                    Text("Track parts and products for warranty and reorder reference.")
-                }
-
-                // MARK: - Oil Type (contextual)
-                if !isCustom && selectedType.involvesOil || isCustom {
-                    Section {
-                        Button {
-                            showOilTypePicker = true
-                        } label: {
+                        VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Image(systemName: "drop.fill")
-                                    .foregroundStyle(.blue)
-                                    .frame(width: 24)
-                                    .accessibilityHidden(true)
-                                if oilType.isEmpty {
-                                    Text("Select oil type")
-                                        .foregroundStyle(.secondary)
-                                } else {
-                                    Text(oilType)
-                                        .foregroundStyle(.primary)
-                                }
+                                Text("Cost")
                                 Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                                    .accessibilityHidden(true)
+                                HStack(spacing: 2) {
+                                    Text(UserSettings.shared.currency.symbol)
+                                        .foregroundStyle(.secondary)
+                                    TextField("0.00", text: $cost)
+                                        .keyboardType(.decimalPad)
+                                        .multilineTextAlignment(.trailing)
+                                        .frame(width: 100)
+                                        .accessibilityLabel("Service cost in \(UserSettings.shared.currency.symbol)")
+                                        .onChange(of: cost) { _, _ in costFieldError = nil; validationError = nil }
+                                }
+                            }
+                            if let err = costFieldError {
+                                Text(err)
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
                             }
                         }
-                        .accessibilityLabel("Oil type: \(oilType.isEmpty ? "not set" : oilType)")
-                        .accessibilityHint("Select the oil type or specification used")
-
-                        if !oilType.isEmpty {
-                            Button(role: .destructive) {
-                                oilType = ""
-                            } label: {
-                                Text("Clear oil type")
-                                    .font(.caption)
-                            }
-                            .accessibilityLabel("Clear selected oil type")
-                        }
-                    } header: {
-                        Text("Oil / Fluid Type")
+                        .listRowBackground(
+                            costFieldError != nil
+                                ? Color.red.opacity(0.06)
+                                : Color(.secondarySystemGroupedBackground)
+                        )
                     }
-                }
 
-                // MARK: - Photos (Pro feature)
-                Section {
-                    if store.isPro {
-                        PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 5, matching: .images) {
-                            Label("Add Photos", systemImage: "camera.fill")
-                                .foregroundStyle(theme.accent)
+                    // MARK: - Notes
+
+                    Section("Notes (optional)") {
+                        TextField("Any additional details...", text: $notes, axis: .vertical)
+                            .lineLimit(3 ... 6)
+                            .accessibilityLabel("Service notes")
+                    }
+
+                    // MARK: - Shop / Service Provider
+
+                    Section {
+                        HStack {
+                            Image(systemName: "building.2.fill")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 24)
+                                .accessibilityHidden(true)
+                            TextField("Shop or mechanic name", text: $shopName)
+                                .accessibilityLabel("Service provider name")
+                                .accessibilityHint("Who performed the service")
                         }
-                        .accessibilityLabel("Add receipt photos")
-                        .accessibilityHint("Attach up to 5 photos")
 
-                        if !photoDataItems.isEmpty {
+                        if !recentShops.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
-                                    ForEach(photoDataItems.indices, id: \.self) { index in
-                                        if let img = UIImage(data: photoDataItems[index]) {
-                                            Image(uiImage: img)
-                                                .resizable()
-                                                .scaledToFill()
-                                                .frame(width: 80, height: 80)
-                                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                                .overlay(alignment: .topTrailing) {
-                                                    Button {
-                                                        photoDataItems.remove(at: index)
-                                                    } label: {
-                                                        Image(systemName: "xmark.circle.fill")
-                                                            .font(.caption)
-                                                            .foregroundStyle(.white, .red)
-                                                    }
-                                                    .offset(x: 4, y: -4)
-                                                    .accessibilityLabel("Remove photo \(index + 1)")
+                                    ForEach(recentShops, id: \.self) { shop in
+                                        Button {
+                                            shopName = shop
+                                        } label: {
+                                            Text(shop)
+                                                .font(.caption)
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 5)
+                                                .background(shopName == shop ? theme.accent.opacity(0.2) : Color(.systemGray6))
+                                                .foregroundStyle(shopName == shop ? theme.accent : .primary)
+                                                .clipShape(Capsule())
+                                        }
+                                        .accessibilityLabel("Select \(shop)")
+                                        .accessibilityAddTraits(shopName == shop ? .isSelected : [])
+                                    }
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    } header: {
+                        Text("Service Provider")
+                    }
+
+                    // MARK: - Parts Used
+
+                    Section {
+                        // Suggested parts chips (from service type)
+                        if !isCustom {
+                            let suggestions = selectedType.recommendedParts.filter { !partsUsed.contains($0) }
+                            if !suggestions.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Suggested parts")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    FlowLayout(spacing: 6) {
+                                        ForEach(suggestions, id: \.self) { part in
+                                            Button {
+                                                withAnimation(.snappy(duration: 0.2)) {
+                                                    partsUsed.append(part)
                                                 }
-                                                .accessibilityLabel("Receipt photo \(index + 1)")
+                                            } label: {
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: "plus.circle.fill")
+                                                        .font(.caption2)
+                                                    Text(part)
+                                                        .font(.caption)
+                                                }
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 5)
+                                                .background(Color(.systemGray6))
+                                                .foregroundStyle(.primary)
+                                                .clipShape(Capsule())
+                                            }
+                                            .accessibilityLabel("Add \(part)")
                                         }
                                     }
                                 }
                             }
                         }
 
-                        // Photo save warnings
-                        if !photoWarnings.isEmpty {
-                            ForEach(photoWarnings, id: \.self) { warning in
-                                HStack(spacing: 6) {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .font(.caption2)
-                                        .foregroundStyle(.orange)
-                                    Text(warning)
+                        // Added parts
+                        ForEach(partsUsed, id: \.self) { part in
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .font(.caption)
+                                Text(part)
+                                    .font(.subheadline)
+                                Spacer()
+                                Button {
+                                    withAnimation(.snappy(duration: 0.2)) {
+                                        partsUsed.removeAll { $0 == part }
+                                    }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
                                         .font(.caption)
-                                        .foregroundStyle(.orange)
+                                }
+                                .accessibilityLabel("Remove \(part)")
+                            }
+                        }
+
+                        // Custom part entry
+                        HStack {
+                            Image(systemName: "wrench.fill")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 24)
+                                .accessibilityHidden(true)
+                            TextField("Add custom part...", text: $newPartText)
+                                .onSubmit { addCustomPart() }
+                                .accessibilityLabel("Custom part name")
+                            if !newPartText.trimmingCharacters(in: .whitespaces).isEmpty {
+                                Button {
+                                    addCustomPart()
+                                } label: {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundStyle(theme.accent)
+                                }
+                                .accessibilityLabel("Add part")
+                            }
+                        }
+                    } header: {
+                        Text("Parts Used")
+                    } footer: {
+                        Text("Track parts and products for warranty and reorder reference.")
+                    }
+
+                    // MARK: - Oil Type (contextual)
+
+                    if !isCustom && selectedType.involvesOil || isCustom {
+                        Section {
+                            Button {
+                                showOilTypePicker = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "drop.fill")
+                                        .foregroundStyle(.blue)
+                                        .frame(width: 24)
+                                        .accessibilityHidden(true)
+                                    if oilType.isEmpty {
+                                        Text("Select oil type")
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Text(oilType)
+                                            .foregroundStyle(.primary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                        .accessibilityHidden(true)
                                 }
                             }
-                        }
-                    } else {
-                        Button {
-                            showProPrompt = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "lock.fill")
-                                    .foregroundStyle(.secondary)
-                                    .accessibilityHidden(true)
-                                Text("Pro feature — attach receipt photos")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .accessibilityLabel("Receipt photos, Pro feature")
-                        .accessibilityHint("Double tap to view Pro upgrade options")
-                    }
-                } header: {
-                    Text("Receipt Photos")
-                }
+                            .accessibilityLabel("Oil type: \(oilType.isEmpty ? "not set" : oilType)")
+                            .accessibilityHint("Select the oil type or specification used")
 
-                // MARK: - Reminder hint
-                if !isCustom && selectedType.defaultMileageInterval > 0 {
-                    Section {
-                        HStack {
-                            Image(systemName: "bell.fill")
-                                .foregroundStyle(theme.accent)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Reminder will be set")
-                                    .font(.subheadline.weight(.medium))
-                                Text("Next: \(selectedType.defaultMileageInterval.formatted()) \(UserSettings.shared.distanceUnit.label) or \(selectedType.defaultMonthInterval) months")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                            if !oilType.isEmpty {
+                                Button(role: .destructive) {
+                                    oilType = ""
+                                } label: {
+                                    Text("Clear oil type")
+                                        .font(.caption)
+                                }
+                                .accessibilityLabel("Clear selected oil type")
                             }
+                        } header: {
+                            Text("Oil / Fluid Type")
                         }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Reminder will be set. Next: \(selectedType.defaultMileageInterval.formatted()) \(UserSettings.shared.distanceUnit.label) or \(selectedType.defaultMonthInterval) months")
                     }
-                }
+
+                    // MARK: - Photos (Pro feature)
+
+                    Section {
+                        if store.isPro {
+                            PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 5, matching: .images) {
+                                Label("Add Photos", systemImage: "camera.fill")
+                                    .foregroundStyle(theme.accent)
+                            }
+                            .accessibilityLabel("Add receipt photos")
+                            .accessibilityHint("Attach up to 5 photos")
+
+                            if !photoDataItems.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(photoDataItems.indices, id: \.self) { index in
+                                            if let img = UIImage(data: photoDataItems[index]) {
+                                                Image(uiImage: img)
+                                                    .resizable()
+                                                    .scaledToFill()
+                                                    .frame(width: 80, height: 80)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                    .overlay(alignment: .topTrailing) {
+                                                        Button {
+                                                            photoDataItems.remove(at: index)
+                                                        } label: {
+                                                            Image(systemName: "xmark.circle.fill")
+                                                                .font(.caption)
+                                                                .foregroundStyle(.white, .red)
+                                                        }
+                                                        .offset(x: 4, y: -4)
+                                                        .accessibilityLabel("Remove photo \(index + 1)")
+                                                    }
+                                                    .accessibilityLabel("Receipt photo \(index + 1)")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Photo save warnings
+                            if !photoWarnings.isEmpty {
+                                ForEach(photoWarnings, id: \.self) { warning in
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(.orange)
+                                        Text(warning)
+                                            .font(.caption)
+                                            .foregroundStyle(.orange)
+                                    }
+                                }
+                            }
+                        } else {
+                            Button {
+                                TelemetryService.paywallShown(source: "add_service_photos")
+                                showProPrompt = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "lock.fill")
+                                        .foregroundStyle(.secondary)
+                                        .accessibilityHidden(true)
+                                    Text("Pro feature — attach receipt photos")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .accessibilityLabel("Receipt photos, Pro feature")
+                            .accessibilityHint("Double tap to view Pro upgrade options")
+                        }
+                    } header: {
+                        Text("Receipt Photos")
+                    }
+
+                    // MARK: - Reminder hint
+
+                    if !isCustom, selectedType.defaultMileageInterval > 0 {
+                        Section {
+                            HStack {
+                                Image(systemName: "bell.fill")
+                                    .foregroundStyle(theme.accent)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Reminder will be set")
+                                        .font(.subheadline.weight(.medium))
+                                    Text("Next: \(selectedType.defaultMileageInterval.formatted()) \(UserSettings.shared.distanceUnit.label) or \(selectedType.defaultMonthInterval) months")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Reminder will be set. Next: \(selectedType.defaultMileageInterval.formatted()) \(UserSettings.shared.distanceUnit.label) or \(selectedType.defaultMonthInterval) months")
+                        }
+                    }
                 } // Form
                 .scrollDismissesKeyboard(.interactively)
+                .frame(maxWidth: sizeClass == .regular ? 500 : .infinity)
 
                 CelebrationOverlay(isShowing: $showCelebration)
             } // ZStack
@@ -447,7 +460,7 @@ struct AddServiceView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showProPrompt) {
+            .fullScreenCover(isPresented: $showProPrompt) {
                 ProUpgradeView()
             }
             .sheet(isPresented: $showTypePicker) {
@@ -481,7 +494,7 @@ struct AddServiceView: View {
         ToolbarItem(placement: .confirmationAction) {
             Button("Save") { saveRecord() }
                 .fontWeight(.semibold)
-                .foregroundStyle(Color.wrenchAmber)
+                .foregroundStyle(theme.accent)
                 .disabled(isSaving)
                 .shake(trigger: shakeTrigger)
                 .accessibilityIdentifier("addServiceSave")
@@ -516,6 +529,7 @@ struct AddServiceView: View {
                 .accessibilityHint("Enable to enter a custom service type")
         } else {
             Button {
+                TelemetryService.paywallShown(source: "add_service_custom_type")
                 showProPrompt = true
             } label: {
                 HStack {
@@ -523,7 +537,7 @@ struct AddServiceView: View {
                     Spacer()
                     Image(systemName: "crown.fill")
                         .font(.caption)
-                        .foregroundStyle(Color.wrenchAmber)
+                        .foregroundStyle(theme.accent)
                 }
             }
             .accessibilityLabel("Custom service, Pro feature")
@@ -541,7 +555,7 @@ struct AddServiceView: View {
         var hasError = false
 
         // Validate custom type name
-        if isCustom && customTypeName.trimmingCharacters(in: .whitespaces).isEmpty {
+        if isCustom, customTypeName.trimmingCharacters(in: .whitespaces).isEmpty {
             serviceTypeError = "Custom service name is required."
             hasError = true
         }
@@ -603,9 +617,9 @@ struct AddServiceView: View {
             photoWarnings = []
             for photoData in photoDataItems {
                 switch photoManager.savePhoto(photoData, for: record.id) {
-                case .success(let fileName):
+                case let .success(fileName):
                     record.photoFileNames.append(fileName)
-                case .failure(let reason):
+                case let .failure(reason):
                     photoWarnings.append(reason)
                 }
             }
@@ -622,6 +636,7 @@ struct AddServiceView: View {
 
         do {
             try DataManager.save(context)
+            FuelTrackingTip.servicesLogged += 1
         } catch {
             saveError = error.errorDescription
             haptic.error()
@@ -649,7 +664,7 @@ struct AddServiceView: View {
         }
 
         let totalServices = vehicle.safeServiceRecords.count
-        if totalServices > 0 && totalServices % 10 == 0 {
+        if totalServices > 0, totalServices % 10 == 0 {
             haptic.celebrate()
             SoundManager.playCelebration()
             showCelebration = true
@@ -664,6 +679,7 @@ struct AddServiceView: View {
 
         // Track action for soft paywall
         SoftPaywallTracker.shared.recordAction()
+        TelemetryService.serviceLogged()
 
         let allServiceCount = (try? context.fetch(FetchDescriptor<ServiceRecord>()))?.count ?? 0
         if allServiceCount == 5 {
@@ -727,7 +743,6 @@ struct ServiceTypePickerView: View {
         }
     }
 
-    @ViewBuilder
     private var standardCategorySections: some View {
         ForEach(filteredCategories, id: \.category) { group in
             Section {
@@ -775,7 +790,7 @@ struct ServiceTypePickerView: View {
 
             Spacer()
 
-            if !isCustom && selectedType == type {
+            if !isCustom, selectedType == type {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(theme.accent)
             }
@@ -800,32 +815,32 @@ struct ServiceTypePickerView: View {
                 .onDelete { indexSet in
                     var types = savedCustomTypes
                     types.remove(atOffsets: indexSet)
-                UserDefaults.standard.set(types, forKey: "wl_custom_service_types")
-            }
+                    UserDefaults.standard.set(types, forKey: "wl_custom_service_types")
+                }
 
-            // Add new custom type inline
-            HStack {
-                Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(theme.accent)
-                    .frame(width: 28)
-                    .accessibilityHidden(true)
-                TextField("Add custom type…", text: $newCustomType)
-                    .onSubmit { addAndSelectCustomType() }
-                    .accessibilityLabel("New custom service type name")
-                if !newCustomType.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Button("Add") { addAndSelectCustomType() }
+                // Add new custom type inline
+                HStack {
+                    Image(systemName: "plus.circle.fill")
                         .foregroundStyle(theme.accent)
-                        .accessibilityLabel("Add custom type")
+                        .frame(width: 28)
+                        .accessibilityHidden(true)
+                    TextField("Add custom type…", text: $newCustomType)
+                        .onSubmit { addAndSelectCustomType() }
+                        .accessibilityLabel("New custom service type name")
+                    if !newCustomType.trimmingCharacters(in: .whitespaces).isEmpty {
+                        Button("Add") { addAndSelectCustomType() }
+                            .foregroundStyle(theme.accent)
+                            .accessibilityLabel("Add custom type")
+                    }
+                }
+            } header: {
+                HStack(spacing: 6) {
+                    Image(systemName: ServiceCategory.custom.icon)
+                        .font(.caption)
+                        .foregroundStyle(ServiceCategory.custom.color)
+                    Text("Custom")
                 }
             }
-        } header: {
-            HStack(spacing: 6) {
-                Image(systemName: ServiceCategory.custom.icon)
-                    .font(.caption)
-                    .foregroundStyle(ServiceCategory.custom.color)
-                Text("Custom")
-            }
-        }
         } // end if store.isPro
     }
 
@@ -840,7 +855,7 @@ struct ServiceTypePickerView: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.primary)
             Spacer()
-            if isCustom && customTypeName == typeName {
+            if isCustom, customTypeName == typeName {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(theme.accent)
             }
@@ -931,12 +946,12 @@ struct OilTypePickerView: View {
 struct FlowLayout: Layout {
     var spacing: CGFloat = 6
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
         let result = layout(proposal: proposal, subviews: subviews)
         return result.size
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
         let result = layout(proposal: proposal, subviews: subviews)
         for (index, origin) in result.origins.enumerated() {
             subviews[index].place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
@@ -952,7 +967,7 @@ struct FlowLayout: Layout {
 
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
-            if x + size.width > maxWidth && x > 0 {
+            if x + size.width > maxWidth, x > 0 {
                 x = 0
                 y += rowHeight + spacing
                 rowHeight = 0
@@ -968,8 +983,8 @@ struct FlowLayout: Layout {
 
 // MARK: - Calendar Preferences Store
 
-struct CalendarStore {
-    nonisolated(unsafe) private static let defaults = UserDefaults.standard
+enum CalendarStore {
+    private nonisolated(unsafe) static let defaults = UserDefaults.standard
 
     static var calendarSyncEnabled: Bool {
         get { defaults.bool(forKey: "wl_calendar_sync_enabled") }

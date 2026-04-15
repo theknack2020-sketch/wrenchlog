@@ -1,8 +1,8 @@
-import Testing
 import Foundation
+import SwiftUI
+import Testing
 @testable import WrenchLog
 
-@Suite("Service Type Tests")
 struct ServiceTypeTests {
     @Test("All 22 service types have a category")
     func allTypesHaveCategory() {
@@ -19,7 +19,9 @@ struct ServiceTypeTests {
     }
 
     @Test("Total service types count is 22")
-    func totalCount() { #expect(ServiceType.allCases.count == 22) }
+    func totalCount() {
+        #expect(ServiceType.allCases.count == 22)
+    }
 
     @Test("Oil change has correct defaults")
     func oilChangeDefaults() {
@@ -34,22 +36,34 @@ struct ServiceTypeTests {
     }
 
     @Test("Each type has an icon")
-    func allIcons() { ServiceType.allCases.forEach { #expect(!$0.icon.isEmpty) } }
+    func allIcons() {
+        ServiceType.allCases.forEach { #expect(!$0.icon.isEmpty) }
+    }
 
     @Test("Engine fluids: 5 types")
-    func engineFluids() { #expect(ServiceType.types(for: .engineFluids).count == 5) }
+    func engineFluids() {
+        #expect(ServiceType.types(for: .engineFluids).count == 5)
+    }
 
     @Test("Tires & brakes: 5 types")
-    func tiresBrakes() { #expect(ServiceType.types(for: .tiresBrakes).count == 5) }
+    func tiresBrakes() {
+        #expect(ServiceType.types(for: .tiresBrakes).count == 5)
+    }
 
     @Test("Filters & belts: 5 types")
-    func filtersBelts() { #expect(ServiceType.types(for: .filtersBelts).count == 5) }
+    func filtersBelts() {
+        #expect(ServiceType.types(for: .filtersBelts).count == 5)
+    }
 
     @Test("Electrical: 3 types")
-    func electrical() { #expect(ServiceType.types(for: .electrical).count == 3) }
+    func electrical() {
+        #expect(ServiceType.types(for: .electrical).count == 3)
+    }
 
     @Test("Inspection: 4 types")
-    func inspection() { #expect(ServiceType.types(for: .inspection).count == 4) }
+    func inspection() {
+        #expect(ServiceType.types(for: .inspection).count == 4)
+    }
 
     @Test("All types with mileage intervals are positive")
     func mileageIntervals() {
@@ -67,7 +81,6 @@ struct ServiceTypeTests {
 }
 
 @MainActor
-@Suite("Unit Formatting Tests")
 struct UnitTests {
     @Test("Mileage with value contains unit label")
     func formatMilesWithValue() {
@@ -123,17 +136,29 @@ struct UnitTests {
     }
 
     @Test("All currencies have symbols")
-    func symbols() { Currency.allCases.forEach { #expect(!$0.symbol.isEmpty) } }
+    func symbols() {
+        Currency.allCases.forEach { #expect(!$0.symbol.isEmpty) }
+    }
 
     @Test("All distance units have labels")
-    func labels() { DistanceUnit.allCases.forEach { #expect(!$0.label.isEmpty) } }
+    func labels() {
+        DistanceUnit.allCases.forEach { #expect(!$0.label.isEmpty) }
+    }
 }
 
-@Suite("Category Tests")
 struct CategoryTests {
-    @Test("All have icons") func icons() { ServiceCategory.allCases.forEach { #expect(!$0.icon.isEmpty) } }
-    @Test("6 categories") func count() { #expect(ServiceCategory.allCases.count == 6) }
-    @Test("Custom exists") func custom() { #expect(ServiceCategory.custom.rawValue == "Custom") }
+    @Test("All have icons") func icons() {
+        ServiceCategory.allCases.forEach { #expect(!$0.icon.isEmpty) }
+    }
+
+    @Test("6 categories") func count() {
+        #expect(ServiceCategory.allCases.count == 6)
+    }
+
+    @Test("Custom exists") func custom() {
+        #expect(ServiceCategory.custom.rawValue == "Custom")
+    }
+
     @Test("All have colors") func colors() {
         for cat in ServiceCategory.allCases {
             // Just accessing .color shouldn't crash
@@ -142,7 +167,6 @@ struct CategoryTests {
     }
 }
 
-@Suite("Vehicle Model Tests")
 struct VehicleTests {
     @Test("Display name format")
     func displayName() {
@@ -176,7 +200,6 @@ struct VehicleTests {
     }
 }
 
-@Suite("Service Record Tests")
 struct ServiceRecordTests {
     @Test("Preset record")
     func preset() {
@@ -228,7 +251,7 @@ struct ServiceRecordTests {
 
     @Test("Record with all fields")
     func fullRecord() {
-        let date = Date(timeIntervalSince1970: 1700000000)
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
         let r = ServiceRecord(serviceType: .brakePads, date: date, mileage: 75000, cost: 350.0, notes: "Front and rear")
         #expect(r.date == date)
         #expect(r.mileage == 75000)
@@ -238,7 +261,6 @@ struct ServiceRecordTests {
     }
 }
 
-@Suite("PDF Export Tests")
 struct PDFTests {
     @MainActor
     @Test("PDF generates non-nil data for vehicle with records")
@@ -266,15 +288,13 @@ struct PDFTests {
 // MARK: - Retention Engine Tests
 
 @MainActor
-@Suite("Retention Engine Tests")
 struct RetentionEngineTests {
-
     /// Clean UserDefaults keys used by RetentionEngine before each test
     private func cleanDefaults() {
         let keys = [
             "wl_streak", "wl_longest_streak", "wl_last_active",
             "wl_total_opens", "wl_install_date", "wl_grace_used_date",
-            "wl_journey_notifs_scheduled"
+            "wl_journey_notifs_scheduled",
         ]
         keys.forEach { UserDefaults.standard.removeObject(forKey: $0) }
     }
@@ -313,12 +333,12 @@ struct RetentionEngineTests {
     }
 
     @Test("journeyMessage returns non-nil for day 1")
-    func journeyMessageDay1() {
+    func journeyMessageDay1() throws {
         cleanDefaults()
         UserDefaults.standard.set(Date(), forKey: "wl_install_date")
         let message = RetentionEngine.shared.journeyMessage
         #expect(message != nil)
-        #expect(message!.contains("Welcome"))
+        #expect(try #require(message?.contains("Welcome")))
         cleanDefaults()
     }
 
@@ -334,12 +354,12 @@ struct RetentionEngineTests {
     }
 
     @Test("streakMessage returns message for streak of 2")
-    func streakMessageForTwo() {
+    func streakMessageForTwo() throws {
         cleanDefaults()
         UserDefaults.standard.set(2, forKey: "wl_streak")
         let msg = RetentionEngine.shared.streakMessage
         #expect(msg != nil)
-        #expect(msg!.contains("2-day"))
+        #expect(try #require(msg?.contains("2-day")))
         cleanDefaults()
     }
 
@@ -372,9 +392,7 @@ struct RetentionEngineTests {
 // MARK: - Soft Paywall Tests
 
 @MainActor
-@Suite("Soft Paywall Tests")
 struct SoftPaywallTests {
-
     /// Reset UserDefaults keys used by SoftPaywallTracker
     private func cleanDefaults() {
         UserDefaults.standard.removeObject(forKey: "wl_lifetime_actions")
@@ -430,9 +448,7 @@ struct SoftPaywallTests {
 // MARK: - Maintenance Score Tests
 
 @MainActor
-@Suite("Maintenance Score Tests")
 struct MaintenanceScoreTests {
-
     @Test("Score for new vehicle with no records is 50")
     func scoreNewVehicle() {
         let v = Vehicle(make: "Test", model: "Car", year: 2024)
@@ -466,21 +482,21 @@ struct MaintenanceScoreTests {
         // Test representative scores from each bucket
         let scores = [0, 20, 39, 40, 59, 60, 79, 80, 100]
         for s in scores {
-            let _ = MaintenanceScoreEngine.color(for: s)
+            _ = MaintenanceScoreEngine.color(for: s)
             // No crash = Color returned successfully
         }
     }
 
-    @Test("color maps high score to wrenchGreen")
+    @Test("color maps high score to success green")
     func colorHighScore() {
         let c = MaintenanceScoreEngine.color(for: 90)
-        #expect(c == .wrenchGreen)
+        #expect(c == Color.Status.success.shade500)
     }
 
-    @Test("color maps low score to wrenchRed")
+    @Test("color maps low score to error red")
     func colorLowScore() {
         let c = MaintenanceScoreEngine.color(for: 20)
-        #expect(c == .wrenchRed)
+        #expect(c == Color.Status.error.shade500)
     }
 
     @Test("label returns correct string for score ranges")
@@ -504,9 +520,7 @@ struct MaintenanceScoreTests {
 // MARK: - Theme Tests
 
 @MainActor
-@Suite("Theme Tests")
 struct ThemeTests {
-
     @Test("5 themes exist")
     func themeCount() {
         #expect(AppTheme.allCases.count == 5)
@@ -515,8 +529,8 @@ struct ThemeTests {
     @Test("Each theme has an accent color")
     func accentColors() {
         for theme in AppTheme.allCases {
-            let _ = theme.accent
-            let _ = theme.accentLight
+            _ = theme.accent
+            _ = theme.accentLight
             // No crash = colors exist
         }
     }
@@ -578,9 +592,7 @@ struct ThemeTests {
 
 // MARK: - Fuel Efficiency Tests
 
-@Suite("Fuel Efficiency Tests")
 struct FuelEfficiencyTests {
-
     @Test("FuelType has EV case")
     func fuelTypeHasEV() {
         #expect(FuelType.allCases.contains(.ev))

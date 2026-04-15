@@ -12,6 +12,7 @@ struct ReminderSettingsView: View {
     @State private var dueSoonDays = ReminderStore.dueSoonThresholdDays
     @FocusState private var isFocused: Bool
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appTheme) private var theme
 
     private let settings = UserSettings.shared
 
@@ -19,42 +20,58 @@ struct ReminderSettingsView: View {
         NavigationStack {
             Form {
                 // MARK: - Master Toggles
+
                 Section {
                     Toggle("Service Reminders", isOn: $remindersEnabled)
+                        .accessibilityLabel("Service reminders")
+                        .accessibilityHint("Toggle to enable or disable all service reminders")
                         .onChange(of: remindersEnabled) { _, val in
                             ReminderStore.remindersEnabled = val
+                            HapticManager.shared.selection()
                         }
                     Toggle("Weekly Mileage Nudge", isOn: $mileageNudge)
+                        .accessibilityLabel("Weekly mileage reminder")
+                        .accessibilityHint("Get a weekly reminder to update your odometer")
                         .onChange(of: mileageNudge) { _, val in
                             ReminderStore.mileageNudgeEnabled = val
+                            HapticManager.shared.selection()
                         }
                 } footer: {
                     Text("Get a weekly reminder to update your odometer for accurate service tracking.")
                 }
+                .staggeredAppear(index: 0)
 
                 // MARK: - Per-Vehicle Toggle
+
                 Section {
                     Toggle("Reminders for \(vehicle.displayName)", isOn: $vehicleRemindersOn)
+                        .accessibilityLabel("Reminders for \(vehicle.displayName)")
+                        .accessibilityHint("Disable to silence all reminders for this vehicle")
                         .onChange(of: vehicleRemindersOn) { _, val in
                             ReminderStore.setVehicleReminderEnabled(val, for: vehicle.id)
+                            HapticManager.shared.selection()
                         }
                 } footer: {
                     Text("Disable to silence all reminders for this vehicle without affecting others.")
                 }
+                .staggeredAppear(index: 1)
 
                 // MARK: - Next Reminder Preview
+
                 if let preview = ServiceReminderEngine.nextReminderPreview(for: vehicle) {
                     Section("Next Reminder") {
                         nextReminderRow(preview)
                     }
+                    .staggeredAppear(index: 2)
                 }
 
                 // MARK: - Driving Pace
+
                 if let pace = ServiceReminderEngine.drivingPace(for: vehicle) {
                     Section("Driving Pace") {
                         HStack {
                             Image(systemName: "gauge.open.with.needle.33percent")
-                                .foregroundStyle(Color.wrenchAmber)
+                                .foregroundStyle(theme.accent)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("~\(Int(pace.milesPerMonth).formatted()) \(settings.distanceUnit.label)/month")
                                     .font(.subheadline.weight(.medium))
@@ -63,19 +80,23 @@ struct ReminderSettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
+                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
                     }
+                    .staggeredAppear(index: 3)
                 }
 
                 // MARK: - Quiet Hours
+
                 Section {
                     Toggle("Quiet Hours", isOn: $quietHoursEnabled)
                         .onChange(of: quietHoursEnabled) { _, val in
                             ReminderStore.quietHoursEnabled = val
+                            HapticManager.shared.selection()
                         }
 
                     if quietHoursEnabled {
                         Picker("From", selection: $quietStart) {
-                            ForEach(0..<24, id: \.self) { hour in
+                            ForEach(0 ..< 24, id: \.self) { hour in
                                 Text(formatHour(hour)).tag(hour)
                             }
                         }
@@ -84,7 +105,7 @@ struct ReminderSettingsView: View {
                         }
 
                         Picker("Until", selection: $quietEnd) {
-                            ForEach(0..<24, id: \.self) { hour in
+                            ForEach(0 ..< 24, id: \.self) { hour in
                                 Text(formatHour(hour)).tag(hour)
                             }
                         }
@@ -101,8 +122,10 @@ struct ReminderSettingsView: View {
                         Text("No notification timing restrictions. Enable to prevent late-night alerts.")
                     }
                 }
+                .staggeredAppear(index: 4)
 
                 // MARK: - Due Soon Threshold
+
                 Section {
                     Picker("Due Soon Threshold", selection: $dueSoonDays) {
                         Text("14 days").tag(14)
@@ -117,16 +140,19 @@ struct ReminderSettingsView: View {
                 } footer: {
                     Text("Services within this window are flagged as \"Due Soon\" with an orange badge.")
                 }
+                .staggeredAppear(index: 5)
 
                 // MARK: - Service Intervals
-                ForEach(ServiceCategory.allCases.filter({ $0 != .custom }), id: \.self) { category in
+
+                ForEach(Array(ServiceCategory.allCases.filter { $0 != .custom }.enumerated()), id: \.element) { categoryIndex, category in
                     let types = ServiceType.types(for: category).filter {
                         $0.defaultMileageInterval > 0 || $0.defaultMonthInterval > 0
                     }
                     if !types.isEmpty {
                         Section(category.rawValue) {
-                            ForEach(types, id: \.self) { serviceType in
+                            ForEach(Array(types.enumerated()), id: \.element) { rowIndex, serviceType in
                                 reminderRow(for: serviceType)
+                                    .staggeredAppear(index: 6 + categoryIndex * 3 + rowIndex)
                             }
                         }
                     }
@@ -134,11 +160,13 @@ struct ReminderSettingsView: View {
 
                 Section {
                     Button("Reset All to Defaults", role: .destructive) {
+                        HapticManager.shared.deleteWarning()
                         ReminderStore.resetOverrides(for: vehicle.id)
                         overrides = [:]
                     }
                 }
             }
+            .smoothSheetTransition()
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Reminders")
             .navigationBarTitleDisplayMode(.inline)
@@ -151,6 +179,7 @@ struct ReminderSettingsView: View {
                                 ReminderStore.setOverride(override, for: vehicle.id, serviceType: st)
                             }
                         }
+                        HapticManager.shared.success()
                         dismiss()
                     }
                     .fontWeight(.semibold)
@@ -285,10 +314,10 @@ struct ReminderSettingsView: View {
 
     private func badgeColor(for urgency: ReminderUrgency) -> Color {
         switch urgency {
-        case .overdue: .wrenchRed
-        case .due: .wrenchAmber
-        case .dueSoon: .wrenchYellow
-        case .ok: .wrenchGreen
+        case .overdue: Color.Status.error.shade500
+        case .due: Color.Status.warning.shade600
+        case .dueSoon: Color.Status.warning.shade400
+        case .ok: Color.Status.success.shade500
         }
     }
 

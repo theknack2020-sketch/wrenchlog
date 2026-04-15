@@ -1,11 +1,12 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct EditServiceView: View {
     @Bindable var record: ServiceRecord
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var date: Date = .now
     @State private var mileage: String = ""
@@ -79,11 +80,12 @@ struct EditServiceView: View {
 
                 Section("Notes") {
                     TextField("Notes...", text: $notes, axis: .vertical)
-                        .lineLimit(3...6)
+                        .lineLimit(3 ... 6)
                         .accessibilityLabel("Service notes")
                 }
 
                 // MARK: - Shop / Service Provider
+
                 Section("Service Provider") {
                     HStack {
                         Image(systemName: "building.2.fill")
@@ -119,6 +121,7 @@ struct EditServiceView: View {
                 }
 
                 // MARK: - Parts Used
+
                 Section {
                     // Suggested parts chips
                     if let serviceType = record.serviceType {
@@ -131,9 +134,10 @@ struct EditServiceView: View {
                                 FlowLayout(spacing: 6) {
                                     ForEach(suggestions, id: \.self) { part in
                                         Button {
-                                            withAnimation(.snappy(duration: 0.2)) {
+                                            withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
                                                 partsUsed.append(part)
                                             }
+                                            HapticManager.shared.light()
                                         } label: {
                                             HStack(spacing: 4) {
                                                 Image(systemName: "plus.circle.fill")
@@ -158,15 +162,16 @@ struct EditServiceView: View {
                     ForEach(partsUsed, id: \.self) { part in
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
+                                .foregroundStyle(Color.Status.success.shade500)
                                 .font(.caption)
                             Text(part)
                                 .font(.subheadline)
                             Spacer()
                             Button {
-                                withAnimation(.snappy(duration: 0.2)) {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
                                     partsUsed.removeAll { $0 == part }
                                 }
+                                HapticManager.shared.light()
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundStyle(.secondary)
@@ -200,6 +205,7 @@ struct EditServiceView: View {
                 }
 
                 // MARK: - Oil Type (contextual)
+
                 if record.serviceType?.involvesOil == true || record.serviceType == nil {
                     Section("Oil / Fluid Type") {
                         Button {
@@ -237,7 +243,9 @@ struct EditServiceView: View {
                     }
                 }
             }
+            .smoothSheetTransition()
             .scrollDismissesKeyboard(.interactively)
+            .frame(maxWidth: sizeClass == .regular ? 500 : .infinity)
             .navigationTitle("Edit Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -249,7 +257,7 @@ struct EditServiceView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { saveChanges() }
                         .fontWeight(.semibold)
-                        .foregroundStyle(Color.wrenchAmber)
+                        .foregroundStyle(theme.accent)
                         .accessibilityIdentifier("editServiceSave")
                         .accessibilityLabel("Save changes")
                         .accessibilityHint("Saves updated service record")
@@ -291,9 +299,10 @@ struct EditServiceView: View {
     private func addCustomPart() {
         let trimmed = newPartText.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty, !partsUsed.contains(trimmed) else { return }
-        withAnimation(.snappy(duration: 0.2)) {
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
             partsUsed.append(trimmed)
         }
+        HapticManager.shared.light()
         newPartText = ""
     }
 

@@ -15,10 +15,10 @@ struct DueSoonBadge: View {
 
     private var color: Color {
         switch urgency {
-        case .overdue: .wrenchRed
-        case .due: .wrenchAmber
-        case .dueSoon: .wrenchYellow
-        case .ok: .wrenchGreen
+        case .overdue: Color.Status.error.shade500
+        case .due: Color.Status.warning.shade600
+        case .dueSoon: Color.Status.warning.shade400
+        case .ok: Color.Status.success.shade500
         }
     }
 
@@ -61,10 +61,10 @@ struct DueSoonDetailBadge: View {
 
     private var color: Color {
         switch urgency {
-        case .overdue: .wrenchRed
-        case .due: .wrenchAmber
-        case .dueSoon: .wrenchYellow
-        case .ok: .wrenchGreen
+        case .overdue: Color.Status.error.shade500
+        case .due: Color.Status.warning.shade600
+        case .dueSoon: Color.Status.warning.shade400
+        case .ok: Color.Status.success.shade500
         }
     }
 

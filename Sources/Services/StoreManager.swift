@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import StoreKit
 
 @Observable @MainActor
@@ -28,7 +29,7 @@ final class StoreManager {
             }
         } catch {
             loadError = "Failed to load products. Check your connection."
-            print("[WrenchLog] Product load error: \(error)")
+            Logger.store.error("Product load failed: \(error)")
         }
         isLoading = false
     }
@@ -36,7 +37,7 @@ final class StoreManager {
     func checkEntitlements() async {
         var foundPro = false
         for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result else { continue }
+            guard case let .verified(transaction) = result else { continue }
             if transaction.productID == Self.lifetimeID || transaction.productID == Self.yearlyID {
                 if transaction.revocationDate == nil {
                     foundPro = true
@@ -48,7 +49,7 @@ final class StoreManager {
 
     private func listenForTransactions() async {
         for await result in Transaction.updates {
-            guard case .verified(let transaction) = result else { continue }
+            guard case let .verified(transaction) = result else { continue }
             await transaction.finish()
             await checkEntitlements()
         }
@@ -57,10 +58,11 @@ final class StoreManager {
     func purchase(_ product: Product) async throws -> Bool {
         let result = try await product.purchase()
         switch result {
-        case .success(let verification):
-            guard case .verified(let transaction) = verification else { return false }
+        case let .success(verification):
+            guard case let .verified(transaction) = verification else { return false }
             await transaction.finish()
             await checkEntitlements()
+            TelemetryService.purchaseCompleted(product: product.id)
             return true
         case .pending, .userCancelled:
             return false
@@ -75,11 +77,16 @@ final class StoreManager {
             await checkEntitlements()
             return isPro
         } catch {
-            print("[WrenchLog] Restore error: \(error)")
+            Logger.store.error("Restore failed: \(error)")
             return false
         }
     }
 
-    var yearlyProduct: Product? { products.first { $0.id == Self.yearlyID } }
-    var lifetimeProduct: Product? { products.first { $0.id == Self.lifetimeID } }
+    var yearlyProduct: Product? {
+        products.first { $0.id == Self.yearlyID }
+    }
+
+    var lifetimeProduct: Product? {
+        products.first { $0.id == Self.lifetimeID }
+    }
 }

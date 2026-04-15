@@ -1,6 +1,6 @@
-import SwiftUI
-import SwiftData
 import Charts
+import SwiftData
+import SwiftUI
 
 // MARK: - Insights View (Cross-Vehicle Statistics & Analytics)
 
@@ -10,10 +10,12 @@ struct InsightsView: View {
     private var vehicles: [Vehicle]
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
     private let settings = UserSettings.shared
     private let store = StoreManager.shared
 
     @State private var chartAnimationProgress: Double = 0
+    @State private var donutScale: CGFloat = 0.4
     @State private var selectedMonthlySpend: MonthlySpend?
     @State private var selectedComplianceVehicle: Vehicle?
     @State private var showProPrompt = false
@@ -56,11 +58,11 @@ struct InsightsView: View {
     private var monthlySpending: [MonthlySpend] {
         let calendar = Calendar.current
         let now = Date()
-        return (0..<12).reversed().map { monthsAgo in
-            let month = calendar.date(byAdding: .month, value: -monthsAgo, to: now)!
+        return (0 ..< 12).reversed().map { monthsAgo in
+            let month = calendar.safeDate(byAdding: .month, value: -monthsAgo, to: now)
             let comps = calendar.dateComponents([.year, .month], from: month)
-            let start = calendar.date(from: comps)!
-            let end = calendar.date(byAdding: .month, value: 1, to: start)!
+            let start = calendar.safeDate(from: comps)
+            let end = calendar.safeDate(byAdding: .month, value: 1, to: start)
 
             let svc = allRecords
                 .filter { $0.date >= start && $0.date < end }
@@ -114,7 +116,7 @@ struct InsightsView: View {
         }
         .sorted { $0.total > $1.total }
         .prefix(8)
-        .map { $0 }
+        .map(\.self)
     }
 
     // MARK: - Maintenance Frequency (services per month)
@@ -122,13 +124,13 @@ struct InsightsView: View {
     private var maintenanceFrequency: [FrequencyPoint] {
         let calendar = Calendar.current
         let now = Date()
-        return (0..<12).reversed().map { monthsAgo in
-            let month = calendar.date(byAdding: .month, value: -monthsAgo, to: now)!
+        return (0 ..< 12).reversed().map { monthsAgo in
+            let month = calendar.safeDate(byAdding: .month, value: -monthsAgo, to: now)
             let comps = calendar.dateComponents([.year, .month], from: month)
-            let start = calendar.date(from: comps)!
-            let end = calendar.date(byAdding: .month, value: 1, to: start)!
+            let start = calendar.safeDate(from: comps)
+            let end = calendar.safeDate(byAdding: .month, value: 1, to: start)
 
-            let count = allRecords.filter { $0.date >= start && $0.date < end }.count
+            let count = allRecords.count(where: { $0.date >= start && $0.date < end })
             return FrequencyPoint(month: start, count: count)
         }
     }
@@ -159,7 +161,7 @@ struct InsightsView: View {
     private var projectedAnnualCost: Double? {
         let calendar = Calendar.current
         let now = Date()
-        let yearStart = calendar.date(from: calendar.dateComponents([.year], from: now))!
+        let yearStart = calendar.safeDate(from: calendar.dateComponents([.year], from: now))
 
         let ytdService = allRecords
             .filter { $0.date >= yearStart }
@@ -209,7 +211,7 @@ struct InsightsView: View {
                 best = effValues.max() ?? avg
                 worst = effValues.min() ?? avg
             case .l100km:
-                best = effValues.min() ?? avg   // lower is better
+                best = effValues.min() ?? avg // lower is better
                 worst = effValues.max() ?? avg
             }
             return VehicleEfficiency(
@@ -271,7 +273,7 @@ struct InsightsView: View {
         vehicles.compactMap { v in
             let reminders = ServiceReminderEngine.reminders(for: v)
             guard !reminders.isEmpty else { return nil }
-            let compliant = reminders.filter { $0.urgency == .ok || $0.urgency == .dueSoon }.count
+            let compliant = reminders.count(where: { $0.urgency == .ok || $0.urgency == .dueSoon })
             let pct = Double(compliant) / Double(reminders.count) * 100.0
             let healthScore = MaintenanceScoreEngine.score(for: v)
             return VehicleComplianceScore(
@@ -281,7 +283,7 @@ struct InsightsView: View {
                 healthScore: healthScore,
                 compliant: compliant,
                 total: reminders.count,
-                overdue: reminders.filter { $0.urgency == .overdue }.count
+                overdue: reminders.count(where: { $0.urgency == .overdue })
             )
         }.sorted { $0.healthScore > $1.healthScore }
     }
@@ -320,6 +322,9 @@ struct InsightsView: View {
             }
             withAnimation(.spring(response: 0.7, dampingFraction: 0.72).delay(0.1)) {
                 chartAnimationProgress = 1.0
+            }
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.65).delay(0.2)) {
+                donutScale = 1.0
             }
         }
     }
@@ -429,7 +434,7 @@ struct InsightsView: View {
             }
         }
         .redacted(reason: isLoaded ? [] : .placeholder)
-        .sheet(isPresented: $showProPrompt) {
+        .fullScreenCover(isPresented: $showProPrompt) {
             ProUpgradeView()
         }
     }
@@ -446,6 +451,7 @@ struct InsightsView: View {
                 proTeaser(title: "Cost of Ownership", icon: "dollarsign.circle.fill", description: "Total ownership costs")
 
                 Button {
+                    TelemetryService.paywallShown(source: "insights_pro_button")
                     showProPrompt = true
                 } label: {
                     HStack(spacing: 6) {
@@ -459,13 +465,13 @@ struct InsightsView: View {
                     .foregroundStyle(.white)
                     .background(
                         LinearGradient(
-                            colors: [Color.wrenchAmber, Color(red: 0.85, green: 0.55, blue: 0.05)],
+                            colors: [theme.accent, Color(red: 0.85, green: 0.55, blue: 0.05)],
                             startPoint: .leading,
                             endPoint: .trailing
                         ),
                         in: RoundedRectangle(cornerRadius: 12)
                     )
-                    .shadow(color: Color.wrenchAmber.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .shadow(color: theme.accent.opacity(0.3), radius: 8, x: 0, y: 4)
                 }
                 .pressable()
                 .accessibilityIdentifier("insightsUnlockPro")
@@ -481,11 +487,11 @@ struct InsightsView: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.wrenchAmber.opacity(0.1))
+                    .fill(theme.accent.opacity(0.1))
                     .frame(width: 36, height: 36)
                 Image(systemName: icon)
                     .font(.subheadline)
-                    .foregroundStyle(Color.wrenchAmber.opacity(0.6))
+                    .foregroundStyle(theme.accent.opacity(0.6))
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -500,7 +506,10 @@ struct InsightsView: View {
                 .foregroundStyle(.tertiary)
         }
         .contentShape(Rectangle())
-        .onTapGesture { showProPrompt = true }
+        .onTapGesture {
+            TelemetryService.paywallShown(source: "insights_locked_card")
+            showProPrompt = true
+        }
     }
 
     // MARK: - Fleet Summary Section
@@ -535,7 +544,13 @@ struct InsightsView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Fleet overview: total spent \(settings.formatCost(totalCost))")
 
-                HStack(spacing: 8) {
+                // iPad: 3x2 grid, iPhone: 3+3 stacked
+                let columns = sizeClass == .regular
+                    ? [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()),
+                       GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+                    : [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+
+                LazyVGrid(columns: columns, spacing: 8) {
                     summaryCard(
                         title: "Total Spent",
                         value: settings.formatCost(totalCost),
@@ -557,9 +572,6 @@ struct InsightsView: View {
                         color: .catTires
                     )
                     .statPop(index: 2)
-                }
-
-                HStack(spacing: 8) {
                     summaryCard(
                         title: "Avg/Service",
                         value: settings.formatCost(averageServiceCost),
@@ -615,7 +627,7 @@ struct InsightsView: View {
                         .foregroundStyle(.secondary)
 
                     let calendar = Calendar.current
-                    let yearStart = calendar.date(from: calendar.dateComponents([.year], from: Date()))!
+                    let yearStart = calendar.safeDate(from: calendar.dateComponents([.year], from: Date()))
                     let ytdTotal = allRecords.filter { $0.date >= yearStart }.reduce(0) { $0 + $1.cost }
                         + allFuelLogs.filter { $0.date >= yearStart }.reduce(0) { $0 + $1.totalCost }
 
@@ -641,14 +653,14 @@ struct InsightsView: View {
                 ZStack {
                     Circle()
                         .fill(yoy.changePercent >= 0
-                              ? Color.wrenchRed.opacity(0.12)
-                              : Color.wrenchGreen.opacity(0.12))
+                            ? Color.Status.error.shade500.opacity(0.12)
+                            : Color.Status.success.shade500.opacity(0.12))
                         .frame(width: 44, height: 44)
                     Image(systemName: yoy.changePercent >= 0
-                          ? "arrow.up.right"
-                          : "arrow.down.right")
+                        ? "arrow.up.right"
+                        : "arrow.down.right")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(yoy.changePercent >= 0 ? Color.wrenchRed : Color.wrenchGreen)
+                        .foregroundStyle(yoy.changePercent >= 0 ? Color.Status.error.shade500 : Color.Status.success.shade500)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -657,11 +669,11 @@ struct InsightsView: View {
                             .font(.subheadline.weight(.semibold))
                         Text(String(format: "%+.1f%%", yoy.changePercent))
                             .font(.caption.weight(.bold).monospacedDigit())
-                            .foregroundStyle(yoy.changePercent >= 0 ? Color.wrenchRed : Color.wrenchGreen)
+                            .foregroundStyle(yoy.changePercent >= 0 ? Color.Status.error.shade500 : Color.Status.success.shade500)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(
-                                (yoy.changePercent >= 0 ? Color.wrenchRed : Color.wrenchGreen).opacity(0.12),
+                                (yoy.changePercent >= 0 ? Color.Status.error.shade500 : Color.Status.success.shade500).opacity(0.12),
                                 in: Capsule()
                             )
                     }
@@ -697,7 +709,7 @@ struct InsightsView: View {
     // MARK: - Monthly Spending Section
 
     private var monthlySpendingSection: some View {
-        Section("Monthly Spending (12 Months)") {
+        Section {
             let hasData = monthlySpending.contains { $0.services > 0 || $0.fuel > 0 }
             if hasData {
                 Chart {
@@ -707,16 +719,30 @@ struct InsightsView: View {
                                 x: .value("Month", item.month, unit: .month),
                                 y: .value("Cost", item.services * chartAnimationProgress)
                             )
-                            .foregroundStyle(Color.catEngine)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.catEngine, Color.catEngine.opacity(0.7)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
                             .position(by: .value("Type", "Services"))
+                            .cornerRadius(3)
                         }
                         if item.fuel > 0 {
                             BarMark(
                                 x: .value("Month", item.month, unit: .month),
                                 y: .value("Cost", item.fuel * chartAnimationProgress)
                             )
-                            .foregroundStyle(Color.catFuel)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.catFuel, Color.catFuel.opacity(0.7)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
                             .position(by: .value("Type", "Fuel"))
+                            .cornerRadius(3)
                         }
                     }
 
@@ -728,14 +754,15 @@ struct InsightsView: View {
                 }
                 .chartForegroundStyleScale([
                     "Services": Color.catEngine,
-                    "Fuel": Color.catFuel
+                    "Fuel": Color.catFuel,
                 ])
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .month, count: 2)) { value in
                         if let date = value.as(Date.self) {
                             AxisValueLabel {
                                 Text(date, format: .dateTime.month(.abbreviated))
-                                    .font(.caption2)
+                                    .font(.system(.caption2, design: .rounded))
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -745,18 +772,34 @@ struct InsightsView: View {
                         if let cost = value.as(Double.self) {
                             AxisValueLabel {
                                 Text(formatCompact(cost))
-                                    .font(.caption2)
+                                    .font(.system(.caption2, design: .rounded))
+                                    .foregroundStyle(.secondary)
                             }
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                                .foregroundStyle(.secondary.opacity(0.2))
                         }
                     }
                 }
                 .chartXSelection(value: $selectedMonthlySpend.animation(.easeInOut(duration: 0.15)))
-                .frame(height: 200)
-                .padding(8)
+                .frame(height: sizeClass == .regular ? 260 : 200)
+                .padding(12)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(.systemBackground).opacity(0.8),
+                                    Color(.secondarySystemBackground).opacity(0.4),
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(.ultraThinMaterial)
+                        )
+                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
                         .shadow(color: .black.opacity(0.04), radius: 2, x: 0, y: 1)
                 )
                 .chartReveal()
@@ -777,7 +820,7 @@ struct InsightsView: View {
                             .foregroundStyle(.secondary)
                         Spacer()
                         Text(settings.formatCost(avg))
-                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .font(.system(.caption, design: .rounded, weight: .bold).monospacedDigit())
                             .foregroundStyle(theme.accent)
                     }
                 }
@@ -785,6 +828,14 @@ struct InsightsView: View {
                 Text("No spending data in the last 12 months")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        } header: {
+            HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(theme.accent)
+                    .frame(width: 3, height: 16)
+                Text("Monthly Spending (12 Months)")
+                    .font(.system(.headline, design: .rounded))
             }
         }
     }
@@ -827,7 +878,7 @@ struct InsightsView: View {
     // MARK: - Category Section
 
     private var categorySection: some View {
-        Section("Spending by Category") {
+        Section {
             Chart(categorySpending) { item in
                 SectorMark(
                     angle: .value("Cost", item.total * chartAnimationProgress),
@@ -838,27 +889,45 @@ struct InsightsView: View {
                 .annotation(position: .overlay) {
                     if item.total / totalServiceCost > 0.08 {
                         Text("\(Int(item.total / totalServiceCost * 100))%")
-                            .font(.caption2.weight(.bold))
+                            .font(.system(.caption2, design: .rounded, weight: .bold))
                             .foregroundStyle(.white)
                     }
                 }
             }
-            .frame(height: 200)
+            .frame(height: sizeClass == .regular ? 240 : 200)
+            .scaleEffect(donutScale)
             .chartReveal()
 
+            // Legend with icon circles + bold values
             ForEach(categorySpending) { item in
                 HStack(spacing: 10) {
-                    Image(systemName: item.category.icon)
-                        .font(.caption)
-                        .foregroundStyle(item.category.color)
-                        .frame(width: 22)
+                    ZStack {
+                        Circle()
+                            .fill(item.category.color.opacity(0.15))
+                            .frame(width: 28, height: 28)
+                        Image(systemName: item.category.icon)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(item.category.color)
+                    }
                     Text(item.category.rawValue)
                         .font(.subheadline)
                     Spacer()
-                    Text(settings.formatCost(item.total))
-                        .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text(settings.formatCost(item.total))
+                            .font(.system(.subheadline, design: .rounded, weight: .semibold).monospacedDigit())
+                        Text("\(Int(item.total / totalServiceCost * 100))%")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
+            }
+        } header: {
+            HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.catEngine)
+                    .frame(width: 3, height: 16)
+                Text("Spending by Category")
+                    .font(.system(.headline, design: .rounded))
             }
         }
     }
@@ -866,33 +935,50 @@ struct InsightsView: View {
     // MARK: - Vehicle Comparison Section
 
     private var vehicleComparisonSection: some View {
-        Section("Cost per Vehicle") {
+        Section {
             Chart(vehicleCosts) { item in
                 BarMark(
                     x: .value("Vehicle", item.name),
                     y: .value("Cost", item.services * chartAnimationProgress)
                 )
-                .foregroundStyle(Color.catEngine)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.catEngine, Color.catEngine.opacity(0.7)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
                 .position(by: .value("Type", "Services"))
+                .cornerRadius(3)
 
                 BarMark(
                     x: .value("Vehicle", item.name),
                     y: .value("Cost", item.fuel * chartAnimationProgress)
                 )
-                .foregroundStyle(Color.catFuel)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.catFuel, Color.catFuel.opacity(0.7)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
                 .position(by: .value("Type", "Fuel"))
+                .cornerRadius(3)
             }
             .chartForegroundStyleScale([
                 "Services": Color.catEngine,
-                "Fuel": Color.catFuel
+                "Fuel": Color.catFuel,
             ])
             .chartYAxis {
                 AxisMarks(position: .leading) { value in
                     if let cost = value.as(Double.self) {
                         AxisValueLabel {
                             Text(formatCompact(cost))
-                                .font(.caption2)
+                                .font(.system(.caption2, design: .rounded))
+                                .foregroundStyle(.secondary)
                         }
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                            .foregroundStyle(.secondary.opacity(0.2))
                     }
                 }
             }
@@ -901,21 +987,33 @@ struct InsightsView: View {
                     if let name = value.as(String.self) {
                         AxisValueLabel {
                             Text(abbreviateVehicleName(name))
-                                .font(.caption2)
+                                .font(.system(.caption2, design: .rounded))
+                                .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
                     }
                 }
             }
-            .frame(height: 200)
+            .frame(height: sizeClass == .regular ? 260 : 200)
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                    .shadow(color: .black.opacity(0.04), radius: 2, x: 0, y: 1)
+            )
             .chartReveal()
 
             ForEach(vehicleCosts) { item in
                 HStack(spacing: 10) {
-                    Image(systemName: "car.fill")
-                        .font(.caption)
-                        .foregroundStyle(theme.accent)
-                        .frame(width: 22)
+                    ZStack {
+                        Circle()
+                            .fill(theme.accent.opacity(0.12))
+                            .frame(width: 28, height: 28)
+                        Image(systemName: "car.fill")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(theme.accent)
+                    }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.name)
                             .font(.subheadline)
@@ -925,9 +1023,17 @@ struct InsightsView: View {
                     }
                     Spacer()
                     Text(settings.formatCost(item.services + item.fuel))
-                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .font(.system(.subheadline, design: .rounded, weight: .bold).monospacedDigit())
                         .foregroundStyle(theme.accent)
                 }
+            }
+        } header: {
+            HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.catTires)
+                    .frame(width: 3, height: 16)
+                Text("Cost per Vehicle")
+                    .font(.system(.headline, design: .rounded))
             }
         }
     }
@@ -943,7 +1049,7 @@ struct InsightsView: View {
                 )
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [Color.catFuel, Color.catFuel.opacity(0.6)],
+                        colors: [Color.catFuel, Color.catFuel.opacity(0.5)],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
@@ -951,7 +1057,7 @@ struct InsightsView: View {
                 .cornerRadius(4)
                 .annotation(position: .trailing, spacing: 4) {
                     Text(String(format: "%.1f", item.average))
-                        .font(.caption2.weight(.bold).monospacedDigit())
+                        .font(.system(.caption2, design: .rounded, weight: .bold).monospacedDigit())
                         .foregroundStyle(Color.catFuel)
                 }
             }
@@ -960,7 +1066,8 @@ struct InsightsView: View {
                     if let v = value.as(Double.self) {
                         AxisValueLabel {
                             Text(String(format: "%.0f", v))
-                                .font(.caption2)
+                                .font(.system(.caption2, design: .rounded))
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -970,7 +1077,8 @@ struct InsightsView: View {
                     if let name = value.as(String.self) {
                         AxisValueLabel {
                             Text(abbreviateVehicleName(name))
-                                .font(.caption2)
+                                .font(.system(.caption2, design: .rounded))
+                                .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
                     }
@@ -980,20 +1088,24 @@ struct InsightsView: View {
 
             ForEach(vehicleEfficiencyComparison) { item in
                 HStack(spacing: 10) {
-                    Image(systemName: "gauge.medium")
-                        .font(.caption)
-                        .foregroundStyle(Color.catFuel)
-                        .frame(width: 22)
+                    ZStack {
+                        Circle()
+                            .fill(Color.catFuel.opacity(0.12))
+                            .frame(width: 28, height: 28)
+                        Image(systemName: "gauge.medium")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Color.catFuel)
+                    }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.name)
                             .font(.subheadline)
                         HStack(spacing: 8) {
                             Label("Best: \(settings.formatEfficiency(item.best))", systemImage: "arrow.up")
                                 .font(.caption2)
-                                .foregroundStyle(Color.wrenchGreen)
+                                .foregroundStyle(Color.Status.success.shade500)
                             Label("Worst: \(settings.formatEfficiency(item.worst))", systemImage: "arrow.down")
                                 .font(.caption2)
-                                .foregroundStyle(Color.wrenchRed)
+                                .foregroundStyle(Color.Status.error.shade500)
                         }
                     }
                     Spacer()
@@ -1003,7 +1115,13 @@ struct InsightsView: View {
                 }
             }
         } header: {
-            Label("Fuel Efficiency Comparison", systemImage: "gauge.open.with.needle.33percent")
+            HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.catFuel)
+                    .frame(width: 3, height: 16)
+                Label("Fuel Efficiency Comparison", systemImage: "gauge.open.with.needle.33percent")
+                    .font(.system(.headline, design: .rounded))
+            }
         }
     }
 
@@ -1061,7 +1179,7 @@ struct InsightsView: View {
     // MARK: - Maintenance Frequency
 
     private var maintenanceFrequencySection: some View {
-        Section("Maintenance Frequency") {
+        Section {
             let hasData = maintenanceFrequency.contains { $0.count > 0 }
             if hasData {
                 Chart(maintenanceFrequency) { point in
@@ -1071,7 +1189,7 @@ struct InsightsView: View {
                     )
                     .foregroundStyle(theme.accent)
                     .interpolationMethod(.catmullRom)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .lineStyle(StrokeStyle(lineWidth: 2.5))
 
                     AreaMark(
                         x: .value("Month", point.month, unit: .month),
@@ -1079,7 +1197,7 @@ struct InsightsView: View {
                     )
                     .foregroundStyle(
                         .linearGradient(
-                            colors: [theme.accent.opacity(0.2), theme.accent.opacity(0.02)],
+                            colors: [theme.accent.opacity(0.25), theme.accent.opacity(0.02)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -1091,14 +1209,15 @@ struct InsightsView: View {
                         y: .value("Count", Double(point.count) * chartAnimationProgress)
                     )
                     .foregroundStyle(theme.accent)
-                    .symbolSize(point.count > 0 ? 30 : 0)
+                    .symbolSize(point.count > 0 ? 36 : 0)
                 }
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .month, count: 2)) { value in
                         if let date = value.as(Date.self) {
                             AxisValueLabel {
                                 Text(date, format: .dateTime.month(.abbreviated))
-                                    .font(.caption2)
+                                    .font(.system(.caption2, design: .rounded))
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -1108,16 +1227,26 @@ struct InsightsView: View {
                         if let count = value.as(Int.self) {
                             AxisValueLabel {
                                 Text("\(count)")
-                                    .font(.caption2)
+                                    .font(.system(.caption2, design: .rounded))
+                                    .foregroundStyle(.secondary)
                             }
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                                .foregroundStyle(.secondary.opacity(0.2))
                         }
                     }
                 }
-                .frame(height: 160)
+                .frame(height: sizeClass == .regular ? 200 : 160)
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(.ultraThinMaterial)
+                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        .shadow(color: .black.opacity(0.04), radius: 2, x: 0, y: 1)
+                )
                 .chartReveal()
 
                 let totalCount = maintenanceFrequency.reduce(0) { $0 + $1.count }
-                let activeMonths = maintenanceFrequency.filter { $0.count > 0 }.count
+                let activeMonths = maintenanceFrequency.count(where: { $0.count > 0 })
                 let avgPerMonth = activeMonths > 0 ? Double(totalCount) / Double(activeMonths) : 0
 
                 HStack {
@@ -1126,13 +1255,21 @@ struct InsightsView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     Text(String(format: "%.1f", avgPerMonth))
-                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .font(.system(.caption, design: .rounded, weight: .bold).monospacedDigit())
                         .foregroundStyle(theme.accent)
                 }
             } else {
                 Text("No maintenance data in the last 12 months")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        } header: {
+            HStack(spacing: 6) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(theme.accent)
+                    .frame(width: 3, height: 16)
+                Text("Maintenance Frequency")
+                    .font(.system(.headline, design: .rounded))
             }
         }
     }
@@ -1159,7 +1296,7 @@ struct InsightsView: View {
                 }
                 .chartForegroundStyleScale([
                     "Services": Color.catEngine,
-                    "Fuel": Color.catFuel
+                    "Fuel": Color.catFuel,
                 ])
                 .chartYAxis {
                     AxisMarks(position: .leading) { value in
@@ -1341,7 +1478,7 @@ struct InsightsView: View {
                             HStack(spacing: 3) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.caption2)
-                                    .foregroundStyle(Color.wrenchGreen)
+                                    .foregroundStyle(Color.Status.success.shade500)
                                 Text("\(item.compliant)/\(item.total) on track")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -1350,10 +1487,10 @@ struct InsightsView: View {
                                 HStack(spacing: 3) {
                                     Image(systemName: "exclamationmark.circle.fill")
                                         .font(.caption2)
-                                        .foregroundStyle(Color.wrenchRed)
+                                        .foregroundStyle(Color.Status.error.shade500)
                                     Text("\(item.overdue) overdue")
                                         .font(.caption2)
-                                        .foregroundStyle(Color.wrenchRed)
+                                        .foregroundStyle(Color.Status.error.shade500)
                                 }
                             }
                         }
@@ -1400,7 +1537,7 @@ struct InsightsView: View {
                             let overdue = compliance.total - compliance.compliant
                             Text("\(overdue) interval\(overdue == 1 ? "" : "s") overdue or due now")
                                 .font(.caption2)
-                                .foregroundStyle(Color.wrenchRed)
+                                .foregroundStyle(Color.Status.error.shade500)
                         }
                     }
                 }
@@ -1408,7 +1545,7 @@ struct InsightsView: View {
             } else {
                 HStack(spacing: 10) {
                     Image(systemName: "checkmark.shield.fill")
-                        .foregroundStyle(Color.wrenchGreen)
+                        .foregroundStyle(Color.Status.success.shade500)
                     Text("No tracked service intervals yet")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1441,7 +1578,7 @@ struct InsightsView: View {
         .accessibilityLabel("\(title): \(value)")
     }
 
-    private func ownershipStat(label: String, value: String, color: Color) -> some View {
+    private func ownershipStat(label: String, value: String, color _: Color) -> some View {
         VStack(spacing: 2) {
             Text(value)
                 .font(.caption2.weight(.semibold).monospacedDigit())
@@ -1475,9 +1612,9 @@ struct InsightsView: View {
     }
 
     private func complianceColor(_ pct: Double) -> Color {
-        if pct >= 80 { return .wrenchGreen }
-        if pct >= 50 { return .wrenchYellow }
-        return .wrenchRed
+        if pct >= 80 { return Color.Status.success.shade500 }
+        if pct >= 50 { return Color.Status.warning.shade500 }
+        return Color.Status.error.shade500
     }
 
     private func complianceLabel(_ pct: Double) -> String {
@@ -1515,7 +1652,9 @@ private struct MonthlySpend: Identifiable, Plottable {
     let services: Double
     let fuel: Double
 
-    var primitivePlottable: Date { month }
+    var primitivePlottable: Date {
+        month
+    }
 
     init(month: Date, services: Double, fuel: Double) {
         self.month = month
@@ -1524,20 +1663,26 @@ private struct MonthlySpend: Identifiable, Plottable {
     }
 
     init?(primitivePlottable: Date) {
-        self.month = primitivePlottable
-        self.services = 0
-        self.fuel = 0
+        month = primitivePlottable
+        services = 0
+        fuel = 0
     }
 }
 
 private struct CategorySpend: Identifiable {
-    var id: String { category.rawValue }
+    var id: String {
+        category.rawValue
+    }
+
     let category: ServiceCategory
     let total: Double
 }
 
 private struct VehicleCost: Identifiable {
-    var id: String { name }
+    var id: String {
+        name
+    }
+
     let name: String
     let services: Double
     let fuel: Double
@@ -1545,7 +1690,10 @@ private struct VehicleCost: Identifiable {
 }
 
 private struct ServiceTypeSpend: Identifiable {
-    var id: String { name }
+    var id: String {
+        name
+    }
+
     let name: String
     let total: Double
     let count: Int
@@ -1561,7 +1709,10 @@ private struct FrequencyPoint: Identifiable {
 }
 
 private struct YearlyCost: Identifiable {
-    var id: Int { year }
+    var id: Int {
+        year
+    }
+
     let year: Int
     let services: Double
     let fuel: Double
@@ -1575,7 +1726,10 @@ private struct EfficiencyPoint: Identifiable {
 }
 
 private struct OwnershipCost: Identifiable {
-    var id: String { name }
+    var id: String {
+        name
+    }
+
     let name: String
     let serviceCost: Double
     let fuelCost: Double
@@ -1586,7 +1740,10 @@ private struct OwnershipCost: Identifiable {
 }
 
 private struct VehicleEfficiency: Identifiable {
-    var id: String { name }
+    var id: String {
+        name
+    }
+
     let name: String
     let average: Double
     let best: Double
@@ -1595,7 +1752,10 @@ private struct VehicleEfficiency: Identifiable {
 }
 
 private struct VehicleComplianceScore: Identifiable {
-    var id: String { name }
+    var id: String {
+        name
+    }
+
     let name: String
     let vehicle: Vehicle
     let compliancePercent: Double

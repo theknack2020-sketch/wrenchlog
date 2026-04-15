@@ -17,16 +17,16 @@ struct WhatsNewSheet: View {
     }
 
     private let features: [FeatureItem] = [
-        FeatureItem(icon: "flame.fill", title: "Streak Tracking", description: "Build daily habits with streak rewards", color: .orange),
-        FeatureItem(icon: "chart.bar.fill", title: "Weekly Summary", description: "See your vehicle activity at a glance", color: .catEngine),
-        FeatureItem(icon: "bell.badge.fill", title: "Smart Reminders", description: "Mileage + time-based service alerts", color: .wrenchAmber),
-        FeatureItem(icon: "square.and.arrow.up", title: "Share Records", description: "Share service and fuel logs with anyone", color: .catTires),
-        FeatureItem(icon: "hand.draw.fill", title: "Swipe Actions", description: "Swipe to edit or delete records", color: .catElectrical),
-        FeatureItem(icon: "paintpalette.fill", title: "5 Color Themes", description: "Personalize your experience", color: .catFilters),
+        FeatureItem(icon: "sparkles", title: "Beautiful New Design", description: "Every screen polished with premium animations and depth", color: Color.amber.shade500),
+        FeatureItem(icon: "lightbulb.fill", title: "Helpful Tips", description: "Discover features as you use the app", color: .catEngine),
+        FeatureItem(icon: "car.2.fill", title: "2 Free Vehicles", description: "Track a second vehicle on the free plan", color: .catTires),
+        FeatureItem(icon: "arrow.up.heart.fill", title: "Smoother Experience", description: "Improved stability and crash protection", color: Color.Status.success.shade500),
+        FeatureItem(icon: "wrench.adjustable.fill", title: "Refined Screens", description: "Sell, edit, and reminder settings redesigned", color: .catElectrical),
+        FeatureItem(icon: "textformat.size", title: "Full Dynamic Type", description: "All text scales with your accessibility settings", color: .catFilters),
     ]
 
     init() {
-        self.version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }
 
     var body: some View {

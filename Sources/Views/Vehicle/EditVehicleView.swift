@@ -1,12 +1,13 @@
-import SwiftUI
-import SwiftData
 import PhotosUI
+import SwiftData
+import SwiftUI
 
 struct EditVehicleView: View {
     @Bindable var vehicle: Vehicle
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var make: String = ""
     @State private var model: String = ""
@@ -19,7 +20,13 @@ struct EditVehicleView: View {
     @State private var photoData: Data?
     @State private var photoChanged = false
 
+    // VIN decode state
+    @State private var isDecodingVIN = false
+    @State private var vinDecodeError: String?
+    @State private var vinDecodeSuccess = false
+
     private let vehiclePhotoManager = VehiclePhotoManager.shared
+    private let nhtsaService = NHTSAService.shared
 
     // Validation & error state
     @State private var validationError: String?
@@ -41,7 +48,7 @@ struct EditVehicleView: View {
                         .accessibilityLabel("Vehicle model")
                         .onChange(of: model) { _, _ in validationError = nil }
                     Picker("Year", selection: $year) {
-                        ForEach((1950...Calendar.current.component(.year, from: .now) + 1).reversed(), id: \.self) { y in
+                        ForEach((1950 ... Calendar.current.component(.year, from: .now) + 1).reversed(), id: \.self) { y in
                             Text(String(y)).tag(y)
                         }
                     }
@@ -50,7 +57,7 @@ struct EditVehicleView: View {
                         .accessibilityLabel("Current odometer reading")
                         .onChange(of: mileage) { _, newValue in
                             validationError = nil
-                            if let m = Int(newValue), m < vehicle.currentMileage && vehicle.currentMileage > 0 {
+                            if let m = Int(newValue), m < vehicle.currentMileage, vehicle.currentMileage > 0 {
                                 mileageWarning = "Lower than current (\(vehicle.currentMileage.formatted())). Are you sure?"
                             } else {
                                 mileageWarning = nil
@@ -111,34 +118,110 @@ struct EditVehicleView: View {
                     TextField("License Plate", text: $licensePlate)
                         .textInputAutocapitalization(.characters)
                         .accessibilityLabel("License plate number")
-                    TextField("VIN", text: $vin)
-                        .textInputAutocapitalization(.characters)
-                        .accessibilityLabel("Vehicle identification number")
-                        .accessibilityHint("17-character VIN code")
+
+                    // VIN field with decode button
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 10) {
+                            TextField("VIN (17 characters)", text: $vin)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .accessibilityLabel("Vehicle identification number")
+                                .accessibilityHint("Enter 17-character VIN to auto-fill vehicle details")
+                                .onChange(of: vin) { _, _ in
+                                    vinDecodeError = nil
+                                    vinDecodeSuccess = false
+                                }
+
+                            Button {
+                                Task { await decodeVIN() }
+                            } label: {
+                                Group {
+                                    if isDecodingVIN {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    } else {
+                                        Label("Decode", systemImage: "barcode.viewfinder")
+                                            .font(.caption.weight(.semibold))
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(
+                                    vinDecodeButtonEnabled
+                                        ? theme.accent.opacity(0.15)
+                                        : Color.secondary.opacity(0.08),
+                                    in: Capsule()
+                                )
+                                .foregroundStyle(vinDecodeButtonEnabled ? theme.accent : .secondary)
+                            }
+                            .disabled(!vinDecodeButtonEnabled)
+                            .accessibilityLabel("Decode VIN")
+                            .accessibilityHint(vinDecodeButtonEnabled ? "Looks up vehicle details from the VIN" : "Enter a valid 17-character VIN first")
+                        }
+
+                        if vinDecodeSuccess {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.green)
+                                Text("Vehicle details filled from VIN")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .accessibilityLabel("VIN decoded successfully. Vehicle details auto-filled.")
+                        }
+
+                        if let error = vinDecodeError {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                                Text(error)
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .accessibilityLabel("VIN decode error: \(error)")
+                        }
+                    }
 
                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                        HStack {
+                        HStack(spacing: 14) {
                             if let data = photoData, let img = UIImage(data: data) {
                                 Image(uiImage: img)
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: 60, height: 60)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
                                     .accessibilityLabel("Current vehicle photo")
                             } else {
                                 ZStack {
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(theme.accent.opacity(0.1))
-                                        .frame(width: 60, height: 60)
-                                    Image(systemName: "camera.fill")
-                                        .foregroundStyle(theme.accent)
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [theme.accent.opacity(0.15), theme.accent.opacity(0.05)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 80, height: 80)
+                                    VStack(spacing: 4) {
+                                        Image(systemName: "camera.fill")
+                                            .font(.title3)
+                                            .foregroundStyle(theme.accent)
+                                        Text("Add")
+                                            .font(.caption2.weight(.medium))
+                                            .foregroundStyle(theme.accent)
+                                    }
                                 }
                                 .accessibilityHidden(true)
                             }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(photoData == nil ? "Add Photo" : "Change Photo")
-                                    .font(.subheadline)
-                                Text("A photo of your vehicle")
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(photoData == nil ? "Vehicle Photo" : "Change Photo")
+                                    .font(.subheadline.weight(.medium))
+                                Text("Helps identify your vehicle at a glance")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -159,6 +242,7 @@ struct EditVehicleView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
+            .frame(maxWidth: sizeClass == .regular ? 500 : .infinity)
             .navigationTitle("Edit Vehicle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -175,12 +259,12 @@ struct EditVehicleView: View {
                         HapticManager.shared.buttonTap()
                         validateAndSave()
                     }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.wrenchAmber)
-                        .disabled(make.trimmingCharacters(in: .whitespaces).isEmpty || model.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .accessibilityIdentifier("editVehicleSave")
-                        .accessibilityLabel("Save changes")
-                        .accessibilityHint("Saves updated vehicle information")
+                    .fontWeight(.semibold)
+                    .foregroundStyle(theme.accent)
+                    .disabled(make.trimmingCharacters(in: .whitespaces).isEmpty || model.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .accessibilityIdentifier("editVehicleSave")
+                    .accessibilityLabel("Save changes")
+                    .accessibilityHint("Saves updated vehicle information")
                 }
             }
             .onAppear {
@@ -260,7 +344,7 @@ struct EditVehicleView: View {
                 vehicle.vehiclePhotoFileName = fileName
             }
         }
-        vehicle.photoData = nil  // Migrate away from blob storage
+        vehicle.photoData = nil // Migrate away from blob storage
         vehicle.lastUpdated = .now
 
         do {
@@ -273,5 +357,36 @@ struct EditVehicleView: View {
             HapticManager.shared.error()
             SoundManager.playError()
         }
+    }
+
+    // MARK: - VIN Decode
+
+    private var vinDecodeButtonEnabled: Bool {
+        !isDecodingVIN && nhtsaService.isValidVIN(vin)
+    }
+
+    private func decodeVIN() async {
+        isDecodingVIN = true
+        vinDecodeError = nil
+        vinDecodeSuccess = false
+
+        do {
+            let result = try await nhtsaService.decodeVIN(vin)
+
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                if !result.make.isEmpty { make = result.make }
+                if !result.model.isEmpty { model = result.model }
+                if result.year > 0 { year = result.year }
+                vinDecodeSuccess = true
+            }
+
+            HapticManager.shared.success()
+            SoundManager.playSaveSuccess()
+        } catch {
+            vinDecodeError = error.localizedDescription
+            HapticManager.shared.error()
+        }
+
+        isDecodingVIN = false
     }
 }

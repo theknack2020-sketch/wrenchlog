@@ -24,6 +24,7 @@ struct MaintenanceTimelineView: View {
     let vehicle: Vehicle
     private let settings = UserSettings.shared
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var entries: [TimelineEntry] {
         var items: [TimelineEntry] = []
@@ -65,7 +66,7 @@ struct MaintenanceTimelineView: View {
             title: "Vehicle Added",
             detail: vehicle.displayName,
             icon: "car.fill",
-            color: .wrenchAmber,
+            color: Color.amber.shade500,
             cost: 0,
             mileage: 0,
             kind: .vehicleAdded
@@ -74,7 +75,7 @@ struct MaintenanceTimelineView: View {
         return items.sorted { $0.date > $1.date }
     }
 
-    // Group entries by month-year
+    /// Group entries by month-year
     var groupedEntries: [(key: String, entries: [TimelineEntry])] {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
@@ -90,46 +91,31 @@ struct MaintenanceTimelineView: View {
             }
     }
 
+    @State private var tappedEntryID: UUID?
+
     var body: some View {
         List {
             if entries.isEmpty {
-                Section {
-                    VStack(spacing: 24) {
-                        Spacer()
-                        ZStack {
-                            Circle()
-                                .fill(theme.accent.opacity(0.1))
-                                .frame(width: 100, height: 100)
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.system(size: 40))
-                                .foregroundStyle(theme.accent)
-                                .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
-                        }
-                        .accessibilityHidden(true)
-                        VStack(spacing: 8) {
-                            Text("No Timeline Yet")
-                                .font(.system(.title3, design: .rounded, weight: .bold))
-                            Text("Service records and fuel logs will appear here as a timeline.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+                ContentUnavailableView {
+                    Label("No Maintenance History", systemImage: "wrench.and.screwdriver")
+                } description: {
+                    Text("Service records and fuel logs will appear here as a timeline.")
                 }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             } else {
                 ForEach(groupedEntries, id: \.key) { group in
                     Section(group.key) {
-                        ForEach(group.entries) { entry in
+                        ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
                             timelineRow(entry)
+                                .staggeredAppear(index: index)
                         }
                     }
                 }
             }
         }
         .navigationTitle("Timeline")
+        .sensoryFeedback(.selection, trigger: tappedEntryID)
     }
 
     private func timelineRow(_ entry: TimelineEntry) -> some View {
@@ -146,7 +132,7 @@ struct MaintenanceTimelineView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(.ultraThinMaterial)
                     .frame(width: 36, height: 36)
-                    .shadow(color: entry.color.opacity(0.15), radius: 3, y: 1)
+                    .shadow(color: entry.color.opacity(0.18), radius: 4, y: 2)
                 Image(systemName: entry.icon)
                     .font(.caption)
                     .foregroundStyle(entry.color)
@@ -190,6 +176,15 @@ struct MaintenanceTimelineView: View {
             kindBadge(entry.kind)
         }
         .padding(.vertical, 2)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.clear)
+                .shadow(color: entry.color.opacity(0.08), radius: 6, y: 3)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            tappedEntryID = entry.id
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(entry.title), \(entry.date, format: .dateTime.month(.abbreviated).day())\(entry.cost > 0 ? ", \(settings.formatCost(entry.cost))" : "")")
     }
@@ -201,14 +196,17 @@ struct MaintenanceTimelineView: View {
             Image(systemName: "wrench.fill")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
         case .fuel:
             Image(systemName: "fuelpump.fill")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
         case .vehicleAdded:
             Image(systemName: "star.fill")
                 .font(.caption2)
-                .foregroundStyle(Color.wrenchAmber)
+                .foregroundStyle(Color.amber.shade500)
+                .accessibilityHidden(true)
         }
     }
 }

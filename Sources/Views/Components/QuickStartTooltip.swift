@@ -5,13 +5,14 @@ import SwiftUI
 struct QuickStartTooltip: View {
     @Binding var isVisible: Bool
     let tips: [(icon: String, text: String)]
+    @Environment(\.appTheme) private var theme
 
     var body: some View {
         if isVisible {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "lightbulb.fill")
-                        .foregroundStyle(Color.wrenchAmber)
+                        .foregroundStyle(theme.accent)
                     Text("Quick Start Guide")
                         .font(.subheadline.weight(.bold))
                     Spacer()
@@ -24,6 +25,7 @@ struct QuickStartTooltip: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
                     }
+                    .frame(minWidth: 44, minHeight: 44)
                     .accessibilityLabel("Dismiss quick start guide")
                 }
 
@@ -31,11 +33,11 @@ struct QuickStartTooltip: View {
                     HStack(spacing: 10) {
                         ZStack {
                             Circle()
-                                .fill(Color.wrenchAmber.opacity(0.1))
+                                .fill(theme.accent.opacity(0.1))
                                 .frame(width: 28, height: 28)
                             Image(systemName: tips[index].icon)
                                 .font(.caption)
-                                .foregroundStyle(Color.wrenchAmber)
+                                .foregroundStyle(theme.accent)
                         }
 
                         Text(tips[index].text)
@@ -50,7 +52,7 @@ struct QuickStartTooltip: View {
             .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.wrenchAmber.opacity(0.2), lineWidth: 1)
+                    .stroke(theme.accent.opacity(0.2), lineWidth: 1)
             )
             .transition(.asymmetric(
                 insertion: .move(edge: .top).combined(with: .opacity),
@@ -62,7 +64,7 @@ struct QuickStartTooltip: View {
 
 // MARK: - Quick Start State
 
-struct QuickStartState {
+enum QuickStartState {
     static var shouldShow: Bool {
         !UserDefaults.standard.bool(forKey: "wl_quickstart_dismissed")
     }
@@ -72,6 +74,6 @@ struct QuickStartState {
         (icon: "bell.fill", text: "Smart reminders track when services are due"),
         (icon: "chart.bar.fill", text: "View cost analytics for spending insights"),
         (icon: "clock.arrow.circlepath", text: "Timeline shows your complete history"),
-        (icon: "checklist", text: "Use the checklist for quick maintenance tasks")
+        (icon: "checklist", text: "Use the checklist for quick maintenance tasks"),
     ]
 }

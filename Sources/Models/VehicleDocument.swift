@@ -8,8 +8,8 @@ import SwiftData
 final class VehicleDocument {
     var id: UUID = UUID()
     var title: String = ""
-    var fileName: String = ""          // filename in documents directory
-    var documentTypeRaw: String = "Other"   // DocumentType.rawValue
+    var fileName: String = "" // filename in documents directory
+    var documentTypeRaw: String = "Other" // DocumentType.rawValue
     var dateAdded: Date = Date.now
     var expirationDate: Date?
     var notes: String = ""
@@ -28,11 +28,11 @@ final class VehicleDocument {
         fileSizeBytes: Int = 0,
         notes: String = ""
     ) {
-        self.id = UUID()
+        id = UUID()
         self.title = title
         self.fileName = fileName
-        self.documentTypeRaw = documentType.rawValue
-        self.dateAdded = .now
+        documentTypeRaw = documentType.rawValue
+        dateAdded = .now
         self.fileSizeBytes = fileSizeBytes
         self.notes = notes
     }
@@ -49,7 +49,9 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
     case receipt = "Receipt"
     case other = "Other"
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var icon: String {
         switch self {
@@ -67,7 +69,7 @@ enum DocumentType: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .insurance: .catEngine
         case .registration: .catTires
-        case .title: .wrenchAmber
+        case .title: Color.amber.shade500
         case .inspection: .catInspection
         case .warranty: .catElectrical
         case .receipt: .catFilters

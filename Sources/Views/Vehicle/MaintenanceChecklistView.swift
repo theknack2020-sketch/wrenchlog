@@ -1,24 +1,34 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
+import TipKit
 
 struct MaintenanceChecklistView: View {
     @Bindable var vehicle: Vehicle
     @State private var newItemTitle = ""
     @State private var showAddItem = false
+    @State private var completionTrigger = false
     @FocusState private var isAddFieldFocused: Bool
     @Environment(\.modelContext) private var context
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var pendingItems: [MaintenanceChecklistItem] {
         vehicle.safeChecklistItems.filter { !$0.isCompleted }.sorted { $0.createdDate > $1.createdDate }
     }
 
     var completedItems: [MaintenanceChecklistItem] {
-        vehicle.safeChecklistItems.filter { $0.isCompleted }.sorted { ($0.completedDate ?? .now) > ($1.completedDate ?? .now) }
+        vehicle.safeChecklistItems.filter(\.isCompleted).sorted { ($0.completedDate ?? .now) > ($1.completedDate ?? .now) }
     }
 
     var body: some View {
         List {
+            Section {
+                TipView(ChecklistTip())
+                    .tipBackground(theme.accent.opacity(0.08))
+            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+
             // Add item
             Section {
                 HStack {
@@ -26,53 +36,39 @@ struct MaintenanceChecklistView: View {
                         .focused($isAddFieldFocused)
                         .textInputAutocapitalization(.sentences)
                         .onSubmit { addItem() }
+                        .accessibilityLabel("New checklist item")
+                        .accessibilityIdentifier("checklistNewItem")
 
                     Button {
                         addItem()
                     } label: {
                         Image(systemName: "plus.circle.fill")
-                            .foregroundStyle(Color.wrenchAmber)
+                            .foregroundStyle(theme.accent)
                     }
                     .disabled(newItemTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityLabel("Add checklist item")
+                    .accessibilityHint("Adds the entered item to your checklist")
                 }
             }
 
             // Empty state + Quick-add presets
             if vehicle.safeChecklistItems.isEmpty {
-                Section {
-                    VStack(spacing: 24) {
-                        Spacer()
-                        ZStack {
-                            Circle()
-                                .fill(theme.accent.opacity(0.1))
-                                .frame(width: 100, height: 100)
-                            Image(systemName: "checklist")
-                                .font(.system(size: 40))
-                                .foregroundStyle(theme.accent)
-                                .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
-                        }
-                        .accessibilityHidden(true)
-                        VStack(spacing: 8) {
-                            Text("No Checklist Items")
-                                .font(.system(.title3, design: .rounded, weight: .bold))
-                            Text("Add items to track your maintenance tasks.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        Button {
-                            isAddFieldFocused = true
-                        } label: {
-                            Label("Add First Item", systemImage: "plus.circle.fill")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(theme.accent)
-                        }
-                        .pressable()
-                        Spacer()
+                ContentUnavailableView {
+                    Label("No Checklist Items", systemImage: "checklist")
+                } description: {
+                    Text("Add items to track quick maintenance tasks.")
+                } actions: {
+                    Button {
+                        isAddFieldFocused = true
+                    } label: {
+                        Label("Add First Item", systemImage: "plus.circle.fill")
+                            .font(.subheadline.weight(.medium))
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+                    .pressable()
                 }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
                 Section {
                     ForEach(presetItems, id: \.self) { preset in
@@ -127,23 +123,29 @@ struct MaintenanceChecklistView: View {
             }
         }
         .navigationTitle("Checklist")
+        .sensoryFeedback(.success, trigger: completionTrigger)
     }
 
     private func checklistRow(_ item: MaintenanceChecklistItem) -> some View {
         HStack(spacing: 12) {
             Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.1)) {
                     item.isCompleted.toggle()
                     item.completedDate = item.isCompleted ? .now : nil
                     DataManager.trySave(context)
+                    if item.isCompleted {
+                        completionTrigger.toggle()
+                    }
                 }
-                HapticManager.shared.light()
             } label: {
                 Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(item.isCompleted ? Color.wrenchGreen : .secondary)
+                    .foregroundStyle(item.isCompleted ? Color.Status.success.shade500 : .secondary)
+                    .symbolEffect(.bounce, value: item.isCompleted)
             }
             .buttonStyle(.plain)
+            .frame(minWidth: 44, minHeight: 44)
+            .accessibilityLabel(item.isCompleted ? "Mark \(item.title) as incomplete" : "Mark \(item.title) as complete")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
@@ -158,6 +160,9 @@ struct MaintenanceChecklistView: View {
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.title)\(item.isCompleted ? ", completed" : ", pending")")
+        .accessibilityAddTraits(.isButton)
     }
 
     private func addItem() {
@@ -189,7 +194,7 @@ struct MaintenanceChecklistView: View {
             "Top off windshield fluid",
             "Inspect wiper blades",
             "Check coolant level",
-            "Rotate tires"
+            "Rotate tires",
         ]
     }
 }

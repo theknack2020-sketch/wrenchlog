@@ -17,8 +17,7 @@ enum Season: String {
 
 // MARK: - Seasonal Suggestion Engine
 
-struct SeasonalSuggestionEngine {
-
+enum SeasonalSuggestionEngine {
     @MainActor
     static func suggestions(for vehicles: [Vehicle]) -> [SeasonalSuggestion] {
         guard !vehicles.isEmpty else { return [] }
@@ -86,7 +85,7 @@ struct SeasonalSuggestionEngine {
                 title: "Coolant System",
                 detail: "High heat strains cooling systems. Check coolant levels and hoses.",
                 icon: "thermometer.sun.fill",
-                color: .wrenchRed,
+                color: Color.Status.error.shade500,
                 season: .summer
             ))
             suggestions.append(SeasonalSuggestion(

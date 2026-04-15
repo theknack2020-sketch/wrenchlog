@@ -1,10 +1,16 @@
+import StoreKit
 import SwiftUI
 import UserNotifications
 
 // MARK: - OnboardingView
 
 struct OnboardingView: View {
-    @Binding var isComplete: Bool
+    @Binding var isShowing: Bool
+
+    // MARK: - Environment
+
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - Navigation
 
@@ -23,13 +29,31 @@ struct OnboardingView: View {
 
     // MARK: - Animations
 
-    @State private var pulseGlow = false
     @State private var checkmarkScale: CGFloat = 0
+    @State private var checkmarkRotation: Double = -90
     @State private var bellBounce = false
     @State private var showCelebration = false
     @State private var pageAppeared: Set<Int> = []
+    @State private var selectedConfettiTrigger = 0
+
+    // MARK: - Purchase State
+
+    @State private var purchasing = false
+    @State private var purchaseError: String?
+
+    // MARK: - Preview Ring
+
+    @State private var healthRingProgress: Double = 0
 
     private let totalPages = 6
+
+    private var isRegularWidth: Bool {
+        sizeClass == .regular
+    }
+
+    private var contentMaxWidth: CGFloat {
+        isRegularWidth ? 500 : .infinity
+    }
 
     // MARK: - Body
 
@@ -38,6 +62,13 @@ struct OnboardingView: View {
             pageGradient
                 .ignoresSafeArea()
                 .animation(.easeInOut(duration: 0.5), value: currentPage)
+
+            // Ambient floating particles
+            if !reduceMotion {
+                FloatingParticlesView()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
 
             VStack(spacing: 0) {
                 skipBar
@@ -48,13 +79,14 @@ struct OnboardingView: View {
                     interestsPage.tag(2)
                     previewPage.tag(3)
                     notificationsPage.tag(4)
-                    getStartedPage.tag(5)
+                    paywallPage.tag(5)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.spring(response: 0.5, dampingFraction: 0.85), value: currentPage)
 
                 bottomControls
             }
+            .frame(maxWidth: contentMaxWidth)
 
             CelebrationOverlay(isShowing: $showCelebration)
         }
@@ -86,8 +118,8 @@ struct OnboardingView: View {
                     completeOnboarding()
                 } label: {
                     Text("Skip")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.3))
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                 }
@@ -104,11 +136,31 @@ struct OnboardingView: View {
 
     private var bottomControls: some View {
         VStack(spacing: 16) {
+            // Premium glowing capsule indicators
             HStack(spacing: 8) {
-                ForEach(0..<totalPages, id: \.self) { i in
+                ForEach(0 ..< totalPages, id: \.self) { i in
+                    let isActive = i == currentPage
+                    let isCompleted = i < currentPage
                     Capsule()
-                        .fill(i == currentPage ? Color.wrenchAmber : Color.white.opacity(0.25))
-                        .frame(width: i == currentPage ? 28 : 8, height: 8)
+                        .fill(
+                            isActive
+                                ? Color.amber.shade500
+                                : isCompleted
+                                ? Color.amber.shade500.opacity(0.7)
+                                : Color.white.opacity(0.12)
+                        )
+                        .frame(width: isActive ? 32 : 8, height: 8)
+                        .overlay(
+                            Capsule()
+                                .stroke(
+                                    isActive ? Color.amber.shade400.opacity(0.6) : Color.clear,
+                                    lineWidth: 1
+                                )
+                        )
+                        .shadow(
+                            color: isActive ? Color.amber.shade500.opacity(0.5) : Color.clear,
+                            radius: isActive ? 6 : 0
+                        )
                         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentPage)
                 }
             }
@@ -120,123 +172,153 @@ struct OnboardingView: View {
                     advancePage()
                 } label: {
                     Text(continueTitle)
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded, weight: .bold))
                         .frame(maxWidth: .infinity)
-                        .frame(height: 54)
+                        .frame(height: 56)
                         .foregroundStyle(.black)
-                        .background(amberButtonGradient, in: RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: Color.wrenchAmber.opacity(0.35), radius: 12, y: 6)
+                        .background {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(amberButtonGradient)
+                                VStack {
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.white.opacity(0.15), Color.clear],
+                                                startPoint: .top,
+                                                endPoint: .center
+                                            )
+                                        )
+                                        .frame(height: 28)
+                                    Spacer()
+                                }
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                        .shadow(color: Color.amber.shade500.opacity(0.35), radius: 12, y: 6)
                 }
                 .padding(.horizontal, 32)
                 .accessibilityLabel(continueTitle)
-            } else {
-                Button {
-                    HapticManager.shared.celebrate()
-                    SoundManager.playCelebration()
-                    saveOnboardingData()
-                    showAddVehicle = true
-                } label: {
-                    Label("Add Your First Vehicle", systemImage: "plus.circle.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .foregroundStyle(.black)
-                        .background(amberButtonGradient, in: RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: Color.wrenchAmber.opacity(0.35), radius: 12, y: 6)
-                }
-                .padding(.horizontal, 32)
-                .accessibilityLabel("Add your first vehicle")
-
-                Button {
-                    HapticManager.shared.light()
-                    SoundManager.playCelebration()
-                    completeOnboarding()
-                } label: {
-                    Text("Explore First")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-                .accessibilityLabel("Skip adding a vehicle and explore the app")
             }
+
+            // Paywall page has its own buttons, so no CTA here for page 5
         }
-        .padding(.bottom, 40)
+        .padding(.bottom, currentPage == totalPages - 1 ? 8 : 40)
         .animation(.easeInOut(duration: 0.25), value: currentPage)
     }
 
-    // MARK: - Page 1: Welcome Hero
+    // MARK: - Page 0: Welcome Hero
 
     private var welcomePage: some View {
         VStack(spacing: 0) {
-            Spacer()
+            Spacer(minLength: 20)
 
-            VStack(spacing: 36) {
+            VStack(spacing: 24) {
+                // Dramatic glow hero with orbiting particles
                 ZStack {
-                    // Outer glow ring
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [Color.wrenchAmber.opacity(0.25), Color.clear],
-                                center: .center,
-                                startRadius: 20,
-                                endRadius: 110
+                    if reduceMotion {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [Color.amber.shade500.opacity(0.3), Color.amber.shade500.opacity(0.08), Color.clear],
+                                    center: .center,
+                                    startRadius: 10,
+                                    endRadius: 100
+                                )
                             )
-                        )
-                        .frame(width: 220, height: 220)
-                        .scaleEffect(pulseGlow ? 1.15 : 0.95)
+                            .frame(width: 200, height: 200)
+                    } else {
+                        PhaseAnimator([false, true]) { phase in
+                            let isExpanded = phase
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        RadialGradient(
+                                            colors: [
+                                                Color.amber.shade500.opacity(isExpanded ? 0.18 : 0.08),
+                                                Color.amber.shade500.opacity(isExpanded ? 0.06 : 0.02),
+                                                Color.clear,
+                                            ],
+                                            center: .center,
+                                            startRadius: 15,
+                                            endRadius: isExpanded ? 120 : 100
+                                        )
+                                    )
+                                    .frame(width: 220, height: 220)
+                                    .blur(radius: isExpanded ? 16 : 10)
 
-                    // Inner glow
-                    Circle()
-                        .fill(Color.wrenchAmber.opacity(0.12))
-                        .frame(width: 140, height: 140)
-                        .scaleEffect(pulseGlow ? 1.05 : 0.98)
+                                Circle()
+                                    .fill(
+                                        RadialGradient(
+                                            colors: [
+                                                Color.amber.shade500.opacity(isExpanded ? 0.35 : 0.15),
+                                                Color.amber.shade500.opacity(isExpanded ? 0.12 : 0.04),
+                                                Color.clear,
+                                            ],
+                                            center: .center,
+                                            startRadius: 10,
+                                            endRadius: isExpanded ? 90 : 75
+                                        )
+                                    )
+                                    .frame(width: 180, height: 180)
+
+                                Circle()
+                                    .fill(Color.amber.shade500.opacity(isExpanded ? 0.18 : 0.08))
+                                    .frame(width: 100, height: 100)
+                                    .blur(radius: 6)
+                            }
+                        } animation: { _ in
+                            .easeInOut(duration: 2.8)
+                        }
+
+                        // Orbiting particles ring
+                        OrbitingDotsView()
+                            .frame(width: 160, height: 160)
+                    }
 
                     Image(systemName: "wrench.adjustable.fill")
-                        .font(.system(size: 72))
+                        .font(.largeTitle)
+                        .imageScale(.large)
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [Color.wrenchAmberLight, Color.wrenchAmber],
+                                colors: [Color.amber.shade400, Color.amber.shade500],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
                         )
-                        .shadow(color: Color.wrenchAmber.opacity(0.5), radius: 16, y: 4)
+                        .shadow(color: Color.amber.shade500.opacity(0.6), radius: 16, y: 4)
+                        .shadow(color: Color.amber.shade500.opacity(0.25), radius: 30, y: 8)
                         .symbolEffect(.bounce, value: pageAppeared.contains(0))
-                }
-                .onAppear {
-                    withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
-                        pulseGlow = true
-                    }
                 }
                 .accessibilityHidden(true)
 
-                VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     Text("WrenchLog")
-                        .font(.system(size: 42, weight: .bold, design: .rounded))
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
                         .foregroundStyle(.white)
 
                     Text("Your private vehicle maintenance tracker")
-                        .font(.system(.title3, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(.system(.body, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
                         .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                // Benefits
-                VStack(alignment: .leading, spacing: 16) {
-                    benefitRow(icon: "checkmark.circle.fill", text: "Track every service")
-                    benefitRow(icon: "bell.badge.fill", text: "Smart reminders")
-                    benefitRow(icon: "lock.shield.fill", text: "No ads, no tracking")
+                // Benefit pills in glass capsules
+                VStack(spacing: 10) {
+                    benefitPill(icon: "checkmark.circle.fill", text: "Track every service", index: 0)
+                    benefitPill(icon: "bell.badge.fill", text: "Smart reminders", index: 1)
+                    benefitPill(icon: "lock.shield.fill", text: "No ads, no tracking", index: 2)
                 }
-                .padding(.top, 8)
             }
 
-            Spacer()
-            Spacer()
+            Spacer(minLength: 60)
         }
-        .padding(.horizontal, 32)
+        .padding(.horizontal, 24)
         .onAppear { pageAppeared.insert(0) }
     }
 
-    // MARK: - Page 2: Vehicle Count Quiz
+    // MARK: - Page 1: Vehicle Count Quiz
 
     private var vehicleCountPage: some View {
         VStack(spacing: 0) {
@@ -248,27 +330,34 @@ struct OnboardingView: View {
                         .font(.system(.title, design: .rounded, weight: .bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
+                        .staggeredAppear(index: 0)
 
                     Text("We'll tailor your experience")
-                        .font(.subheadline)
+                        .font(.system(.body, design: .rounded))
                         .foregroundStyle(.white.opacity(0.5))
+                        .staggeredAppear(index: 1)
                 }
 
-                HStack(spacing: 16) {
-                    vehicleCountCard(value: "1", icon: "car.fill", label: "Just one")
-                    vehicleCountCard(value: "2-3", icon: "car.2.fill", label: "A few")
-                    vehicleCountCard(value: "4+", icon: "bus.fill", label: "Fleet")
+                let columns: [GridItem] = if isRegularWidth {
+                    Array(repeating: GridItem(.flexible(), spacing: 16), count: 4)
+                } else {
+                    Array(repeating: GridItem(.flexible(), spacing: 16), count: 3)
+                }
+
+                LazyVGrid(columns: columns, spacing: 16) {
+                    vehicleCountCard(value: "1", icon: "car.fill", label: "Just one", index: 0)
+                    vehicleCountCard(value: "2-3", icon: "car.2.fill", label: "A few", index: 1)
+                    vehicleCountCard(value: "4+", icon: "bus.fill", label: "Fleet", index: 2)
                 }
             }
 
-            Spacer()
-            Spacer()
+            Spacer(minLength: 60)
         }
         .padding(.horizontal, 24)
         .onAppear { pageAppeared.insert(1) }
     }
 
-    // MARK: - Page 3: Interests Multi-Select
+    // MARK: - Page 2: Interests Multi-Select
 
     private var interestsPage: some View {
         VStack(spacing: 0) {
@@ -280,10 +369,12 @@ struct OnboardingView: View {
                         .font(.system(.title, design: .rounded, weight: .bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
+                        .staggeredAppear(index: 0)
 
                     Text("These help us personalize your experience")
-                        .font(.subheadline)
+                        .font(.system(.body, design: .rounded))
                         .foregroundStyle(.white.opacity(0.5))
+                        .staggeredAppear(index: 1)
                 }
 
                 let interests = [
@@ -294,21 +385,28 @@ struct OnboardingView: View {
                     ("dollarsign.circle.fill", "Resale value"),
                 ]
 
-                OnboardingFlowLayout(spacing: 10) {
-                    ForEach(interests, id: \.1) { icon, label in
-                        interestChip(icon: icon, label: label)
+                if isRegularWidth {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+                        ForEach(Array(interests.enumerated()), id: \.element.1) { idx, item in
+                            interestChip(icon: item.0, label: item.1, index: idx)
+                        }
+                    }
+                } else {
+                    OnboardingFlowLayout(spacing: 10) {
+                        ForEach(Array(interests.enumerated()), id: \.element.1) { idx, item in
+                            interestChip(icon: item.0, label: item.1, index: idx)
+                        }
                     }
                 }
             }
 
-            Spacer()
-            Spacer()
+            Spacer(minLength: 60)
         }
         .padding(.horizontal, 24)
         .onAppear { pageAppeared.insert(2) }
     }
 
-    // MARK: - Page 4: Preview
+    // MARK: - Page 3: Preview
 
     private var previewPage: some View {
         VStack(spacing: 0) {
@@ -320,84 +418,116 @@ struct OnboardingView: View {
                         .font(.system(.title, design: .rounded, weight: .bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
+                        .staggeredAppear(index: 0)
 
                     Text("Here's a preview of your setup")
-                        .font(.subheadline)
+                        .font(.system(.body, design: .rounded))
                         .foregroundStyle(.white.opacity(0.5))
+                        .staggeredAppear(index: 1)
                 }
 
-                // Mock vehicle card
-                VStack(spacing: 0) {
-                    HStack(spacing: 14) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.wrenchAmber.opacity(0.15))
-                                .frame(width: 52, height: 52)
-                            Image(systemName: "car.fill")
-                                .font(.title2)
-                                .foregroundStyle(Color.wrenchAmber)
+                // Double-bezel mock vehicle card
+                ZStack {
+                    // Outer bezel
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Color.white.opacity(0.04))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        )
+
+                    // Inner content
+                    VStack(spacing: 0) {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.amber.shade500.opacity(0.15))
+                                    .frame(width: 52, height: 52)
+                                Image(systemName: "car.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(Color.amber.shade500)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("2024 Toyota Camry")
+                                    .font(.system(.headline, design: .rounded))
+                                    .foregroundStyle(.white)
+                                Text("32,150 miles")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.white.opacity(0.5))
+                            }
+
+                            Spacer()
+
+                            // Health ring with score
+                            ZStack {
+                                ProgressRing(
+                                    progress: healthRingProgress / 100.0,
+                                    lineWidth: 5,
+                                    color: Color.Status.success.shade500
+                                )
+                                .frame(width: 48, height: 48)
+
+                                Text("\(Int(healthRingProgress))")
+                                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                                    .foregroundStyle(Color.Status.success.shade500)
+                            }
                         }
+                        .padding(16)
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("2024 Toyota Camry")
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                            Text("32,150 miles")
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.5))
+                        Divider()
+                            .overlay(Color.white.opacity(0.08))
+
+                        VStack(spacing: 10) {
+                            mockServiceRow(icon: "drop.fill", name: "Oil Change", due: "Due in 500 mi", color: .catEngine)
+                            mockServiceRow(icon: "tire.fill", name: "Tire Rotation", due: "Due in 2 weeks", color: .catTires)
+                            mockServiceRow(icon: "bolt.fill", name: "Battery Check", due: "Up to date", color: .catElectrical)
                         }
-
-                        Spacer()
-
-                        DueSoonBadge(urgency: .dueSoon)
+                        .padding(16)
                     }
-                    .padding(16)
-
-                    Divider()
-                        .overlay(Color.white.opacity(0.08))
-
-                    // Mock upcoming services
-                    VStack(spacing: 10) {
-                        mockServiceRow(icon: "drop.fill", name: "Oil Change", due: "Due in 500 mi", color: .catEngine)
-                        mockServiceRow(icon: "tire.fill", name: "Tire Rotation", due: "Due in 2 weeks", color: .catTires)
-                    }
-                    .padding(16)
+                    .padding(3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 21)
+                            .fill(.ultraThinMaterial)
+                    )
+                    .padding(3)
                 }
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
+                .springStaggeredAppear(index: 2)
 
-                // Context message
                 if let count = selectedVehicleCount {
                     let label = count == "1" ? "your vehicle" : "your \(count) vehicles"
                     Text("Ready to track \(label)")
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.4))
+                        .floatIn(delay: 0.4)
                 }
             }
 
-            Spacer()
-            Spacer()
+            Spacer(minLength: 60)
         }
         .padding(.horizontal, 24)
-        .onAppear { pageAppeared.insert(3) }
+        .onAppear {
+            pageAppeared.insert(3)
+            // Animate health ring
+            withAnimation(.easeOut(duration: 1.2).delay(0.4)) {
+                healthRingProgress = 82
+            }
+        }
     }
 
-    // MARK: - Page 5: Notifications
+    // MARK: - Page 4: Notifications
 
     private var notificationsPage: some View {
         VStack(spacing: 0) {
             Spacer()
 
             VStack(spacing: 32) {
-                // Animated bell
+                // Animated bell with KeyframeAnimator
                 ZStack {
                     Circle()
                         .fill(
                             RadialGradient(
-                                colors: [Color.wrenchAmber.opacity(0.2), Color.clear],
+                                colors: [Color.amber.shade500.opacity(0.2), Color.clear],
                                 center: .center,
                                 startRadius: 10,
                                 endRadius: 80
@@ -405,10 +535,37 @@ struct OnboardingView: View {
                         )
                         .frame(width: 160, height: 160)
 
-                    Image(systemName: "bell.badge.fill")
-                        .font(.system(size: 64))
-                        .foregroundStyle(Color.wrenchAmber)
-                        .symbolEffect(.bounce, value: bellBounce)
+                    if reduceMotion {
+                        Image(systemName: "bell.badge.fill")
+                            .font(.largeTitle).imageScale(.large)
+                            .foregroundStyle(Color.amber.shade500)
+                    } else {
+                        KeyframeAnimator(
+                            initialValue: BellKeyframe(),
+                            trigger: bellBounce
+                        ) { value in
+                            Image(systemName: "bell.badge.fill")
+                                .font(.largeTitle).imageScale(.large)
+                                .foregroundStyle(Color.amber.shade500)
+                                .rotationEffect(.degrees(value.rotation), anchor: .top)
+                                .scaleEffect(value.scale)
+                        } keyframes: { _ in
+                            KeyframeTrack(\.rotation) {
+                                SpringKeyframe(15, duration: 0.15, spring: .bouncy(duration: 0.15))
+                                SpringKeyframe(-12, duration: 0.15, spring: .bouncy(duration: 0.15))
+                                SpringKeyframe(8, duration: 0.12, spring: .bouncy(duration: 0.12))
+                                SpringKeyframe(-5, duration: 0.12, spring: .bouncy(duration: 0.12))
+                                SpringKeyframe(2, duration: 0.1, spring: .bouncy(duration: 0.1))
+                                SpringKeyframe(0, duration: 0.2, spring: .smooth(duration: 0.3))
+                            }
+                            KeyframeTrack(\.scale) {
+                                SpringKeyframe(1.12, duration: 0.15, spring: .bouncy)
+                                SpringKeyframe(0.95, duration: 0.15, spring: .bouncy)
+                                SpringKeyframe(1.05, duration: 0.12, spring: .bouncy)
+                                SpringKeyframe(1.0, duration: 0.3, spring: .smooth(duration: 0.3))
+                            }
+                        }
+                    }
                 }
                 .accessibilityHidden(true)
 
@@ -419,15 +576,19 @@ struct OnboardingView: View {
                         .multilineTextAlignment(.center)
 
                     Text("Stay on top of maintenance")
-                        .font(.subheadline)
+                        .font(.system(.body, design: .rounded))
                         .foregroundStyle(.white.opacity(0.5))
                 }
 
-                // Benefits list
+                // Mock notification banner
+                notificationBanner
+                    .floatIn(delay: 0.2)
+
+                // Benefits with animated checkmarks
                 VStack(alignment: .leading, spacing: 14) {
-                    notifBenefitRow(icon: "clock.badge.checkmark.fill", text: "Smart reminders before due dates")
-                    notifBenefitRow(icon: "exclamationmark.triangle.fill", text: "Overdue service alerts")
-                    notifBenefitRow(icon: "moon.fill", text: "Quiet at night — no interruptions")
+                    notifBenefitRow(icon: "clock.badge.checkmark.fill", text: "Smart reminders before due dates", index: 0)
+                    notifBenefitRow(icon: "exclamationmark.triangle.fill", text: "Overdue service alerts", index: 1)
+                    notifBenefitRow(icon: "moon.fill", text: "Quiet at night — no interruptions", index: 2)
                 }
                 .padding(.horizontal, 8)
 
@@ -437,12 +598,30 @@ struct OnboardingView: View {
                         requestNotifications()
                     } label: {
                         Label("Enable Notifications", systemImage: "bell.fill")
-                            .font(.headline)
+                            .font(.system(.headline, design: .rounded, weight: .bold))
                             .frame(maxWidth: .infinity)
-                            .frame(height: 54)
+                            .frame(height: 56)
                             .foregroundStyle(.black)
-                            .background(amberButtonGradient, in: RoundedRectangle(cornerRadius: 16))
-                            .shadow(color: Color.wrenchAmber.opacity(0.35), radius: 12, y: 6)
+                            .background {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(amberButtonGradient)
+                                    VStack {
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [Color.white.opacity(0.15), Color.clear],
+                                                    startPoint: .top,
+                                                    endPoint: .center
+                                                )
+                                            )
+                                            .frame(height: 28)
+                                        Spacer()
+                                    }
+                                }
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                            }
+                            .shadow(color: Color.amber.shade500.opacity(0.35), radius: 12, y: 6)
                     }
                     .padding(.horizontal, 8)
 
@@ -452,127 +631,308 @@ struct OnboardingView: View {
                     } label: {
                         Text("Maybe Later")
                             .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.white.opacity(0.35))
                     }
                 } else {
-                    // Post-permission state
                     HStack(spacing: 10) {
                         Image(systemName: notificationsGranted ? "checkmark.circle.fill" : "info.circle.fill")
-                            .foregroundStyle(notificationsGranted ? .green : .white.opacity(0.5))
+                            .foregroundStyle(notificationsGranted ? Color.Status.success.shade500 : .white.opacity(0.5))
                         Text(notificationsGranted ? "Notifications enabled!" : "You can enable them later in Settings")
                             .font(.subheadline)
-                            .foregroundStyle(notificationsGranted ? .green : .white.opacity(0.5))
+                            .foregroundStyle(notificationsGranted ? Color.Status.success.shade500 : .white.opacity(0.5))
                     }
                     .padding(.vertical, 8)
                     .transition(.opacity.combined(with: .scale))
                 }
             }
 
-            Spacer()
-            Spacer()
+            Spacer(minLength: 60)
         }
         .padding(.horizontal, 24)
         .onAppear { pageAppeared.insert(4) }
     }
 
-    // MARK: - Page 6: Get Started
+    // MARK: - Page 5: Paywall
 
-    private var getStartedPage: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            VStack(spacing: 36) {
-                // Animated checkmark circle
-                ZStack {
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [Color.wrenchGreen.opacity(0.25), Color.clear],
-                                center: .center,
-                                startRadius: 10,
-                                endRadius: 100
+    private var paywallPage: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                VStack(spacing: 28) {
+                    // Crown hero
+                    ZStack {
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        Color.amber.shade500.opacity(0.25),
+                                        Color.amber.shade500.opacity(0.06),
+                                        Color.clear,
+                                    ],
+                                    center: .center,
+                                    startRadius: 10,
+                                    endRadius: 100
+                                )
                             )
-                        )
-                        .frame(width: 200, height: 200)
+                            .frame(width: 200, height: 200)
 
-                    Circle()
-                        .stroke(Color.wrenchGreen.opacity(0.3), lineWidth: 3)
-                        .frame(width: 120, height: 120)
+                        Image(systemName: "crown.fill")
+                            .font(.largeTitle).imageScale(.large)
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.amber.shade400, Color.amber.shade600],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .shadow(color: Color.amber.shade500.opacity(0.5), radius: 16, y: 4)
+                            .scaleEffect(checkmarkScale)
+                            .rotationEffect(.degrees(checkmarkRotation))
+                    }
+                    .accessibilityHidden(true)
 
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 80))
-                        .foregroundStyle(Color.wrenchGreen)
-                        .scaleEffect(checkmarkScale)
-                }
-                .accessibilityHidden(true)
+                    VStack(spacing: 10) {
+                        Text("Unlock the Full\nExperience")
+                            .font(.system(.title, design: .rounded, weight: .bold))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
 
-                VStack(spacing: 10) {
-                    Text("You're all set!")
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        Text("Take your maintenance tracking to the next level")
+                            .font(.system(.body, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .multilineTextAlignment(.center)
+                    }
 
-                    Text("Your maintenance tracker is ready.\nLet's add your first vehicle.")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.5))
-                        .multilineTextAlignment(.center)
-                }
+                    // Pro feature rows
+                    VStack(spacing: 14) {
+                        proFeatureRow(icon: "car.2.fill", text: "Unlimited vehicles", index: 0)
+                        proFeatureRow(icon: "chart.bar.xaxis", text: "Full analytics & charts", index: 1)
+                        proFeatureRow(icon: "camera.fill", text: "Receipt photo storage", index: 2)
+                        proFeatureRow(icon: "doc.text.fill", text: "PDF & CSV export", index: 3)
+                        proFeatureRow(icon: "paintpalette.fill", text: "All color themes", index: 4)
+                    }
+                    .padding(.horizontal, 8)
 
-                // Trial CTA
-                if !StoreManager.shared.isPro {
-                    VStack(spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "crown.fill")
-                                .font(.caption)
-                                .foregroundStyle(Color.wrenchAmber)
-                            Text("Start 7-Day Free Trial")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.white)
-                        }
-                        Text("Unlock analytics, themes, and more")
+                    // Product cards
+                    paywallProducts
+
+                    // Error display
+                    if let err = purchaseError {
+                        Text(err)
                             .font(.caption)
+                            .foregroundStyle(Color.Status.error.shade500)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                            .transition(.opacity)
+                    }
+
+                    // Secondary: Continue Free
+                    Button {
+                        HapticManager.shared.buttonTap()
+                        SoundManager.playCelebration()
+                        saveOnboardingData()
+                        showAddVehicle = true
+                    } label: {
+                        Label("Continue Free — Add Your Vehicle", systemImage: "plus.circle.fill")
+                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .foregroundStyle(.white.opacity(0.8))
+                            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            )
+                    }
+                    .padding(.horizontal, 24)
+                    .accessibilityLabel("Continue free and add your first vehicle")
+
+                    // Tertiary: Explore First
+                    Button {
+                        HapticManager.shared.light()
+                        SoundManager.playCelebration()
+                        completeOnboarding()
+                    } label: {
+                        Text("Explore First")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.35))
+                    }
+                    .accessibilityLabel("Skip adding a vehicle and explore the app")
+
+                    // Restore purchases
+                    Button {
+                        Task {
+                            purchasing = true
+                            let success = await StoreManager.shared.restorePurchases()
+                            purchasing = false
+                            if success {
+                                HapticManager.shared.success()
+                                saveOnboardingData()
+                                showAddVehicle = true
+                            }
+                        }
+                    } label: {
+                        Text("Restore Purchases")
+                            .font(.caption.weight(.medium))
                             .foregroundStyle(.white.opacity(0.4))
                     }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 20)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-                    .shadow(color: Color.wrenchAmber.opacity(0.15), radius: 8, y: 4)
-                    .accessibilityLabel("Start 7-day free trial for Pro features")
+                    .disabled(purchasing)
+                    .accessibilityLabel("Restore previous purchases")
+
+                    // Legal footer
+                    paywallLegal
                 }
+                .padding(.top, 24)
+                .padding(.bottom, 40)
+            }
+        }
+        .onAppear { pageAppeared.insert(5) }
+    }
+
+    // MARK: - Notification Banner Mock
+
+    private var notificationBanner: some View {
+        HStack(spacing: 12) {
+            // App icon mock
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.amber.shade500, Color.amber.shade600],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 38, height: 38)
+
+                Image(systemName: "wrench.adjustable.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white)
             }
 
-            Spacer()
-            Spacer()
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text("WrenchLog")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.9))
+                    Spacer()
+                    Text("now")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+                Text("Oil change due in 3 days")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.65))
+            }
         }
-        .padding(.horizontal, 24)
-        .onAppear { pageAppeared.insert(5) }
+        .padding(12)
+        .glassBackground(cornerRadius: 16)
+    }
+}
+
+// MARK: - Bell Keyframe Model
+
+private struct BellKeyframe {
+    var rotation: Double = 0
+    var scale: Double = 1.0
+}
+
+// MARK: - Floating Particles View (Persistent Ambient)
+
+private struct FloatingParticlesView: View {
+    private let particleCount = 12
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            Canvas { context, size in
+                let now = timeline.date.timeIntervalSinceReferenceDate
+                for i in 0 ..< particleCount {
+                    let seed = Double(i) * 137.508
+                    let period = 8.0 + (seed.truncatingRemainder(dividingBy: 6.0))
+                    let phase = seed.truncatingRemainder(dividingBy: .pi * 2)
+
+                    let xBase = (seed.truncatingRemainder(dividingBy: size.width)).magnitude
+                    let yBase = ((seed * 2.3).truncatingRemainder(dividingBy: size.height)).magnitude
+
+                    let x = xBase + sin(now / period + phase) * 30
+                    let y = yBase + cos(now / (period * 0.8) + phase) * 20
+
+                    let breathe = 0.3 + 0.3 * sin(now / (period * 0.5) + phase)
+                    let particleSize = 2.5 + (seed.truncatingRemainder(dividingBy: 2.0))
+
+                    let rect = CGRect(
+                        x: x - particleSize / 2,
+                        y: y - particleSize / 2,
+                        width: particleSize,
+                        height: particleSize
+                    )
+                    context.opacity = breathe
+                    context.fill(
+                        Circle().path(in: rect),
+                        with: .color(Color.amber.shade400)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Orbiting Dots View
+
+private struct OrbitingDotsView: View {
+    private let dotCount = 6
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            Canvas { context, size in
+                let now = timeline.date.timeIntervalSinceReferenceDate
+                let cx = size.width / 2
+                let cy = size.height / 2
+                let radius: CGFloat = min(size.width, size.height) / 2 - 8
+
+                for i in 0 ..< dotCount {
+                    let baseAngle = (Double(i) / Double(dotCount)) * .pi * 2
+                    let angle = baseAngle + now * 0.4
+                    let x = cx + cos(angle) * radius
+                    let y = cy + sin(angle) * radius
+
+                    let dotSize: CGFloat = 4
+                    let rect = CGRect(x: x - dotSize / 2, y: y - dotSize / 2, width: dotSize, height: dotSize)
+                    let opacity = 0.4 + 0.3 * sin(now * 2 + Double(i))
+                    context.opacity = opacity
+                    context.fill(
+                        Circle().path(in: rect),
+                        with: .color(Color.amber.shade400)
+                    )
+                }
+            }
+        }
     }
 }
 
 // MARK: - Gradients & Styling
 
 private extension OnboardingView {
-
     var pageGradient: some View {
         let colors: [Color] = switch currentPage {
         case 0:
-            [Color(red: 0.45, green: 0.28, blue: 0.05), Color(red: 0.08, green: 0.06, blue: 0.04), .black]
+            [Color(red: 0.45, green: 0.28, blue: 0.05), Color(red: 0.08, green: 0.06, blue: 0.04), Color.Neutral.shade900]
         case 1:
-            [Color(red: 0.38, green: 0.24, blue: 0.06), Color(red: 0.10, green: 0.07, blue: 0.04), .black]
+            [Color(red: 0.38, green: 0.24, blue: 0.06), Color(red: 0.10, green: 0.07, blue: 0.04), Color.Neutral.shade900]
         case 2:
-            [Color(red: 0.35, green: 0.22, blue: 0.07), Color(red: 0.10, green: 0.08, blue: 0.04), .black]
+            [Color(red: 0.35, green: 0.22, blue: 0.07), Color(red: 0.10, green: 0.08, blue: 0.04), Color.Neutral.shade900]
         case 3:
-            [Color(red: 0.30, green: 0.20, blue: 0.08), Color(red: 0.09, green: 0.07, blue: 0.04), .black]
+            [Color(red: 0.30, green: 0.20, blue: 0.08), Color(red: 0.09, green: 0.07, blue: 0.04), Color.Neutral.shade900]
         case 4:
-            [Color(red: 0.28, green: 0.18, blue: 0.06), Color(red: 0.08, green: 0.06, blue: 0.04), .black]
+            [Color(red: 0.28, green: 0.18, blue: 0.06), Color(red: 0.08, green: 0.06, blue: 0.04), Color.Neutral.shade900]
         default:
-            [Color(red: 0.10, green: 0.22, blue: 0.12), Color(red: 0.06, green: 0.08, blue: 0.05), .black]
+            [Color(red: 0.35, green: 0.22, blue: 0.07), Color(red: 0.10, green: 0.07, blue: 0.04), Color.Neutral.shade900]
         }
         return LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
     }
 
     var amberButtonGradient: LinearGradient {
         LinearGradient(
-            colors: [Color.wrenchAmberLight, Color.wrenchAmber],
+            colors: [Color.amber.shade400, Color.amber.shade600],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -580,9 +940,9 @@ private extension OnboardingView {
 
     var continueTitle: String {
         switch currentPage {
-        case 0: return "Get Started"
-        case 4 where notificationsRequested: return "Continue"
-        default: return "Next"
+        case 0: "Get Started"
+        case 4 where notificationsRequested: "Continue"
+        default: "Next"
         }
     }
 }
@@ -590,60 +950,102 @@ private extension OnboardingView {
 // MARK: - Component Builders
 
 private extension OnboardingView {
+    // MARK: Welcome Page Benefit Pill
 
-    func benefitRow(icon: String, text: String) -> some View {
-        HStack(spacing: 14) {
+    func benefitPill(icon: String, text: String, index: Int) -> some View {
+        HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.body)
-                .foregroundStyle(Color.wrenchAmber)
-                .frame(width: 28)
+                .font(.subheadline)
+                .foregroundStyle(Color.amber.shade500)
+                .frame(width: 24)
             Text(text)
-                .font(.body)
+                .font(.system(.subheadline, design: .rounded, weight: .medium))
                 .foregroundStyle(.white.opacity(0.8))
             Spacer()
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .background(.ultraThinMaterial, in: Capsule())
+        .staggeredAppear(index: index + 2)
     }
 
-    func vehicleCountCard(value: String, icon: String, label: String) -> some View {
+    // MARK: Vehicle Count Card (Double Bezel)
+
+    func vehicleCountCard(value: String, icon: String, label: String, index: Int) -> some View {
         let isSelected = selectedVehicleCount == value
         return Button {
             HapticManager.shared.cardPress()
             withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                 selectedVehicleCount = value
             }
-        } label: {
-            VStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 32))
-                    .foregroundStyle(isSelected ? Color.wrenchAmber : .white.opacity(0.5))
-
-                Text(value)
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(isSelected ? .white : .white.opacity(0.7))
-
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.4))
+            if !reduceMotion {
+                selectedConfettiTrigger += 1
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 130)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? AnyShapeStyle(Color.wrenchAmber.opacity(0.15)) : AnyShapeStyle(.ultraThinMaterial))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(isSelected ? Color.wrenchAmber : Color.white.opacity(0.08), lineWidth: isSelected ? 2 : 1)
-            )
-            .shadow(color: isSelected ? Color.wrenchAmber.opacity(0.2) : .black.opacity(0.15), radius: 6, y: 3)
+        } label: {
+            // Outer bezel
+            ZStack {
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.white.opacity(0.04))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(
+                                isSelected ? Color.amber.shade500.opacity(0.7) : Color.white.opacity(0.06),
+                                lineWidth: isSelected ? 1.5 : 1
+                            )
+                    )
+
+                // Inner card
+                VStack(spacing: 12) {
+                    Image(systemName: icon)
+                        .font(.title)
+                        .foregroundStyle(isSelected ? Color.amber.shade500 : .white.opacity(0.5))
+                        .symbolEffect(.bounce, value: isSelected)
+
+                    Text(value)
+                        .font(.system(.title2, design: .rounded, weight: .bold))
+                        .foregroundStyle(isSelected ? .white : .white.opacity(0.7))
+
+                    Text(label)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 130)
+                .padding(3)
+                .background(
+                    RoundedRectangle(cornerRadius: 21)
+                        .fill(
+                            isSelected
+                                ? AnyShapeStyle(
+                                    LinearGradient(
+                                        colors: [Color.amber.shade500.opacity(0.2), Color.amber.shade600.opacity(0.1)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                : AnyShapeStyle(Color.clear)
+                        )
+                )
+                .padding(3)
+            }
+            .overlay {
+                if isSelected, !reduceMotion {
+                    OnboardingSparkleView(trigger: selectedConfettiTrigger)
+                        .allowsHitTesting(false)
+                }
+            }
+            .shadow(color: isSelected ? Color.amber.shade500.opacity(0.25) : .black.opacity(0.15), radius: isSelected ? 10 : 6, y: 3)
             .scaleEffect(isSelected ? 1.04 : 1.0)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OnboardingCardButtonStyle())
+        .springStaggeredAppear(index: index + 2)
         .accessibilityLabel("\(value) vehicles, \(label)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    func interestChip(icon: String, label: String) -> some View {
+    // MARK: Interest Chip (Glass)
+
+    func interestChip(icon: String, label: String, index: Int) -> some View {
         let isSelected = selectedInterests.contains(label)
         return Button {
             HapticManager.shared.selection()
@@ -654,19 +1056,33 @@ private extension OnboardingView {
                     selectedInterests.insert(label)
                 }
             }
+            if !reduceMotion, !isSelected {
+                selectedConfettiTrigger += 1
+            }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.subheadline)
+                    .symbolEffect(.bounce, value: isSelected)
                 Text(label)
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(.subheadline, design: .rounded, weight: .medium))
             }
-            .foregroundStyle(isSelected ? .black : .white.opacity(0.7))
-            .padding(.horizontal, 18)
-            .padding(.vertical, 12)
+            .foregroundStyle(isSelected ? .white : .white.opacity(0.7))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
             .background(
                 Capsule()
-                    .fill(isSelected ? Color.wrenchAmber : Color.white.opacity(0.08))
+                    .fill(
+                        isSelected
+                            ? AnyShapeStyle(
+                                LinearGradient(
+                                    colors: [Color.amber.shade400, Color.amber.shade600],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            : AnyShapeStyle(.ultraThinMaterial)
+                    )
             )
             .overlay(
                 Capsule()
@@ -674,32 +1090,46 @@ private extension OnboardingView {
             )
             .scaleEffect(isSelected ? 1.05 : 1.0)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OnboardingCardButtonStyle())
+        .staggeredAppear(index: index + 2)
         .accessibilityLabel(label)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    func notifBenefitRow(icon: String, text: String) -> some View {
+    // MARK: Notification Benefit Row
+
+    func notifBenefitRow(icon: String, text: String, index: Int) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.body)
-                .foregroundStyle(Color.wrenchAmber)
+                .foregroundStyle(Color.amber.shade500)
                 .frame(width: 28)
             Text(text)
-                .font(.subheadline)
+                .font(.system(.subheadline, design: .rounded))
                 .foregroundStyle(.white.opacity(0.7))
         }
+        .staggeredAppear(index: index + 3)
     }
 
+    // MARK: Mock Service Row
+
     func mockServiceRow(icon: String, name: String, due: String, color: Color) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 0) {
+            // Colored left border
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(width: 3, height: 32)
+                .padding(.trailing, 12)
+
             Image(systemName: icon)
                 .font(.subheadline)
                 .foregroundStyle(color)
                 .frame(width: 24)
+                .padding(.trailing, 8)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(.subheadline, design: .rounded, weight: .medium))
                     .foregroundStyle(.white.opacity(0.8))
                 Text(due)
                     .font(.caption)
@@ -711,12 +1141,350 @@ private extension OnboardingView {
                 .foregroundStyle(.white.opacity(0.2))
         }
     }
+
+    // MARK: Pro Feature Row
+
+    func proFeatureRow(icon: String, text: String, index: Int) -> some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color.amber.shade500.opacity(0.15))
+                    .frame(width: 36, height: 36)
+                Image(systemName: icon)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.amber.shade500)
+            }
+            Text(text)
+                .font(.system(.body, design: .rounded, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+            Spacer()
+            Image(systemName: "checkmark")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Color.amber.shade500)
+        }
+        .staggeredAppear(index: index)
+    }
+
+    // MARK: Paywall Products
+
+    var paywallProducts: some View {
+        let store = StoreManager.shared
+        return Group {
+            if store.isLoading {
+                ProgressView()
+                    .padding()
+            } else if let loadErr = store.loadError {
+                VStack(spacing: 8) {
+                    Text(loadErr)
+                        .font(.caption)
+                        .foregroundStyle(Color.Status.error.shade500)
+                    Button("Retry") {
+                        Task { await store.loadProducts() }
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.amber.shade500)
+                }
+                .padding()
+            } else {
+                VStack(spacing: 12) {
+                    // Yearly — primary CTA
+                    if let yearly = store.yearlyProduct {
+                        paywallYearlyCard(product: yearly)
+                    }
+
+                    // Lifetime — secondary
+                    if let lifetime = store.lifetimeProduct {
+                        paywallLifetimeCard(product: lifetime)
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+        }
+    }
+
+    // MARK: Yearly Card
+
+    func paywallYearlyCard(product: Product) -> some View {
+        Button {
+            Task {
+                purchasing = true
+                purchaseError = nil
+                do {
+                    let ok = try await StoreManager.shared.purchase(product)
+                    if ok {
+                        HapticManager.shared.celebrate()
+                        SoundManager.playCelebration()
+                        saveOnboardingData()
+                        showAddVehicle = true
+                    }
+                    purchasing = false
+                } catch StoreKitError.userCancelled {
+                    purchasing = false
+                } catch {
+                    HapticManager.shared.error()
+                    purchaseError = "Purchase could not be completed. You have not been charged."
+                    purchasing = false
+                }
+            }
+        } label: {
+            VStack(spacing: 0) {
+                // RECOMMENDED badge
+                HStack {
+                    Spacer()
+                    Text("RECOMMENDED")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.2), in: Capsule())
+                    Spacer()
+                }
+                .padding(.top, 12)
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Yearly")
+                            .font(.system(.headline, design: .rounded, weight: .bold))
+                        Text("Start 7-Day Free Trial")
+                            .font(.system(.subheadline, design: .rounded))
+                            .opacity(0.85)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        if purchasing {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        } else {
+                            Text(product.displayPrice)
+                                .font(.system(.headline, design: .rounded, weight: .bold))
+                            Text("/year")
+                                .font(.caption2)
+                                .opacity(0.7)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .padding(.bottom, 4)
+            }
+            .frame(maxWidth: .infinity)
+            .foregroundStyle(.white)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.amber.shade400, Color.amber.shade600],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    // Inner highlight
+                    VStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.15), Color.clear],
+                                    startPoint: .top,
+                                    endPoint: .center
+                                )
+                            )
+                            .frame(height: 40)
+                        Spacer()
+                    }
+                    // Animated glow border
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.3), Color.amber.shade400.opacity(0.2), Color.white.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                }
+            )
+            .shadow(color: Color.amber.shade500.opacity(0.4), radius: 16, y: 6)
+        }
+        .disabled(purchasing)
+        .pressable()
+        .glowPulse(color: Color.amber.shade500)
+        .accessibilityLabel("Yearly plan, \(product.displayPrice) per year, Start 7-day free trial")
+    }
+
+    // MARK: Lifetime Card
+
+    func paywallLifetimeCard(product: Product) -> some View {
+        Button {
+            Task {
+                purchasing = true
+                purchaseError = nil
+                do {
+                    let ok = try await StoreManager.shared.purchase(product)
+                    if ok {
+                        HapticManager.shared.celebrate()
+                        SoundManager.playCelebration()
+                        saveOnboardingData()
+                        showAddVehicle = true
+                    }
+                    purchasing = false
+                } catch StoreKitError.userCancelled {
+                    purchasing = false
+                } catch {
+                    HapticManager.shared.error()
+                    purchaseError = "Purchase could not be completed. You have not been charged."
+                    purchasing = false
+                }
+            }
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Lifetime")
+                        .font(.system(.headline, design: .rounded, weight: .semibold))
+                    Text("One-time purchase · Yours forever")
+                        .font(.caption)
+                        .opacity(0.7)
+                }
+                Spacer()
+                if purchasing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.white)
+                } else {
+                    Text(product.displayPrice)
+                        .font(.system(.headline, design: .rounded, weight: .bold))
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity)
+            .foregroundStyle(.white)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                    )
+            )
+        }
+        .disabled(purchasing)
+        .pressable()
+        .accessibilityLabel("Lifetime plan, \(product.displayPrice), one-time purchase")
+    }
+
+    // MARK: Paywall Legal
+
+    var paywallLegal: some View {
+        VStack(spacing: 8) {
+            Text("No charge until trial ends · Cancel anytime")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.white.opacity(0.45))
+
+            Text("Subscriptions auto-renew unless cancelled at least 24 hours before the end of the current period. Payment is charged to your Apple ID account. Manage in Settings → Apple ID → Subscriptions.")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.25))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
+
+            HStack(spacing: 16) {
+                Link("Privacy Policy", destination: URL(string: "https://theknack2020-sketch.github.io/wrenchlog/privacy/")!)
+                    .accessibilityLabel("Privacy Policy")
+                    .accessibilityHint("Opens privacy policy in browser")
+                Link("Terms of Use", destination: URL(string: "https://theknack2020-sketch.github.io/wrenchlog/terms/")!)
+                    .accessibilityLabel("Terms of Use")
+                    .accessibilityHint("Opens terms of use in browser")
+            }
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.35))
+        }
+        .padding(.top, 8)
+    }
+}
+
+// MARK: - Card Button Style (Press Feedback)
+
+private struct OnboardingCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Sparkle Particle Overlay
+
+private struct OnboardingSparkleView: View {
+    let trigger: Int
+    @State private var particles: [SparkleParticle] = []
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+            Canvas { context, _ in
+                let now = timeline.date.timeIntervalSinceReferenceDate
+                for particle in particles {
+                    let age = now - particle.startTime
+                    guard age < particle.lifetime else { continue }
+                    let progress = age / particle.lifetime
+                    let opacity = 1.0 - progress
+                    let y = particle.startY - CGFloat(age) * particle.speed
+                    let x = particle.startX + sin(CGFloat(age) * particle.wobble) * 6
+
+                    let rect = CGRect(
+                        x: x - particle.size / 2,
+                        y: y - particle.size / 2,
+                        width: particle.size,
+                        height: particle.size
+                    )
+                    context.opacity = opacity * 0.7
+                    context.fill(
+                        Circle().path(in: rect),
+                        with: .color(particle.color)
+                    )
+                }
+            }
+        }
+        .onChange(of: trigger) { _, _ in
+            spawnParticles()
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func spawnParticles() {
+        let now = Date.now.timeIntervalSinceReferenceDate
+        let colors: [Color] = [Color.amber.shade500, Color.amber.shade400, .white, .yellow]
+        var newParticles: [SparkleParticle] = []
+        for _ in 0 ..< 8 {
+            newParticles.append(SparkleParticle(
+                startX: CGFloat.random(in: 20 ... 100),
+                startY: CGFloat.random(in: 40 ... 90),
+                speed: CGFloat.random(in: 30 ... 60),
+                wobble: CGFloat.random(in: 2 ... 5),
+                size: CGFloat.random(in: 3 ... 6),
+                lifetime: Double.random(in: 0.5 ... 1.0),
+                startTime: now,
+                color: colors.randomElement() ?? Color.amber.shade500
+            ))
+        }
+        particles = newParticles
+    }
+}
+
+private struct SparkleParticle {
+    let startX: CGFloat
+    let startY: CGFloat
+    let speed: CGFloat
+    let wobble: CGFloat
+    let size: CGFloat
+    let lifetime: Double
+    let startTime: Double
+    let color: Color
 }
 
 // MARK: - Actions
 
 private extension OnboardingView {
-
     func advancePage() {
         guard currentPage < totalPages - 1 else { return }
         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
@@ -739,8 +1507,14 @@ private extension OnboardingView {
 
     func triggerCelebration() {
         showCelebration = true
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.6).delay(0.15)) {
+        if reduceMotion {
             checkmarkScale = 1.0
+            checkmarkRotation = 0
+        } else {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.55).delay(0.15)) {
+                checkmarkScale = 1.0
+                checkmarkRotation = 0
+            }
         }
     }
 
@@ -758,22 +1532,21 @@ private extension OnboardingView {
     func completeOnboarding() {
         saveOnboardingData()
         UserDefaults.standard.set(true, forKey: "wl_onboarding_complete")
-        isComplete = true
+        isShowing = false
     }
 }
 
 // MARK: - FlowLayout
 
-/// Simple horizontal wrapping layout for interest chips.
 private struct OnboardingFlowLayout: Layout {
     var spacing: CGFloat = 8
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
         let result = computeLayout(proposal: proposal, subviews: subviews)
         return result.size
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
         let result = computeLayout(proposal: proposal, subviews: subviews)
         for (index, position) in result.positions.enumerated() {
             subviews[index].place(at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y), proposal: .unspecified)

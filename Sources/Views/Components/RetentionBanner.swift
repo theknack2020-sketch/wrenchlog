@@ -12,7 +12,7 @@ struct RetentionBanner: View {
             if let journey = retention.journeyMessage {
                 bannerRow(
                     icon: "sparkles",
-                    iconColor: .wrenchAmber,
+                    iconColor: theme.accent,
                     text: journey,
                     style: .journey
                 )
@@ -59,7 +59,7 @@ struct RetentionBanner: View {
 
             // Streak counter badge
             if style == .streak || (style == .tip && RetentionEngine.shared.currentStreak > 0) {
-                if style == .tip && RetentionEngine.shared.currentStreak > 0 {
+                if style == .tip, RetentionEngine.shared.currentStreak > 0 {
                     HStack(spacing: 3) {
                         Image(systemName: "flame.fill")
                             .font(.caption2)
@@ -80,7 +80,7 @@ struct RetentionBanner: View {
             switch style {
             case .journey:
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.wrenchAmber.opacity(0.08))
+                    .fill(theme.accent.opacity(0.08))
             case .streak:
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.orange.opacity(0.08))
@@ -90,6 +90,7 @@ struct RetentionBanner: View {
             }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
     }
 }
 

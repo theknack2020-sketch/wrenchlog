@@ -1,10 +1,12 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct EditFuelLogView: View {
     @Bindable var fuelLog: FuelLog
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var date: Date = .now
     @State private var mileage = ""
@@ -26,13 +28,50 @@ struct EditFuelLogView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Fuel Type") {
-                    Picker("Type", selection: $fuelType) {
-                        ForEach(FuelType.allCases) { type in
-                            Label(type.rawValue, systemImage: type.icon)
-                                .tag(type)
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Select fuel type")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        FlowLayout(spacing: 8) {
+                            ForEach(FuelType.allCases) { type in
+                                Button {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        fuelType = type
+                                    }
+                                    HapticManager.shared.selection()
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: type.icon)
+                                            .font(.caption.weight(.semibold))
+                                        Text(type.rawValue)
+                                            .font(.caption.weight(.medium))
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        fuelType == type
+                                            ? AnyShapeStyle(type.color.opacity(0.18))
+                                            : AnyShapeStyle(Color(.systemGray6)),
+                                        in: Capsule()
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(fuelType == type ? type.color.opacity(0.4) : .clear, lineWidth: 1.5)
+                                    )
+                                    .foregroundStyle(fuelType == type ? type.color : .primary)
+                                    .scaleEffect(fuelType == type ? 1.03 : 1.0)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(type.rawValue)
+                                .accessibilityAddTraits(fuelType == type ? .isSelected : [])
+                            }
                         }
                     }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Fuel Type")
                 }
 
                 Section {
@@ -108,24 +147,32 @@ struct EditFuelLogView: View {
 
                 Section("Notes") {
                     TextField("Notes...", text: $notes, axis: .vertical)
-                        .lineLimit(3...6)
+                        .lineLimit(3 ... 6)
                 }
             }
+            .formStyle(.grouped)
             .scrollDismissesKeyboard(.interactively)
+            .frame(maxWidth: sizeClass == .regular ? 500 : .infinity)
             .navigationTitle("Edit Fuel Log")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .accessibilityIdentifier("editFuelLogCancel")
-                        .accessibilityLabel("Cancel editing fuel log")
+                    Button("Cancel") {
+                        HapticManager.shared.light()
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("editFuelLogCancel")
+                    .accessibilityLabel("Cancel editing fuel log")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { saveChanges() }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.wrenchAmber)
-                        .accessibilityIdentifier("editFuelLogSave")
-                        .accessibilityLabel("Save fuel log changes")
+                    Button("Save") {
+                        HapticManager.shared.buttonTap()
+                        saveChanges()
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundStyle(theme.accent)
+                    .accessibilityIdentifier("editFuelLogSave")
+                    .accessibilityLabel("Save fuel log changes")
                 }
             }
             .onAppear {
@@ -148,6 +195,7 @@ struct EditFuelLogView: View {
                 Text(saveError ?? "An unexpected error occurred.")
             }
         }
+        .smoothSheetTransition()
     }
 
     private func saveChanges() {

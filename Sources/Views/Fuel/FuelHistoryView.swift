@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct FuelHistoryView: View {
     let vehicle: Vehicle
@@ -12,6 +12,7 @@ struct FuelHistoryView: View {
     @State private var fuelLogForEdit: FuelLog?
     @Environment(\.modelContext) private var context
     @Environment(\.appTheme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     private let settings = UserSettings.shared
 
@@ -81,7 +82,7 @@ struct FuelHistoryView: View {
                 showAddFuel = true
             } label: {
                 Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(Color.wrenchAmber)
+                    .foregroundStyle(theme.accent)
             }
             .accessibilityIdentifier("fuelHistoryAdd")
             .accessibilityLabel("Add fuel log")
@@ -99,7 +100,7 @@ struct FuelHistoryView: View {
 
     private var summaryStatsSection: some View {
         Section {
-            HStack(spacing: 8) {
+            HStack(spacing: sizeClass == .regular ? 12 : 8) {
                 statCard(title: "Total Fuel", value: settings.formatCost(totalFuelCost), color: .catFuel)
                     .statPop(index: 0)
                 statCard(title: "Fill-Ups", value: "\(sortedLogs.count)", color: .catEngine)
@@ -107,6 +108,10 @@ struct FuelHistoryView: View {
                 if let avg = averageEfficiency {
                     statCard(title: "Avg \(settings.efficiencyUnit.label)", value: String(format: "%.1f", avg), color: .catTires)
                         .statPop(index: 2)
+                }
+                if sizeClass == .regular {
+                    statCard(title: "Volume", value: settings.formatVolume(totalVolume, fuelType: .regular), color: .catFuelRegular)
+                        .statPop(index: 3)
                 }
             }
         }
@@ -130,7 +135,7 @@ struct FuelHistoryView: View {
                         .fill(theme.accent.opacity(0.1))
                         .frame(width: 100, height: 100)
                     Image(systemName: "fuelpump.circle.fill")
-                        .font(.system(size: 40))
+                        .font(.largeTitle)
                         .foregroundStyle(theme.accent)
                         .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
                 }
@@ -304,7 +309,7 @@ struct FuelHistoryView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
-        .background(Color.wrenchCharcoal.opacity(0.85))
+        .background(Color.Neutral.shade800.opacity(0.85))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
     }
@@ -385,7 +390,7 @@ struct FuelLogRow: View {
                         Text(settings.formatCost(log.totalCost))
                             .font(.subheadline.weight(.semibold).monospacedDigit())
                             .contentTransition(.numericText())
-                            .foregroundStyle(Color.wrenchAmber)
+                            .foregroundStyle(Color.amber.shade500)
                     }
                     Text(settings.formatVolume(log.volume, fuelType: log.fuelType))
                         .font(.caption.monospacedDigit())

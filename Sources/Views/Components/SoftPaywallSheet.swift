@@ -1,20 +1,22 @@
 import SwiftUI
 
 /// A soft, non-blocking paywall sheet shown after N completed actions.
-/// Glassmorphism design. Always dismissable.
+/// Premium glass design. Always dismissable.
 struct SoftPaywallSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showFullPaywall = false
+    @State private var appeared = false
     private let store = StoreManager.shared
 
     var body: some View {
         ZStack {
-            // Gradient background
+            // Rich gradient background
             LinearGradient(
                 colors: [
-                    Color.wrenchAmber.opacity(0.15),
-                    Color(red: 0.85, green: 0.55, blue: 0.05).opacity(0.08),
-                    Color(.systemBackground)
+                    Color.amber.shade500.opacity(0.12),
+                    Color.Neutral.shade800.opacity(0.3),
+                    Color(.systemBackground),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -33,7 +35,7 @@ struct SoftPaywallSheet: View {
                     Circle()
                         .fill(
                             RadialGradient(
-                                colors: [Color.wrenchAmber.opacity(0.25), Color.wrenchAmber.opacity(0.0)],
+                                colors: [Color.amber.shade500.opacity(0.25), Color.clear],
                                 center: .center,
                                 startRadius: 20,
                                 endRadius: 80
@@ -44,13 +46,13 @@ struct SoftPaywallSheet: View {
                     Circle()
                         .fill(.ultraThinMaterial)
                         .frame(width: 90, height: 90)
-                        .shadow(color: Color.wrenchAmber.opacity(0.2), radius: 16, x: 0, y: 6)
+                        .shadow(color: Color.amber.shade500.opacity(0.2), radius: 16, y: 6)
 
-                    Image(systemName: "wrench.adjustable.fill")
+                    Image(systemName: "crown.fill")
                         .font(.system(.largeTitle, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [Color.wrenchAmber, Color(red: 0.85, green: 0.55, blue: 0.05)],
+                                colors: [Color.amber.shade400, Color.amber.shade600],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -64,7 +66,7 @@ struct SoftPaywallSheet: View {
                         .font(.system(.title2, design: .rounded, weight: .bold))
 
                     Text("You're getting the most out of WrenchLog.\nUnlock the full experience with Pro.")
-                        .font(.subheadline)
+                        .font(.system(.subheadline, design: .rounded))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -72,16 +74,14 @@ struct SoftPaywallSheet: View {
 
                 // What you'll unlock
                 VStack(spacing: 12) {
-                    unlockRow(icon: "chart.bar.fill", text: "Full Analytics & Charts", color: .catEngine)
-                    unlockRow(icon: "gauge.open.with.needle.33percent", text: "Fuel Efficiency Trends", color: .catFuel)
-                    unlockRow(icon: "doc.richtext", text: "PDF Reports & CSV Export", color: .catElectrical)
-                    unlockRow(icon: "car.2.fill", text: "Unlimited Vehicles", color: .catTires)
-                    unlockRow(icon: "paintpalette.fill", text: "All Color Themes", color: .catFilters)
+                    unlockRow(icon: "chart.bar.fill", text: "Full Analytics & Charts", color: .catEngine, index: 0)
+                    unlockRow(icon: "gauge.open.with.needle.33percent", text: "Fuel Efficiency Trends", color: .catFuel, index: 1)
+                    unlockRow(icon: "doc.richtext", text: "PDF Reports & CSV Export", color: .catElectrical, index: 2)
+                    unlockRow(icon: "car.2.fill", text: "Unlimited Vehicles", color: .catTires, index: 3)
+                    unlockRow(icon: "paintpalette.fill", text: "All Color Themes", color: .catFilters, index: 4)
                 }
                 .padding(16)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
-                .shadow(color: .black.opacity(0.04), radius: 2, y: 1)
+                .glassBackground(cornerRadius: 16)
                 .padding(.horizontal, 24)
 
                 // CTA
@@ -93,20 +93,37 @@ struct SoftPaywallSheet: View {
                         Image(systemName: "crown.fill")
                             .font(.subheadline)
                         Text("Start 7-Day Free Trial")
-                            .font(.headline)
+                            .font(.system(.headline, design: .rounded, weight: .bold))
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 52)
+                    .frame(height: 54)
                     .foregroundStyle(.white)
                     .background(
-                        LinearGradient(
-                            colors: [Color.wrenchAmber, Color(red: 0.85, green: 0.55, blue: 0.05)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        in: RoundedRectangle(cornerRadius: 14)
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.amber.shade400, Color.amber.shade600],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                            VStack {
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.white.opacity(0.12), Color.clear],
+                                            startPoint: .top,
+                                            endPoint: .center
+                                        )
+                                    )
+                                    .frame(height: 27)
+                                Spacer()
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
                     )
-                    .shadow(color: Color.wrenchAmber.opacity(0.35), radius: 12, x: 0, y: 6)
+                    .shadow(color: Color.amber.shade500.opacity(0.35), radius: 12, y: 6)
                 }
                 .pressable()
                 .padding(.horizontal, 24)
@@ -135,12 +152,18 @@ struct SoftPaywallSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
-        .sheet(isPresented: $showFullPaywall) {
+        .fullScreenCover(isPresented: $showFullPaywall) {
             ProUpgradeView()
+        }
+        .onAppear {
+            TelemetryService.paywallShown(source: "soft_paywall")
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                appeared = true
+            }
         }
     }
 
-    private func unlockRow(icon: String, text: String, color: Color) -> some View {
+    private func unlockRow(icon: String, text: String, color: Color, index: Int) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
@@ -150,12 +173,17 @@ struct SoftPaywallSheet: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(color)
             }
+            .accessibilityHidden(true)
             Text(text)
-                .font(.subheadline.weight(.medium))
+                .font(.system(.subheadline, design: .rounded, weight: .medium))
             Spacer()
             Image(systemName: "checkmark.circle.fill")
                 .font(.caption)
-                .foregroundStyle(Color.wrenchAmber)
+                .foregroundStyle(Color.amber.shade500)
+                .accessibilityHidden(true)
         }
+        .staggeredAppear(index: index)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
     }
 }
