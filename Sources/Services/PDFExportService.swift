@@ -1,11 +1,10 @@
-import SwiftUI
 import PDFKit
+import SwiftUI
 
-struct PDFExportService {
-    
+enum PDFExportService {
     @MainActor
     static func generatePDF(for vehicle: Vehicle, settings: UserSettings) -> Data? {
-        let pageWidth: CGFloat = 612  // US Letter
+        let pageWidth: CGFloat = 612 // US Letter
         let pageHeight: CGFloat = 792
         let margin: CGFloat = 50
         let contentWidth = pageWidth - margin * 2
@@ -41,10 +40,10 @@ struct PDFExportService {
         // Monthly spending (last 6 months)
         let calendar = Calendar.current
         let now = Date()
-        let monthlySpending: [(month: String, total: Double)] = (0..<6).reversed().compactMap { monthsAgo in
-            let month = calendar.date(byAdding: .month, value: -monthsAgo, to: now)!
-            let start = calendar.date(from: calendar.dateComponents([.year, .month], from: month))!
-            let end = calendar.date(byAdding: .month, value: 1, to: start)!
+        let monthlySpending: [(month: String, total: Double)] = (0 ..< 6).reversed().compactMap { monthsAgo in
+            let month = calendar.safeDate(byAdding: .month, value: -monthsAgo, to: now)
+            let start = calendar.safeDate(from: calendar.dateComponents([.year, .month], from: month))
+            let end = calendar.safeDate(byAdding: .month, value: 1, to: start)
             let svc = records.filter { $0.date >= start && $0.date < end }.reduce(0) { $0 + $1.cost }
             let fuel = fuelLogs.filter { $0.date >= start && $0.date < end }.reduce(0) { $0 + $1.totalCost }
             let formatter = DateFormatter()
@@ -52,7 +51,7 @@ struct PDFExportService {
             return (month: formatter.string(from: month), total: svc + fuel)
         }
 
-        let data = renderer.pdfData { context in
+        return renderer.pdfData { context in
             context.beginPage()
             var y: CGFloat = margin
 
@@ -70,7 +69,7 @@ struct PDFExportService {
             // Title
             let titleAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 24, weight: .bold),
-                .foregroundColor: titleColor
+                .foregroundColor: titleColor,
             ]
             let title = "Vehicle Report"
             title.draw(at: CGPoint(x: margin, y: y), withAttributes: titleAttrs)
@@ -79,11 +78,11 @@ struct PDFExportService {
             // Vehicle info
             let infoAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 14, weight: .regular),
-                .foregroundColor: bodyColor
+                .foregroundColor: bodyColor,
             ]
             let boldAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
-                .foregroundColor: titleColor
+                .foregroundColor: titleColor,
             ]
 
             let vehicleInfo = vehicle.displayName
@@ -115,7 +114,7 @@ struct PDFExportService {
 
             let sectionTitleAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 16, weight: .bold),
-                .foregroundColor: titleColor
+                .foregroundColor: titleColor,
             ]
             "Statistics Summary".draw(at: CGPoint(x: margin, y: y), withAttributes: sectionTitleAttrs)
             y += 26
@@ -125,11 +124,11 @@ struct PDFExportService {
             let boxHeight: CGFloat = 56
             let statBoxAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 16, weight: .bold),
-                .foregroundColor: titleColor
+                .foregroundColor: titleColor,
             ]
             let statLabelAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 9, weight: .medium),
-                .foregroundColor: lightColor
+                .foregroundColor: lightColor,
             ]
 
             // Row 1: Total Cost, Service Cost, Fuel Cost
@@ -171,7 +170,7 @@ struct PDFExportService {
                 if let highest = highestService, highest.cost > 0 {
                     let highestBoxAttrs: [NSAttributedString.Key: Any] = [
                         .font: UIFont.systemFont(ofSize: 13, weight: .bold),
-                        .foregroundColor: titleColor
+                        .foregroundColor: titleColor,
                     ]
                     drawStatBox(context: context, x: margin + (boxWidth + 8) * 2, y: y, width: boxWidth, height: boxHeight,
                                 value: settings.formatCost(highest.cost), label: "MOST EXPENSIVE",
@@ -188,7 +187,7 @@ struct PDFExportService {
                 y += 4
                 let catTitleAttrs: [NSAttributedString.Key: Any] = [
                     .font: UIFont.systemFont(ofSize: 13, weight: .bold),
-                    .foregroundColor: titleColor
+                    .foregroundColor: titleColor,
                 ]
                 "Spending by Category".draw(at: CGPoint(x: margin, y: y), withAttributes: catTitleAttrs)
                 y += 20
@@ -198,11 +197,11 @@ struct PDFExportService {
 
                 let catNameAttrs: [NSAttributedString.Key: Any] = [
                     .font: UIFont.systemFont(ofSize: 10, weight: .medium),
-                    .foregroundColor: bodyColor
+                    .foregroundColor: bodyColor,
                 ]
                 let catValueAttrs: [NSAttributedString.Key: Any] = [
                     .font: UIFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold),
-                    .foregroundColor: bodyColor
+                    .foregroundColor: bodyColor,
                 ]
 
                 for (name, value) in categoryBreakdown.prefix(6) {
@@ -243,7 +242,7 @@ struct PDFExportService {
 
                 let chartTitleAttrs: [NSAttributedString.Key: Any] = [
                     .font: UIFont.systemFont(ofSize: 13, weight: .bold),
-                    .foregroundColor: titleColor
+                    .foregroundColor: titleColor,
                 ]
                 "Monthly Spending (6 Months)".draw(at: CGPoint(x: margin, y: y), withAttributes: chartTitleAttrs)
                 y += 20
@@ -256,11 +255,11 @@ struct PDFExportService {
 
                 let monthLabelAttrs: [NSAttributedString.Key: Any] = [
                     .font: UIFont.systemFont(ofSize: 8, weight: .medium),
-                    .foregroundColor: lightColor
+                    .foregroundColor: lightColor,
                 ]
                 let monthValueAttrs: [NSAttributedString.Key: Any] = [
                     .font: UIFont.monospacedDigitSystemFont(ofSize: 7, weight: .semibold),
-                    .foregroundColor: bodyColor
+                    .foregroundColor: bodyColor,
                 ]
 
                 for (index, item) in monthlySpending.enumerated() {
@@ -309,7 +308,7 @@ struct PDFExportService {
             // Column headers
             let headerAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 11, weight: .bold),
-                .foregroundColor: bodyColor
+                .foregroundColor: bodyColor,
             ]
             "DATE".draw(at: CGPoint(x: margin, y: y), withAttributes: headerAttrs)
             "SERVICE".draw(at: CGPoint(x: margin + 100, y: y), withAttributes: headerAttrs)
@@ -320,11 +319,11 @@ struct PDFExportService {
             // Records
             let rowAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 11),
-                .foregroundColor: titleColor
+                .foregroundColor: titleColor,
             ]
             let rowLightAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 11),
-                .foregroundColor: bodyColor
+                .foregroundColor: bodyColor,
             ]
 
             for record in records {
@@ -350,7 +349,7 @@ struct PDFExportService {
                     let notesStr = "  \(record.notes)"
                     let noteAttrs: [NSAttributedString.Key: Any] = [
                         .font: UIFont.italicSystemFont(ofSize: 10),
-                        .foregroundColor: lightColor
+                        .foregroundColor: lightColor,
                     ]
                     notesStr.draw(
                         in: CGRect(x: margin + 100, y: y, width: contentWidth - 100, height: 30),
@@ -410,12 +409,10 @@ struct PDFExportService {
 
             let footerAttrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 9),
-                .foregroundColor: lightColor
+                .foregroundColor: lightColor,
             ]
             "Generated by WrenchLog — wrenchlog.app".draw(at: CGPoint(x: margin, y: y), withAttributes: footerAttrs)
         }
-
-        return data
     }
 
     // MARK: - PDF Drawing Helpers
@@ -431,7 +428,7 @@ struct PDFExportService {
     }
 
     private static func drawStatBox(
-        context: UIGraphicsPDFRendererContext,
+        context _: UIGraphicsPDFRendererContext,
         x: CGFloat, y: CGFloat,
         width: CGFloat, height: CGFloat,
         value: String, label: String,

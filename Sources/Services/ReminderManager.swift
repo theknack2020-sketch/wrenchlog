@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import UserNotifications
 
 // MARK: - Notification Action Identifiers
@@ -19,7 +20,7 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
     private let center = UNUserNotificationCenter.current()
     private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
 
-    private override init() {
+    override private init() {
         super.init()
         center.delegate = self
         registerCategories()
@@ -34,7 +35,7 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
             await refreshAuthorizationStatus()
             return granted
         } catch {
-            print("[WrenchLog] Notification auth failed: \(error)")
+            Logger.reminders.error("Notification auth failed: \(error)")
             return false
         }
     }
@@ -142,15 +143,14 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
         let start = ReminderStore.quietHoursStart
         let end = ReminderStore.quietHoursEnd
 
-        let isQuiet: Bool
-        if start > end {
+        let isQuiet: Bool = if start > end {
             // Wraps midnight: e.g. 22–8
-            isQuiet = hour >= start || hour < end
+            hour >= start || hour < end
         } else if start < end {
             // Same-day range: e.g. 0–8
-            isQuiet = hour >= start && hour < end
+            hour >= start && hour < end
         } else {
-            isQuiet = false
+            false
         }
 
         if isQuiet {
@@ -220,7 +220,7 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
             "serviceType": serviceType.rawValue,
             "vehicleName": vehicleName,
             "vehicleId": vehicleId.uuidString,
-            "isEscalated": isEscalated
+            "isEscalated": isEscalated,
         ]
 
         return content
@@ -252,7 +252,7 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
             from: triggerDate
         )
         // Ensure we don't schedule in deep night if quiet hours somehow missed
-        if components.hour == nil || components.hour! < 8 {
+        if (components.hour ?? 0) < 8 {
             components.hour = 9
         }
 
@@ -275,14 +275,14 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
     // MARK: - UNUserNotificationCenterDelegate
 
     nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
+        _: UNUserNotificationCenter,
+        willPresent _: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
     }
 
     nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
+        _: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
         let userInfo = response.notification.request.content.userInfo
@@ -296,7 +296,7 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
             ReminderStore.clearSnooze(for: vehicleId, serviceType: serviceType)
 
         case ReminderAction.snooze:
-            let oneWeek = Calendar.current.date(byAdding: .day, value: 7, to: .now)!
+            let oneWeek = Calendar.current.safeDate(byAdding: .day, value: 7, to: .now)
             ReminderStore.setSnooze(for: vehicleId, serviceType: serviceType, until: oneWeek)
 
         default:

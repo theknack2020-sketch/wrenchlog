@@ -41,14 +41,14 @@ struct DrivingPace {
 // MARK: - Service Reminder
 
 struct ServiceReminder: Identifiable {
-    let id: String               // serviceType.rawValue
+    let id: String // serviceType.rawValue
     let serviceType: ServiceType
     let urgency: ReminderUrgency
     let displayDue: String
     let nextDueDate: Date?
     let nextDueMileage: Int?
     let lastServiceDate: Date?
-    let daysOverdue: Int         // positive = overdue by N days, 0 = not overdue
+    let daysOverdue: Int // positive = overdue by N days, 0 = not overdue
 }
 
 // MARK: - Batch Notification Item
@@ -65,8 +65,7 @@ struct BatchNotificationItem {
 
 // MARK: - Service Reminder Engine
 
-struct ServiceReminderEngine {
-
+enum ServiceReminderEngine {
     @MainActor
     static func reminders(for vehicle: Vehicle) -> [ServiceReminder] {
         let calendar = Calendar.current
@@ -150,18 +149,17 @@ struct ServiceReminderEngine {
 
             // ── Merge: pick the more urgent of time vs mileage ──
             let urgency = min(timeUrgency, mileageUrgency) // min = more urgent (overdue < due < dueSoon < ok)
-            let displayDue: String
-            if timeUrgency < mileageUrgency {
+            let displayDue: String = if timeUrgency < mileageUrgency {
                 // Time is more urgent — lead with time, append mileage hint
-                displayDue = mileageDisplay.isEmpty ? timeDisplay : "\(timeDisplay) · \(mileageDisplay)"
+                mileageDisplay.isEmpty ? timeDisplay : "\(timeDisplay) · \(mileageDisplay)"
             } else if mileageUrgency < timeUrgency {
                 // Mileage is more urgent — lead with mileage, append time hint
-                displayDue = timeDisplay.isEmpty ? mileageDisplay : "\(mileageDisplay) · \(timeDisplay)"
+                timeDisplay.isEmpty ? mileageDisplay : "\(mileageDisplay) · \(timeDisplay)"
             } else if !timeDisplay.isEmpty && !mileageDisplay.isEmpty {
                 // Same urgency — show both with separator
-                displayDue = "\(timeDisplay) · \(mileageDisplay)"
+                "\(timeDisplay) · \(mileageDisplay)"
             } else {
-                displayDue = timeDisplay.isEmpty ? mileageDisplay : timeDisplay
+                timeDisplay.isEmpty ? mileageDisplay : timeDisplay
             }
 
             // Skip if no record and interval requires one
@@ -195,7 +193,8 @@ struct ServiceReminderEngine {
 
         guard records.count >= 2,
               let first = records.first,
-              let last = records.last else {
+              let last = records.last
+        else {
             return nil
         }
 
@@ -220,7 +219,7 @@ struct ServiceReminderEngine {
             return Calendar.current.date(byAdding: .day, value: -7, to: dueDate)
         }
 
-        if let dueMileage = reminder.nextDueMileage, let pace = pace, pace.milesPerMonth > 0 {
+        if let dueMileage = reminder.nextDueMileage, let pace, pace.milesPerMonth > 0 {
             let milesRemaining = dueMileage - vehicleCurrentMileage
             guard milesRemaining > 0 else { return nil }
             let monthsRemaining = Double(milesRemaining) / pace.milesPerMonth
@@ -260,7 +259,8 @@ struct ServiceReminderEngine {
             for reminder in reminders {
                 // Check snooze
                 if let snoozeEnd = ReminderStore.snoozeDate(for: vehicle.id, serviceType: reminder.id),
-                   snoozeEnd > Date() {
+                   snoozeEnd > Date()
+                {
                     items.append(BatchNotificationItem(
                         vehicleId: vehicle.id,
                         vehicleName: vehicle.displayName,
@@ -277,7 +277,7 @@ struct ServiceReminderEngine {
                 case .overdue:
                     let isEscalated = reminder.daysOverdue >= escalationDays
                     // Schedule for tomorrow
-                    let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date())!
+                    let tomorrow = calendar.safeDate(byAdding: .day, value: 1, to: Date())
                     items.append(BatchNotificationItem(
                         vehicleId: vehicle.id,
                         vehicleName: vehicle.displayName,
@@ -290,7 +290,7 @@ struct ServiceReminderEngine {
 
                     // Escalated: also schedule day-after-tomorrow for persistence
                     if isEscalated {
-                        let dayAfter = calendar.date(byAdding: .day, value: 2, to: Date())!
+                        let dayAfter = calendar.safeDate(byAdding: .day, value: 2, to: Date())
                         items.append(BatchNotificationItem(
                             vehicleId: vehicle.id,
                             vehicleName: vehicle.displayName,
@@ -303,7 +303,7 @@ struct ServiceReminderEngine {
                     }
 
                 case .due:
-                    let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date())!
+                    let tomorrow = calendar.safeDate(byAdding: .day, value: 1, to: Date())
                     items.append(BatchNotificationItem(
                         vehicleId: vehicle.id,
                         vehicleName: vehicle.displayName,

@@ -1,5 +1,8 @@
-import SwiftUI
+import OSLog
 import SwiftData
+import SwiftUI
+import TelemetryDeck
+import TipKit
 
 @main
 struct WrenchLogApp: App {
@@ -13,38 +16,56 @@ struct WrenchLogApp: App {
 
     private let modelContainer: ModelContainer
 
+    @State private var showDataError = false
+
     init() {
-        // Crash-safe container initialization with fallback
+        let schema = Schema(versionedSchema: WrenchLogSchemaV4.self)
+
+        // Crash-safe container initialization with migration plan
         do {
-            let schema = Schema([Vehicle.self, ServiceRecord.self, FuelLog.self, MaintenanceChecklistItem.self, VehicleDocument.self])
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
-            modelContainer = try ModelContainer(for: schema, configurations: [config])
+            modelContainer = try ModelContainer(
+                for: schema,
+                migrationPlan: WrenchLogMigrationPlan.self,
+                configurations: [config]
+            )
         } catch {
-            // If migration or store creation fails, log and attempt a fresh container.
-            // This prevents a crash loop from corrupt data.
-            print("[WrenchLog] CRITICAL: ModelContainer init failed: \(error)")
-            print("[WrenchLog] Attempting fallback with fresh store...")
+            // If migration fails, attempt a fresh store
+            Logger.app.fault("ModelContainer init failed: \(error)")
+            Logger.app.warning("Attempting fallback with fresh store")
             do {
-                let schema = Schema([Vehicle.self, ServiceRecord.self, FuelLog.self, MaintenanceChecklistItem.self, VehicleDocument.self])
                 let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
-                // Attempt to remove corrupt store
                 let storeURL = config.url
-                do {
-                    try FileManager.default.removeItem(at: storeURL)
-                } catch { /* ignore if file doesn't exist */ }
-                // Also remove WAL and SHM files
-                let walURL = storeURL.appendingPathExtension("wal")
-                let shmURL = storeURL.appendingPathExtension("shm")
-                try? FileManager.default.removeItem(at: walURL)
-                try? FileManager.default.removeItem(at: shmURL)
-                modelContainer = try ModelContainer(for: schema, configurations: [config])
+                try? FileManager.default.removeItem(at: storeURL)
+                try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("wal"))
+                try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("shm"))
+                modelContainer = try ModelContainer(
+                    for: schema,
+                    migrationPlan: WrenchLogMigrationPlan.self,
+                    configurations: [config]
+                )
             } catch {
-                fatalError("[WrenchLog] Cannot create ModelContainer even with fresh store: \(error)")
+                // Last resort: in-memory container to avoid crash loop
+                Logger.app.fault("Cannot create persistent store: \(error). Using in-memory fallback.")
+                let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                // In-memory ModelContainer creation is safe — schema is already validated
+                modelContainer = Self.makeInMemoryContainer(schema: schema, config: memConfig)
+                // Flag to show user alert about data loss
+                DispatchQueue.main.async { [self] in
+                    showDataError = true
+                }
             }
         }
 
         // Enable autosave for crash safety
         modelContainer.mainContext.autosaveEnabled = true
+
+        // Initialize TelemetryDeck analytics
+        TelemetryService.initialize()
+        TelemetryService.appLaunched()
+
+        // Initialize TipKit for feature discovery
+        try? Tips.configure()
 
         // Register Home Screen Quick Actions
         Self.registerQuickActions()
@@ -54,13 +75,7 @@ struct WrenchLogApp: App {
         WindowGroup {
             Group {
                 if showOnboarding {
-                    OnboardingView(isComplete: $showOnboarding)
-                        .onChange(of: showOnboarding) { _, done in
-                            if done {
-                                UserDefaults.standard.set(true, forKey: "wl_onboarding_complete")
-                                showOnboarding = false
-                            }
-                        }
+                    OnboardingView(isShowing: $showOnboarding)
                 } else {
                     ContentView()
                         .environment(\.pendingQuickAction, $pendingQuickAction)
@@ -71,7 +86,7 @@ struct WrenchLogApp: App {
             .tint(themeManager.current.accent)
             .onAppear {
                 // Show What's New sheet if version changed (and onboarding is done)
-                if !showOnboarding && WhatsNewSheet.shouldShow {
+                if !showOnboarding, WhatsNewSheet.shouldShow {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         showWhatsNew = true
                     }
@@ -107,6 +122,23 @@ struct WrenchLogApp: App {
         .modelContainer(modelContainer)
     }
 
+    // MARK: - Container Fallback
+
+    /// Creates an in-memory ModelContainer as a last resort.
+    /// In-memory containers with a valid schema do not fail in practice.
+    private static func makeInMemoryContainer(schema: Schema, config: ModelConfiguration) -> ModelContainer {
+        if let container = try? ModelContainer(for: schema, configurations: [config]) {
+            return container
+        }
+        // Absolute fallback — effectively unreachable because in-memory stores always succeed
+        Logger.app.fault("In-memory container failed with provided config, trying bare minimum")
+        let bare = ModelConfiguration(isStoredInMemoryOnly: true)
+        guard let container = try? ModelContainer(for: schema, configurations: [bare]) else {
+            preconditionFailure("ModelContainer cannot be created even in-memory — corrupted binary")
+        }
+        return container
+    }
+
     // MARK: - Home Screen Quick Actions
 
     private static func registerQuickActions() {
@@ -135,17 +167,8 @@ enum QuickActionService {
     nonisolated(unsafe) static var pendingAction: String?
 }
 
-// MARK: - Quick Action Environment Key
-
-private struct PendingQuickActionKey: EnvironmentKey {
-    static let defaultValue: Binding<String?> = .constant(nil)
-}
-
 extension EnvironmentValues {
-    var pendingQuickAction: Binding<String?> {
-        get { self[PendingQuickActionKey.self] }
-        set { self[PendingQuickActionKey.self] = newValue }
-    }
+    @Entry var pendingQuickAction: Binding<String?> = .constant(nil)
 }
 
 // MARK: - Quick Action App Delegate
@@ -153,7 +176,7 @@ extension EnvironmentValues {
 /// Handles Home Screen Quick Actions when the app is already running (warm launch).
 class QuickActionAppDelegate: NSObject, UIApplicationDelegate {
     func application(
-        _ application: UIApplication,
+        _: UIApplication,
         performActionFor shortcutItem: UIApplicationShortcutItem,
         completionHandler: @escaping (Bool) -> Void
     ) {
