@@ -14,3 +14,14 @@ fastlane/api_key.json
 .gsd/runtime/
 .gsd/activity/
 .gsd/worktrees/
+
+# App Store screenshots (large PNGs, don't track in git)
+fastlane/screenshots/
+
+# screenshot artifacts — untracked per house rule (2026-07-03)
+fastlane/screenshots/
+screenshots/
+build_sim/
+build_sim26/
+build_output/
+*.xcarchive

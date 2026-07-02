@@ -1,3 +1,4 @@
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -40,7 +41,7 @@ struct DataManager {
         do {
             try context.save()
         } catch {
-            print("[WrenchLog] Save error: \(error)")
+            Logger.data.error("Save failed: \(error)")
             throw .saveFailed(underlying: error)
         }
     }
@@ -52,7 +53,7 @@ struct DataManager {
             try context.save()
             return true
         } catch {
-            print("[WrenchLog] Save error: \(error)")
+            Logger.data.error("Save failed: \(error)")
             return false
         }
     }
@@ -66,7 +67,7 @@ struct DataManager {
         do {
             return try context.fetch(descriptor)
         } catch {
-            print("[WrenchLog] Fetch error: \(error)")
+            Logger.data.error("Fetch failed: \(error)")
             throw .fetchFailed(underlying: error)
         }
     }
@@ -81,7 +82,7 @@ struct DataManager {
         do {
             try context.save()
         } catch {
-            print("[WrenchLog] Delete+save error: \(error)")
+            Logger.data.error("Delete+save failed: \(error)")
             throw .deleteFailed(underlying: error)
         }
     }
@@ -96,7 +97,7 @@ struct DataManager {
         do {
             try context.save()
         } catch {
-            print("[WrenchLog] Insert+save error: \(error)")
+            Logger.data.error("Insert+save failed: \(error)")
             throw .saveFailed(underlying: error)
         }
     }

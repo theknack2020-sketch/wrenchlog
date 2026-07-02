@@ -1,3 +1,4 @@
+import OSLog
 import EventKit
 import Foundation
 
@@ -37,7 +38,7 @@ final class CalendarService {
                 return try await eventStore.requestAccess(to: .event)
             }
         } catch {
-            print("[WrenchLog] Calendar access request failed: \(error)")
+            Logger.calendar.error("Calendar access request failed: \(error)")
             return false
         }
     }
@@ -62,7 +63,7 @@ final class CalendarService {
         } else if let localSource = eventStore.sources.first(where: { $0.sourceType == .local }) {
             calendar.source = localSource
         } else {
-            print("[WrenchLog] No calendar source available")
+            Logger.calendar.warning("No calendar source available")
             return nil
         }
 
@@ -70,7 +71,7 @@ final class CalendarService {
             try eventStore.saveCalendar(calendar, commit: true)
             return calendar
         } catch {
-            print("[WrenchLog] Failed to create WrenchLog calendar: \(error)")
+            Logger.calendar.error("Failed to create calendar: \(error)")
             return nil
         }
     }
@@ -119,7 +120,7 @@ final class CalendarService {
             try eventStore.save(event, span: .thisEvent)
             return event.eventIdentifier
         } catch {
-            print("[WrenchLog] Failed to save calendar event: \(error)")
+            Logger.calendar.error("Failed to save event: \(error)")
             return nil
         }
     }
@@ -135,7 +136,7 @@ final class CalendarService {
         do {
             try eventStore.remove(event, span: .thisEvent)
         } catch {
-            print("[WrenchLog] Failed to remove calendar event: \(error)")
+            Logger.calendar.error("Failed to remove event: \(error)")
         }
     }
 

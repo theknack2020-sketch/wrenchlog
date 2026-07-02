@@ -1,3 +1,4 @@
+import OSLog
 import Foundation
 import SwiftData
 
@@ -48,7 +49,7 @@ struct DataExportImportService {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
         } catch {
-            print("[WrenchLog] Failed to write temp file: \(error)")
+            Logger.export.error("Failed to write temp file: \(error)")
             return nil
         }
     }

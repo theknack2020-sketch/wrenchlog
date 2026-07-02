@@ -11,3 +11,4 @@
 | K007 | Age rating: scale fields = "NONE" string, toggle fields = false boolean | AquaFaste M002 |
 | K008 | Competitor apps (CARFAX, Drivvo) collect excessive user data — privacy is a differentiator | Web research |
 | K009 | ServiceLog charges $24.99/yr or $69.99 lifetime — there's willingness to pay in this category | Web research |
+| K010 | Onboarding binding inversion bug: if `@Binding var isComplete` is bound to `showOnboarding` (true=showing), setting `isComplete = true` is a no-op because the value doesn't change. Use `isShowing` with `= false` to dismiss, or invert the semantics. Always test onboarding dismiss on iPad. | WrenchLog 1.0.0 rejection — Guideline 2.1(a) |

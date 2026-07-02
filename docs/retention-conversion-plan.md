@@ -29,7 +29,7 @@ Vehicle maintenance apps: low daily engagement by nature. Users open when they s
 | **PDF Reports** | ❌ | ✅ |
 | **CSV Export** | ❌ | ✅ |
 | **Receipt Photos** | ❌ | ✅ |
-| **Custom Categories** | ❌ | ✅ |
+| **Spending Projections** | ❌ | ✅ |
 | **All Color Themes** (3/5 locked) | 2 themes | 5 themes |
 
 ### Why This Split Works

@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 import PhotosUI
 
@@ -29,7 +30,7 @@ struct ServicePhotoManager {
         do {
             try FileManager.default.createDirectory(at: documentsURL, withIntermediateDirectories: true)
         } catch {
-            print("[WrenchLog] Failed to create photos directory: \(error)")
+            Logger.media.error("Failed to create photos directory: \(error)")
         }
     }
 
@@ -65,7 +66,7 @@ struct ServicePhotoManager {
             try dataToWrite.write(to: url, options: .atomic)
             return .success(fileName: fileName)
         } catch {
-            print("[WrenchLog] Photo write failed: \(error)")
+            Logger.media.error("Photo write failed: \(error)")
             return .failure(reason: "Failed to save photo: \(error.localizedDescription)")
         }
     }

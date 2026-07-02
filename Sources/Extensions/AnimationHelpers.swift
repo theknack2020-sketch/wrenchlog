@@ -193,66 +193,184 @@ struct ProgressRing: View {
     }
 }
 
-// MARK: - Celebration Overlay
+// MARK: - Premium Card Style
 
-/// Confetti-like particles that burst and fade — lightweight, no SpriteKit.
-struct CelebrationOverlay: View {
-    @Binding var isShowing: Bool
-    @State private var particles: [CelebrationParticle] = []
+/// Press-responsive card with scale, shadow depth change, and subtle rotation.
+/// Respects `accessibilityReduceMotion`.
+struct PremiumCardStyle: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPressed = false
 
-    var body: some View {
-        ZStack {
-            ForEach(particles) { particle in
-                Circle()
-                    .fill(particle.color)
-                    .frame(width: particle.size, height: particle.size)
-                    .offset(x: particle.offsetX, y: particle.offsetY)
-                    .opacity(particle.opacity)
-            }
-        }
-        .allowsHitTesting(false)
-        .onChange(of: isShowing) { _, show in
-            if show { burst() }
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(isPressed ? 0.97 : 1.0)
+            .rotation3DEffect(
+                .degrees(isPressed ? -0.5 : 0),
+                axis: (x: 1, y: 0, z: 0)
+            )
+            .shadow(
+                color: .black.opacity(isPressed ? 0.10 : 0.18),
+                radius: isPressed ? 4 : 8,
+                y: isPressed ? 2 : 4
+            )
+            .shadow(
+                color: .black.opacity(0.05),
+                radius: 2,
+                y: 1
+            )
+            .animation(
+                reduceMotion ? .none : .spring(response: 0.25, dampingFraction: 0.7),
+                value: isPressed
+            )
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        if !isPressed { isPressed = true }
+                    }
+                    .onEnded { _ in isPressed = false }
+            )
+    }
+}
+
+// MARK: - Shimmer Effect
+
+/// Loading placeholder shimmer using a gradient mask animation.
+/// Respects `accessibilityReduceMotion`.
+struct ShimmerEffect: ViewModifier {
+    let active: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase: CGFloat = -1.0
+
+    func body(content: Content) -> some View {
+        if active && !reduceMotion {
+            content
+                .overlay(shimmerOverlay)
+                .onAppear { startShimmer() }
+        } else if active {
+            // Reduce motion: static low-opacity pulse instead
+            content.opacity(0.6)
+        } else {
+            content
         }
     }
 
-    private func burst() {
-        let colors: [Color] = [.wrenchAmber, .wrenchAmberLight, .wrenchGreen, .catEngine, .catTires]
-        particles = (0..<20).map { i in
-            CelebrationParticle(
-                id: i,
-                color: colors[i % colors.count],
-                size: CGFloat.random(in: 4...10),
-                offsetX: 0,
-                offsetY: 0,
-                opacity: 1
+    private var shimmerOverlay: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .white.opacity(0.4), location: 0.3),
+                    .init(color: .white.opacity(0.6), location: 0.5),
+                    .init(color: .white.opacity(0.4), location: 0.7),
+                    .init(color: .clear, location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
             )
+            .frame(width: width * 0.6)
+            .offset(x: phase * width)
+            .blendMode(.softLight)
         }
+        .clipped()
+    }
 
-        withAnimation(.easeOut(duration: 0.9)) {
-            particles = particles.map { p in
-                var copy = p
-                copy.offsetX = CGFloat.random(in: -120...120)
-                copy.offsetY = CGFloat.random(in: -150...(-30))
-                copy.opacity = 0
-                return copy
-            }
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            isShowing = false
-            particles = []
+    private func startShimmer() {
+        withAnimation(
+            .linear(duration: 1.4)
+            .repeatForever(autoreverses: false)
+        ) {
+            phase = 1.5
         }
     }
 }
 
-struct CelebrationParticle: Identifiable {
-    let id: Int
+// MARK: - Count Up Animation
+
+/// Animates a number from 0 to the target value using `Animatable`.
+/// Respects `accessibilityReduceMotion` — shows the final value immediately if enabled.
+struct CountUpText: View, Animatable {
+    var targetValue: Double
+    let format: (Double) -> String
+    let font: Font
     let color: Color
-    let size: CGFloat
-    var offsetX: CGFloat
-    var offsetY: CGFloat
-    var opacity: Double
+
+    nonisolated var animatableData: Double {
+        get { targetValue }
+        set { targetValue = newValue }
+    }
+
+    var body: some View {
+        Text(format(targetValue))
+            .font(font)
+            .foregroundStyle(color)
+    }
+}
+
+/// Modifier that drives the count-up from 0 to a target value.
+struct CountUpAnimation: ViewModifier {
+    let targetValue: Double
+    let duration: Double
+    let format: (Double) -> String
+    let font: Font
+    let color: Color
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var animatedValue: Double = 0
+
+    func body(content: Content) -> some View {
+        CountUpText(
+            targetValue: animatedValue,
+            format: format,
+            font: font,
+            color: color
+        )
+        .onAppear {
+            if reduceMotion {
+                animatedValue = targetValue
+            } else {
+                withAnimation(.easeOut(duration: duration)) {
+                    animatedValue = targetValue
+                }
+            }
+        }
+        .onChange(of: targetValue) { _, newVal in
+            if reduceMotion {
+                animatedValue = newVal
+            } else {
+                withAnimation(.easeOut(duration: duration * 0.7)) {
+                    animatedValue = newVal
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Glow Pulse
+
+/// Subtle pulsing glow around an element.
+/// Respects `accessibilityReduceMotion`.
+struct GlowPulse: ViewModifier {
+    let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var glowing = false
+
+    func body(content: Content) -> some View {
+        content
+            .shadow(
+                color: color.opacity(glowing ? 0.5 : 0.15),
+                radius: glowing ? 12 : 6
+            )
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(
+                    .easeInOut(duration: 1.6)
+                    .repeatForever(autoreverses: true)
+                ) {
+                    glowing = true
+                }
+            }
+    }
 }
 
 // MARK: - Animated Mileage Counter
@@ -371,6 +489,21 @@ extension View {
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
             .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
             .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
+    }
+
+    /// Premium card — press-responsive with scale, shadow depth, and subtle rotation.
+    func premiumCard() -> some View {
+        modifier(PremiumCardStyle())
+    }
+
+    /// Loading shimmer overlay. Pass `active: true` to show.
+    func shimmer(active: Bool) -> some View {
+        modifier(ShimmerEffect(active: active))
+    }
+
+    /// Subtle pulsing glow around the element.
+    func glowPulse(color: Color = Color.amber.shade500) -> some View {
+        modifier(GlowPulse(color: color))
     }
 
     /// Section header with rounded design font.

@@ -11,66 +11,106 @@ enum AppTheme: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var accent: Color {
+    // MARK: - Accent Palette Access
+
+    /// Full 9-shade tonal scale for this theme's accent.
+    var accentPalette: Color.TonalScale {
         switch self {
-        case .defaultAmber: Color(red: 0.91, green: 0.64, blue: 0.09)
-        case .oceanBlue: Color(red: 0.20, green: 0.55, blue: 0.85)
-        case .darkMono: Color(red: 0.65, green: 0.65, blue: 0.68)
-        case .forestGreen: Color(red: 0.18, green: 0.62, blue: 0.38)
-        case .sunsetRose: Color(red: 0.85, green: 0.35, blue: 0.42)
+        case .defaultAmber: Color.amber
+        case .oceanBlue:    Color.ocean
+        case .darkMono:     Color.mono
+        case .forestGreen:  Color.forest
+        case .sunsetRose:   Color.rose
         }
     }
 
-    var accentLight: Color {
-        switch self {
-        case .defaultAmber: Color(red: 1.0, green: 0.71, blue: 0.15)
-        case .oceanBlue: Color(red: 0.35, green: 0.68, blue: 0.95)
-        case .darkMono: Color(red: 0.78, green: 0.78, blue: 0.80)
-        case .forestGreen: Color(red: 0.30, green: 0.75, blue: 0.50)
-        case .sunsetRose: Color(red: 0.95, green: 0.50, blue: 0.55)
-        }
-    }
+    var accent: Color { accentPalette.shade500 }
+    var accentLight: Color { accentPalette.shade400 }
 
     var icon: String {
         switch self {
         case .defaultAmber: "sun.max.fill"
-        case .oceanBlue: "water.waves"
-        case .darkMono: "moon.fill"
-        case .forestGreen: "leaf.fill"
-        case .sunsetRose: "sunrise.fill"
+        case .oceanBlue:    "water.waves"
+        case .darkMono:     "moon.fill"
+        case .forestGreen:  "leaf.fill"
+        case .sunsetRose:   "sunrise.fill"
         }
     }
 
     var preferredColorScheme: ColorScheme? {
         switch self {
-        case .defaultAmber: nil
-        case .oceanBlue: nil
         case .darkMono: .dark
-        case .forestGreen: nil
-        case .sunsetRose: nil
+        default: nil
         }
     }
 
+    // MARK: - Gradients
+
     /// Primary gradient for headers, banners, and CTA buttons
     var headerGradient: [Color] {
-        switch self {
-        case .defaultAmber: [Color(red: 0.91, green: 0.64, blue: 0.09), Color(red: 0.85, green: 0.55, blue: 0.05)]
-        case .oceanBlue: [Color(red: 0.15, green: 0.45, blue: 0.80), Color(red: 0.25, green: 0.60, blue: 0.90)]
-        case .darkMono: [Color(red: 0.30, green: 0.30, blue: 0.34), Color(red: 0.20, green: 0.20, blue: 0.24)]
-        case .forestGreen: [Color(red: 0.12, green: 0.55, blue: 0.32), Color(red: 0.22, green: 0.70, blue: 0.42)]
-        case .sunsetRose: [Color(red: 0.85, green: 0.30, blue: 0.38), Color(red: 0.92, green: 0.50, blue: 0.45)]
-        }
+        [accentPalette.shade500, accentPalette.shade700]
     }
 
     /// Softer gradient for section backgrounds and cards
     var sectionGradient: [Color] {
         switch self {
-        case .defaultAmber: [accent.opacity(0.15), accent.opacity(0.05)]
-        case .oceanBlue: [accent.opacity(0.15), accent.opacity(0.05)]
-        case .darkMono: [Color(red: 0.22, green: 0.22, blue: 0.25), Color(red: 0.16, green: 0.16, blue: 0.18)]
-        case .forestGreen: [accent.opacity(0.15), accent.opacity(0.05)]
-        case .sunsetRose: [accent.opacity(0.15), accent.opacity(0.05)]
+        case .darkMono:
+            [Color.Neutral.shade700, Color.Neutral.shade800]
+        default:
+            [accentPalette.shade500.opacity(0.15), accentPalette.shade500.opacity(0.05)]
         }
+    }
+
+    /// Card-specific gradient — subtle shimmer for elevated surfaces
+    var cardGradient: [Color] {
+        switch self {
+        case .darkMono:
+            [Color.Neutral.shade700.opacity(0.8), Color.Neutral.shade800.opacity(0.6)]
+        default:
+            [accentPalette.shade50.opacity(0.6), accentPalette.shade100.opacity(0.3)]
+        }
+    }
+
+    // MARK: - Surface & Text Colors (programmatic dark mode)
+
+    /// Main background surface — light in light mode, dark in dark mode
+    var surfaceColor: Color {
+        Color(UIColor { traits in
+            if traits.userInterfaceStyle == .dark {
+                return UIColor(Color.Neutral.shade900)
+            }
+            return UIColor(Color.Neutral.shade50)
+        })
+    }
+
+    /// Primary text — high contrast
+    var textPrimary: Color {
+        Color(UIColor { traits in
+            if traits.userInterfaceStyle == .dark {
+                return UIColor(Color.Neutral.shade100)
+            }
+            return UIColor(Color.Neutral.shade900)
+        })
+    }
+
+    /// Secondary text — medium contrast for descriptions, timestamps
+    var textSecondary: Color {
+        Color(UIColor { traits in
+            if traits.userInterfaceStyle == .dark {
+                return UIColor(Color.Neutral.shade400)
+            }
+            return UIColor(Color.Neutral.shade600)
+        })
+    }
+
+    /// Tertiary text — low contrast for hints, captions, disabled states
+    var textTertiary: Color {
+        Color(UIColor { traits in
+            if traits.userInterfaceStyle == .dark {
+                return UIColor(Color.Neutral.shade500)
+            }
+            return UIColor(Color.Neutral.shade400)
+        })
     }
 }
 

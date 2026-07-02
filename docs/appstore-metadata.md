@@ -19,9 +19,11 @@
 ## 2. Keywords (max 100 chars, comma-separated)
 
 ```
-car maintenance,service log,oil change,fuel tracker,mpg,vehicle history,mileage,reminder,auto care
+oil change,mpg,vehicle history,mileage,reminder,auto care,vin decoder,recall,fleet,garage,repair,diy
 ```
-**Chars: 99/100**
+**Chars: 100/100**
+
+**Strategy:** Title has "Car Maintenance", subtitle has "Service Tracker & Fuel Log" — Apple indexes these automatically. Keywords focus on terms NOT in title/subtitle: oil change, mpg, VIN decoder, recall, fleet, garage, repair, diy.
 
 ---
 
@@ -33,7 +35,7 @@ WrenchLog is the private, ad-free vehicle maintenance tracker that keeps your ca
 No account. No ads. No tracking. Your data stays on your device — period.
 
 ▸ TRACK EVERY SERVICE
-Log oil changes, tire rotations, brake work, battery replacements, and 22 preset service types — or create your own custom categories. Record date, mileage, cost, notes, and attach receipt photos to every entry.
+Log oil changes, tire rotations, brake work, battery replacements, and 30+ preset service types across 6 categories. Record date, mileage, cost, notes, and attach receipt photos to every entry.
 
 ▸ FUEL TRACKING & EFFICIENCY
 Log every fill-up with fuel type, volume, cost, and station name. WrenchLog automatically calculates your MPG (or L/100km), cost per mile, and tracks efficiency trends over time with interactive charts. Supports Regular, Mid-Grade, Premium, Diesel, E85, and Electric vehicles.
@@ -81,7 +83,7 @@ WrenchLog collects zero personal data. No account signup. No analytics SDKs. No 
 Whether you're a weekend wrench-turner who does their own oil changes, a family managing two cars, or someone who just wants proof of maintenance when selling — WrenchLog gives you a complete ownership record without the bloat.
 
 FREE: 1 vehicle, service logging, fuel tracking, smart reminders, checklist, timeline.
-PRO: Unlimited vehicles, receipt photos, PDF reports, cost analytics, CSV export, custom categories.
+PRO: Unlimited vehicles, receipt photos, PDF reports, cost analytics, CSV export, spending projections.
 
 Questions? theknack2020@gmail.com
 Privacy Policy: https://theknack2020-sketch.github.io/wrenchlog/privacy/
@@ -119,7 +121,7 @@ Track every oil change, fill-up, and repair. Smart reminders learn your driving 
 ```
 Welcome to WrenchLog! 🔧
 
-• Track services with 22 preset types or custom categories
+• Track services with 30+ preset types across 6 categories
 • Log fuel fill-ups with MPG/L100km efficiency tracking
 • Smart reminders based on time, mileage, and driving pace
 • Vehicle health score (0–100)
@@ -143,7 +145,7 @@ Your car deserves organized records. Your data deserves to stay private.
 |---|--------|----------|---------|
 | 1 | Garage Dashboard | Your Garage at a Glance | Health scores, costs, and reminders for every vehicle |
 | 2 | Vehicle Detail + Health | Know Your Car's Health | Maintenance score updates in real time |
-| 3 | Service Logging | Log Services in Seconds | 22 preset types, custom categories, receipt photos |
+| 3 | Service Logging | Log Services in Seconds | 30+ preset types, 6 categories, receipt photos |
 | 4 | Fuel Tracking | Track Every Fill-Up | MPG trends, cost per mile, efficiency charts |
 | 5 | Cost Analytics | See Where Your Money Goes | Service vs fuel split, monthly trends, category breakdown |
 | 6 | Reminders + Privacy | Never Miss Maintenance | Smart reminders · No ads · No tracking · 100% private |
