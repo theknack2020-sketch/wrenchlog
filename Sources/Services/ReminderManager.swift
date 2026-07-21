@@ -85,7 +85,10 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
     // MARK: - Schedule Reminders (Batch)
 
     func scheduleReminders(for vehicles: [Vehicle]) async {
-        center.removeAllPendingNotificationRequests()
+        // Remove only THIS manager's identifiers — a blanket removeAll would
+        // also wipe RetentionEngine's retention/journey notifications, which
+        // are scheduled just before this runs on dashboard open.
+        await removeOwnPendingRequests()
 
         guard ReminderStore.remindersEnabled else { return }
 
@@ -265,6 +268,17 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
 
     func cancelAll() {
         center.removeAllPendingNotificationRequests()
+    }
+
+    /// Removes only reminder/mileage-nudge requests owned by this manager,
+    /// leaving retention & journey notifications untouched.
+    private func removeOwnPendingRequests() async {
+        let pending = await center.pendingNotificationRequests()
+        let ownIDs = pending.map(\.identifier).filter {
+            $0.hasPrefix("reminder-") || $0.hasPrefix("mileage-nudge-")
+        }
+        guard !ownIDs.isEmpty else { return }
+        center.removePendingNotificationRequests(withIdentifiers: ownIDs)
     }
 
     func pendingCount() async -> Int {
