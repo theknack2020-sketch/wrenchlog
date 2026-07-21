@@ -1,1 +1,1 @@
-oil change,mpg,vehicle,history,mileage,reminder,auto,vin,recall,mechanic,garage,repair,score,health
+oil change,mpg,vehicle,mileage,reminder,auto,vin,mechanic,garage,repair,health,tracker,gas,expense

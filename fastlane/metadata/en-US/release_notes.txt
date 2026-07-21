@@ -1,30 +1,18 @@
-v1.2.0 — A major quality update. Every screen polished, paywall reimagined, and under-the-hood reliability improved.
+v1.3.0 — Safety recalls, VIN decoding, and a refreshed interface.
 
-Beautiful New Design
-Every screen now uses premium haptics, springy animations, and layered depth. Sell a vehicle, edit a service, or review reminders — all redesigned from scratch with the same world-class finish.
+Recall Alerts
+WrenchLog now checks the official NHTSA database and flags open safety recalls for your exact vehicle, right on its page — with risk, remedy, and report date.
 
-Prominent Health Score
-Your car's 0-100 health score now lives front and center on the detail view, with a full color-coded ring. Know at a glance whether your ride is on track or needs attention.
+VIN Decoder
+Type your 17-digit VIN and WrenchLog fills in year, make, model, and engine details for you. No manual entry.
 
-Smarter Empty States
-Upcoming services, checklists, and timelines now use polished empty-state screens so you always know what to do next.
+Refined Interface
+All five color themes tuned across every screen — cleaner forms, sharper charts, and consistent colors in light and dark mode.
 
-Better Paywall Experience
-The Pro upgrade presents as a full-screen experience — no accidental swipe dismisses. Cleaner comparison tables, tappable "Restore Purchases" that actually works, and Terms + Privacy always one tap away.
+Sharper Analytics
+Cost breakdowns and fuel-efficiency charts polished and faster, with clearer legends and localized dates.
 
-2 Free Vehicles
-We've doubled the free tier. Track two vehicles without going Pro. Gate, comparison table, and upgrade prompts all say the same thing.
-
-Helpful Tips
-Discover features as you use the app. Built on Apple TipKit so tips only appear when you're ready for them.
-
-Full Dynamic Type
-Every hardcoded font size has been replaced with Dynamic Type. Crank up your accessibility text — the whole app scales with you.
-
-Crash Protection
-24 unsafe Calendar paths hardened. Zero force-unwraps in production code. If anything ever fails, the app falls back gracefully instead of crashing.
-
-Faster, Cleaner Release
-Migrated deprecated colors to the new design system. Currency values now display with thousand separators. Onboarding skips correctly for returning users. Dozens of small polish fixes.
+Quality
+Quick actions are more reliable, recall dates display in your local format, and dozens of small fixes landed throughout.
 
 No ads. No tracking. Your maintenance data stays on your device and in iCloud.

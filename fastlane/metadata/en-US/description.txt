@@ -48,7 +48,7 @@ Earn badges as you build your history — First Service, Dedicated, Road Warrior
 Miles or kilometers. Gallons or liters. MPG or L/100km. WrenchLog speaks your language.
 
 ▸ FIVE COLOR THEMES
-Default Amber, Ocean Blue, Dark Mono, Forest Green, or Sunset Rose. Pick what looks right to you.
+Amber, Ocean, Mono, Forest, or Rose. Pick what looks right to you.
 
 ▸ PRIVACY FIRST
 WrenchLog collects zero personal data. No account signup. No analytics SDKs. No third-party tracking. No ads — ever. Your vehicle data never leaves your device. We don't sell your information to data brokers, insurance companies, or anyone else.
