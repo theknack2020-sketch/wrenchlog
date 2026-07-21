@@ -2,17 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>ITSAppUsesNonExemptEncryption</key>
-    <false/>
-    <key>UIBackgroundModes</key>
-    <array>
-        <string>remote-notification</string>
-    </array>
-    <key>NSCameraUsageDescription</key>
-    <string>WrenchLog uses the camera to photograph receipts and parts for your service records.</string>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>WrenchLog accesses your photo library to attach receipt images to service records.</string>
-    <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>WrenchLog can add your service records to the Calendar app so you have a complete timeline of vehicle maintenance.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>WrenchLog can add your service records to the Calendar app so you have a complete timeline of vehicle maintenance.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>WrenchLog accesses your photo library to attach receipt images to service records.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
