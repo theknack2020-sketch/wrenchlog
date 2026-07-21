@@ -95,8 +95,17 @@ final class ReminderManager: NSObject, @preconcurrency UNUserNotificationCenterD
         let authorized = await requestAuthorization()
         guard authorized else { return }
 
-        // Use batch scheduling from the engine
+        // Use batch scheduling from the engine. iOS silently discards pending
+        // local notifications past 64 — sort globally by urgency then soonest
+        // trigger and cap our own budget so the most important reminders always
+        // survive (headroom left for retention/journey notifications).
+        let notificationBudget = 56
         let batchItems = ServiceReminderEngine.batchNotificationItems(for: vehicles)
+            .sorted {
+                if $0.urgency != $1.urgency { return $0.urgency < $1.urgency }
+                return $0.triggerDate < $1.triggerDate
+            }
+            .prefix(notificationBudget)
 
         for item in batchItems {
             let triggerDate = adjustForQuietHours(item.triggerDate)

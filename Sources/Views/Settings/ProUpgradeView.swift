@@ -310,7 +310,7 @@ struct ProUpgradeView: View {
                 featureCard(icon: "fuelpump.fill", title: "Fuel Trends", description: "MPG tracking & efficiency insights", color: .catFuel, index: 1)
                 featureCard(icon: "doc.richtext", title: "PDF Reports", description: "Professional service history exports", color: .catElectrical, index: 2)
                 featureCard(icon: "car.2.fill", title: "Unlimited", description: "Manage your entire fleet", color: .catTires, index: 3)
-                featureCard(icon: "paintpalette.fill", title: "Themes", description: "5 premium color palettes", color: .catFilters, index: 4)
+                featureCard(icon: "paintpalette.fill", title: "Themes", description: "Unlock all 5 color themes", color: .catFilters, index: 4)
             }
             .padding(.horizontal, 24)
         }

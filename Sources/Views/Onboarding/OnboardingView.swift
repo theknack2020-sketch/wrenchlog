@@ -344,7 +344,7 @@ struct OnboardingView: View {
                         .multilineTextAlignment(.center)
                         .staggeredAppear(index: 0)
 
-                    Text("We'll tailor your experience")
+                    Text("You can add them all in a minute")
                         .font(.system(.body, design: .rounded))
                         .foregroundStyle(.white.opacity(0.5))
                         .staggeredAppear(index: 1)
@@ -383,7 +383,7 @@ struct OnboardingView: View {
                         .multilineTextAlignment(.center)
                         .staggeredAppear(index: 0)
 
-                    Text("These help us personalize your experience")
+                    Text("A quick look at what WrenchLog can do")
                         .font(.system(.body, design: .rounded))
                         .foregroundStyle(.white.opacity(0.5))
                         .staggeredAppear(index: 1)
