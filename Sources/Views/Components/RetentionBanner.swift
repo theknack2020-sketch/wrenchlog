@@ -63,10 +63,10 @@ struct RetentionBanner: View {
                     HStack(spacing: 3) {
                         Image(systemName: "flame.fill")
                             .font(.caption2)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Color.Status.warningAdaptive)
                         Text("\(RetentionEngine.shared.currentStreak)")
                             .font(.caption2.weight(.bold).monospacedDigit())
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Color.Status.warningAdaptive)
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
@@ -83,7 +83,7 @@ struct RetentionBanner: View {
                     .fill(theme.accent.opacity(0.08))
             case .streak:
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.orange.opacity(0.08))
+                    .fill(Color.Status.warningAdaptive.opacity(0.08))
             case .tip:
                 RoundedRectangle(cornerRadius: 10)
                     .fill(.ultraThinMaterial)
@@ -106,7 +106,7 @@ struct StreakBadge: View {
                 Text("\(streak)")
                     .font(.caption2.weight(.bold).monospacedDigit())
             }
-            .foregroundStyle(.orange)
+            .foregroundStyle(Color.Status.warningAdaptive)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .background(.orange.opacity(0.12), in: Capsule())

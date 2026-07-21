@@ -17,12 +17,11 @@ struct WhatsNewSheet: View {
     }
 
     private let features: [FeatureItem] = [
-        FeatureItem(icon: "sparkles", title: "Beautiful New Design", description: "Every screen polished with premium animations and depth", color: Color.amber.shade500),
-        FeatureItem(icon: "lightbulb.fill", title: "Helpful Tips", description: "Discover features as you use the app", color: .catEngine),
-        FeatureItem(icon: "car.2.fill", title: "2 Free Vehicles", description: "Track a second vehicle on the free plan", color: .catTires),
-        FeatureItem(icon: "arrow.up.heart.fill", title: "Smoother Experience", description: "Improved stability and crash protection", color: Color.Status.success.shade500),
-        FeatureItem(icon: "wrench.adjustable.fill", title: "Refined Screens", description: "Sell, edit, and reminder settings redesigned", color: .catElectrical),
-        FeatureItem(icon: "textformat.size", title: "Full Dynamic Type", description: "All text scales with your accessibility settings", color: .catFilters),
+        FeatureItem(icon: "exclamationmark.triangle.fill", title: "Recall Alerts", description: "Open NHTSA safety recalls for your exact vehicle, right on its page", color: Color.Status.error.shade500),
+        FeatureItem(icon: "barcode.viewfinder", title: "VIN Decoder", description: "Type a VIN and we fill in year, make, model, and engine for you", color: .catElectrical),
+        FeatureItem(icon: "paintpalette.fill", title: "Refined Themes", description: "All five color themes tuned across every screen, light and dark", color: .catFilters),
+        FeatureItem(icon: "chart.pie.fill", title: "Sharper Analytics", description: "Cost breakdowns and fuel trends polished and faster", color: .catEngine),
+        FeatureItem(icon: "arrow.up.heart.fill", title: "Smoother Experience", description: "Cleaner details everywhere — dates, charts, and quick actions", color: Color.Status.success.shade500),
     ]
 
     init() {

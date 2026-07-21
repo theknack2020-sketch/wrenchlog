@@ -60,12 +60,12 @@ struct AddVehicleView: View {
                         if let err = makeError {
                             Text(err)
                                 .font(.caption2)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Color.Status.errorAdaptive)
                         }
                     }
                     .listRowBackground(
                         makeError != nil
-                            ? Color.red.opacity(0.06)
+                            ? Color.Status.errorAdaptive.opacity(0.06)
                             : Color(.secondarySystemGroupedBackground)
                     )
                     VStack(alignment: .leading, spacing: 4) {
@@ -76,12 +76,12 @@ struct AddVehicleView: View {
                         if let err = modelError {
                             Text(err)
                                 .font(.caption2)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Color.Status.errorAdaptive)
                         }
                     }
                     .listRowBackground(
                         modelError != nil
-                            ? Color.red.opacity(0.06)
+                            ? Color.Status.errorAdaptive.opacity(0.06)
                             : Color(.secondarySystemGroupedBackground)
                     )
                     Picker("Year", selection: $year) {
@@ -100,12 +100,12 @@ struct AddVehicleView: View {
                         if let err = mileageError {
                             Text(err)
                                 .font(.caption2)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Color.Status.errorAdaptive)
                         }
                     }
                     .listRowBackground(
                         mileageError != nil
-                            ? Color.red.opacity(0.06)
+                            ? Color.Status.errorAdaptive.opacity(0.06)
                             : Color(.secondarySystemGroupedBackground)
                     )
                 } header: {
@@ -202,7 +202,7 @@ struct AddVehicleView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.caption2)
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(Color.Status.successAdaptive)
                                 Text("Vehicle details filled from VIN")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
@@ -215,10 +215,10 @@ struct AddVehicleView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .font(.caption2)
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(Color.Status.errorAdaptive)
                                 Text(error)
                                     .font(.caption2)
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(Color.Status.errorAdaptive)
                             }
                             .transition(.opacity.combined(with: .move(edge: .top)))
                             .accessibilityLabel("VIN decode error: \(error)")

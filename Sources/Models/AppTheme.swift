@@ -11,6 +11,18 @@ enum AppTheme: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Short label for tight UI (theme picker chips) — raw values are persisted
+    /// in UserDefaults and must not change, so display naming lives here.
+    var displayName: String {
+        switch self {
+        case .defaultAmber: "Amber"
+        case .oceanBlue:    "Ocean"
+        case .darkMono:     "Mono"
+        case .forestGreen:  "Forest"
+        case .sunsetRose:   "Rose"
+        }
+    }
+
     // MARK: - Accent Palette Access
 
     /// Full 9-shade tonal scale for this theme's accent.

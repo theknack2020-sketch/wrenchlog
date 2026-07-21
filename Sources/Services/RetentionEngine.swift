@@ -107,27 +107,27 @@ final class RetentionEngine {
     // MARK: - Daily Tips
 
     private static let tips: [String] = [
-        "💡 Regular oil changes extend engine life by up to 50%",
-        "🔧 Rotating tires every 5,000-8,000 miles ensures even wear",
-        "🌡️ Check coolant levels before long trips — overheating is the #1 roadside issue",
-        "🛞 Proper tire pressure improves fuel efficiency by up to 3%",
-        "⚡ Car batteries typically last 3-5 years — test yours annually",
-        "🧊 Winter: check antifreeze concentration before temperatures drop",
-        "☀️ Summer: AC systems lose ~5% refrigerant per year — service annually",
-        "🔍 Check brake pads every 12,000 miles — thin pads damage rotors",
-        "💧 Replace wiper blades every 6-12 months for best visibility",
-        "🎯 Following your maintenance schedule can increase resale value by 10-15%",
-        "🚗 Air filters affect both performance and fuel economy — replace every 15-30K miles",
-        "⛽ Track fuel efficiency to catch engine problems early — sudden drops signal issues",
-        "🔋 Clean battery terminals prevent starting problems — use baking soda + water",
-        "🏎️ Synthetic oil lasts longer but costs more — check your manual for the right choice",
-        "📋 Keep all service receipts — they significantly boost resale value",
-        "🔦 Check all lights monthly — a burned-out turn signal is a common ticket",
-        "🧲 Transmission fluid should be changed every 30,000-60,000 miles",
-        "🛡️ Rust prevention: wash the undercarriage after driving on salted roads",
-        "⏱️ Timing belts typically need replacement at 60,000-100,000 miles",
-        "🌊 Power steering fluid is often overlooked — check every oil change",
-        "🔩 Loose gas caps trigger check-engine lights — always click until tight",
+        "Regular oil changes extend engine life by up to 50%",
+        "Rotating tires every 5,000-8,000 miles ensures even wear",
+        "Check coolant levels before long trips — overheating is the #1 roadside issue",
+        "Proper tire pressure improves fuel efficiency by up to 3%",
+        "Car batteries typically last 3-5 years — test yours annually",
+        "Winter: check antifreeze concentration before temperatures drop",
+        "Summer: AC systems lose ~5% refrigerant per year — service annually",
+        "Check brake pads every 12,000 miles — thin pads damage rotors",
+        "Replace wiper blades every 6-12 months for best visibility",
+        "Following your maintenance schedule can increase resale value by 10-15%",
+        "Air filters affect both performance and fuel economy — replace every 15-30K miles",
+        "Track fuel efficiency to catch engine problems early — sudden drops signal issues",
+        "Clean battery terminals prevent starting problems — use baking soda + water",
+        "Synthetic oil lasts longer but costs more — check your manual for the right choice",
+        "Keep all service receipts — they significantly boost resale value",
+        "Check all lights monthly — a burned-out turn signal is a common ticket",
+        "Transmission fluid should be changed every 30,000-60,000 miles",
+        "Rust prevention: wash the undercarriage after driving on salted roads",
+        "Timing belts typically need replacement at 60,000-100,000 miles",
+        "Power steering fluid is often overlooked — check every oil change",
+        "Loose gas caps trigger check-engine lights — always click until tight",
     ]
 
     /// Get today's tip (deterministic per day)
@@ -180,11 +180,11 @@ final class RetentionEngine {
         let now = Date()
 
         let journeyItems: [(id: String, delay: TimeInterval, title: String, body: String)] = [
-            ("journey-day1", 24 * 60 * 60, "🚗 Welcome to WrenchLog!",
+            ("journey-day1", 24 * 60 * 60, "Welcome to WrenchLog!",
              "Add your first vehicle to start tracking maintenance."),
-            ("journey-day2", 48 * 60 * 60, "🔧 Day 2: Log Your First Service",
+            ("journey-day2", 48 * 60 * 60, "Day 2: Log Your First Service",
              "Track an oil change, tire rotation, or any maintenance you've done."),
-            ("journey-day3", 72 * 60 * 60, "❤️ Day 3: Check Your Health Score",
+            ("journey-day3", 72 * 60 * 60, "Day 3: Check Your Health Score",
              "See how well-maintained your vehicle is. Open your garage to check."),
         ]
 
@@ -224,7 +224,7 @@ final class RetentionEngine {
         // 1. Daily streak reminder (if user has 2+ day streak)
         if currentStreak >= 2 {
             let content = UNMutableNotificationContent()
-            content.title = "🔥 \(currentStreak)-day streak"
+            content.title = "\(currentStreak)-day streak"
             content.body = "Don't break your streak! Open WrenchLog to keep it going."
             content.sound = .default
             content.threadIdentifier = "retention"
@@ -243,7 +243,7 @@ final class RetentionEngine {
 
         // 2. Weekly summary (Sunday 6pm)
         let weeklySummary = UNMutableNotificationContent()
-        weeklySummary.title = "📊 Your Weekly Summary"
+        weeklySummary.title = "Your Weekly Summary"
         weeklySummary.body = "See how your vehicles performed this week. Tap to check your garage."
         weeklySummary.sound = .default
         weeklySummary.threadIdentifier = "retention"
@@ -261,7 +261,7 @@ final class RetentionEngine {
 
         // 3. Inactivity nudge (3 days without opening)
         let inactivityContent = UNMutableNotificationContent()
-        inactivityContent.title = "🚗 Your vehicles miss you"
+        inactivityContent.title = "Your vehicles miss you"
         inactivityContent.body = "It's been a few days. Check if any services are due."
         inactivityContent.sound = .default
         inactivityContent.threadIdentifier = "retention"
@@ -283,7 +283,7 @@ final class RetentionEngine {
         center.removePendingNotificationRequests(withIdentifiers: ["retention-inactivity"])
 
         let content = UNMutableNotificationContent()
-        content.title = "🚗 Your vehicles miss you"
+        content.title = "Your vehicles miss you"
         content.body = "It's been a few days. Any new services to log?"
         content.sound = .default
         content.threadIdentifier = "retention"
@@ -310,7 +310,7 @@ final class RetentionEngine {
         center.removePendingNotificationRequests(withIdentifiers: ["retention-streak-risk"])
 
         let content = UNMutableNotificationContent()
-        content.title = "⚠️ Streak at risk!"
+        content.title = "Streak at risk!"
         content.body = "Your \(currentStreak)-day streak ends at midnight. Open WrenchLog to keep it alive!"
         content.sound = .default
         content.threadIdentifier = "retention"
@@ -334,7 +334,7 @@ final class RetentionEngine {
         let center = UNUserNotificationCenter.current()
 
         let content = UNMutableNotificationContent()
-        content.title = "🏆 Achievement Unlocked!"
+        content.title = "Achievement Unlocked!"
         content.body = "\(badge.title) — \(badge.detail)"
         content.sound = .default
         content.threadIdentifier = "achievement"

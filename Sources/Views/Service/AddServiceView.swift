@@ -64,12 +64,12 @@ struct AddServiceView: View {
                                 if let err = serviceTypeError {
                                     Text(err)
                                         .font(.caption2)
-                                        .foregroundStyle(.red)
+                                        .foregroundStyle(Color.Status.errorAdaptive)
                                 }
                             }
                             .listRowBackground(
                                 serviceTypeError != nil
-                                    ? Color.red.opacity(0.06)
+                                    ? Color.Status.errorAdaptive.opacity(0.06)
                                     : Color(.secondarySystemGroupedBackground)
                             )
                         } else {
@@ -134,12 +134,12 @@ struct AddServiceView: View {
                             if let err = mileageFieldError {
                                 Text(err)
                                     .font(.caption2)
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(Color.Status.errorAdaptive)
                             }
                         }
                         .listRowBackground(
                             mileageFieldError != nil
-                                ? Color.red.opacity(0.06)
+                                ? Color.Status.errorAdaptive.opacity(0.06)
                                 : Color(.secondarySystemGroupedBackground)
                         )
 
@@ -161,12 +161,12 @@ struct AddServiceView: View {
                             if let err = costFieldError {
                                 Text(err)
                                     .font(.caption2)
-                                    .foregroundStyle(.red)
+                                    .foregroundStyle(Color.Status.errorAdaptive)
                             }
                         }
                         .listRowBackground(
                             costFieldError != nil
-                                ? Color.red.opacity(0.06)
+                                ? Color.Status.errorAdaptive.opacity(0.06)
                                 : Color(.secondarySystemGroupedBackground)
                         )
                     }
@@ -259,7 +259,7 @@ struct AddServiceView: View {
                         ForEach(partsUsed, id: \.self) { part in
                             HStack {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(Color.Status.successAdaptive)
                                     .font(.caption)
                                 Text(part)
                                     .font(.subheadline)
@@ -311,7 +311,7 @@ struct AddServiceView: View {
                             } label: {
                                 HStack {
                                     Image(systemName: "drop.fill")
-                                        .foregroundStyle(.blue)
+                                        .foregroundStyle(Color.Status.infoAdaptive)
                                         .frame(width: 24)
                                         .accessibilityHidden(true)
                                     if oilType.isEmpty {
@@ -390,10 +390,10 @@ struct AddServiceView: View {
                                     HStack(spacing: 6) {
                                         Image(systemName: "exclamationmark.triangle.fill")
                                             .font(.caption2)
-                                            .foregroundStyle(.orange)
+                                            .foregroundStyle(Color.Status.warningAdaptive)
                                         Text(warning)
                                             .font(.caption)
-                                            .foregroundStyle(.orange)
+                                            .foregroundStyle(Color.Status.warningAdaptive)
                                     }
                                 }
                             }

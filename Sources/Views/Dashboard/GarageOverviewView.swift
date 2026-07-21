@@ -22,10 +22,14 @@ struct GarageOverviewView: View {
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
     @State private var isLoaded = false
-    // Quick Action sheet state
-    @State private var quickActionVehicle: Vehicle?
-    @State private var showQuickAddService = false
-    @State private var showQuickAddFuel = false
+    // Quick Action sheet state — item-driven so the sheet content can never
+    // race a separately-set vehicle and render empty.
+    @State private var quickServiceVehicle: Vehicle?
+    @State private var quickFuelVehicle: Vehicle?
+    #if DEBUG
+        // store-shots pipeline: pushed destination for `-uiState` launch arg
+        @State private var tourScreen: ScreenshotTour.State?
+    #endif
     @Environment(\.modelContext) private var context
     @Environment(\.appTheme) private var theme
     @Environment(\.pendingQuickAction) private var pendingQuickAction
@@ -124,6 +128,12 @@ struct GarageOverviewView: View {
                 VehicleDetailView(vehicle: vehicle)
                     .heroZoomTransition(id: vehicle.id, in: heroNamespace)
             }
+            #if DEBUG
+            .navigationDestination(item: $tourScreen) { screen in
+                screenshotTourDestination(screen)
+            }
+            .task { await applyScreenshotTour() }
+            #endif
             .onAppear {
                 // Shimmer loading effect
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -152,15 +162,11 @@ struct GarageOverviewView: View {
                 Text(errorMessage)
             }
             // Quick Action sheets
-            .sheet(isPresented: $showQuickAddService) {
-                if let vehicle = quickActionVehicle {
-                    AddServiceView(vehicle: vehicle)
-                }
+            .sheet(item: $quickServiceVehicle) { vehicle in
+                AddServiceView(vehicle: vehicle)
             }
-            .sheet(isPresented: $showQuickAddFuel) {
-                if let vehicle = quickActionVehicle {
-                    AddFuelLogView(vehicle: vehicle)
-                }
+            .sheet(item: $quickFuelVehicle) { vehicle in
+                AddFuelLogView(vehicle: vehicle)
             }
             .onChange(of: pendingQuickAction.wrappedValue) { _, action in
                 guard let action else { return }
@@ -188,12 +194,11 @@ struct GarageOverviewView: View {
             return
         }
         let vehicle = activeVehicles[0]
-        quickActionVehicle = vehicle
         switch action {
         case "com.theknack.wrenchlog.addService":
-            showQuickAddService = true
+            quickServiceVehicle = vehicle
         case "com.theknack.wrenchlog.addFuel":
-            showQuickAddFuel = true
+            quickFuelVehicle = vehicle
         default:
             break
         }
@@ -884,6 +889,57 @@ struct GarageOverviewView: View {
         case .overdue: Color.Status.error.shade500
         }
     }
+
+    #if DEBUG
+        // MARK: - Screenshot Tour (store-shots pipeline)
+
+        /// The vehicle a `-heroIndex`-scoped panel should show.
+        private var tourHeroVehicle: Vehicle? {
+            guard !activeVehicles.isEmpty else { return nil }
+            let index = min(max(0, ScreenshotTour.heroIndex), activeVehicles.count - 1)
+            return activeVehicles[index]
+        }
+
+        /// Routes to the screen requested via `-uiState` after the seeded data
+        /// has loaded. No-op outside a screenshot tour.
+        private func applyScreenshotTour() async {
+            guard let state = ScreenshotTour.state else { return }
+            // Let the seeded @Query results land before navigating.
+            try? await Task.sleep(for: .milliseconds(400))
+            switch state {
+            case .garage:
+                break
+            case .vehicleDetail:
+                selectedVehicle = tourHeroVehicle
+            case .addService:
+                quickServiceVehicle = tourHeroVehicle
+            case .addFuel:
+                quickFuelVehicle = tourHeroVehicle
+            case .paywall:
+                showProPrompt = true
+            case .fuelChart, .costAnalytics, .insights, .timeline, .settings:
+                tourScreen = state
+            }
+        }
+
+        @ViewBuilder
+        private func screenshotTourDestination(_ screen: ScreenshotTour.State) -> some View {
+            switch screen {
+            case .fuelChart:
+                if let vehicle = tourHeroVehicle { FuelEfficiencyChartView(vehicle: vehicle) }
+            case .costAnalytics:
+                if let vehicle = tourHeroVehicle { CostAnalyticsView(vehicle: vehicle) }
+            case .timeline:
+                if let vehicle = tourHeroVehicle { MaintenanceTimelineView(vehicle: vehicle) }
+            case .insights:
+                InsightsView()
+            case .settings:
+                SettingsView()
+            default:
+                EmptyView()
+            }
+        }
+    #endif
 }
 
 // MARK: - Garage Vehicle Card (Premium Double-Bezel)

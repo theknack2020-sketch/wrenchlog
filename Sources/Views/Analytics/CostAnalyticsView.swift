@@ -217,22 +217,9 @@ struct CostAnalyticsView: View {
                         }
                         .shadow(color: theme.accent.opacity(0.2), radius: 6, x: 0, y: 0)
 
-                        if sizeClass == .regular {
-                            // iPad: all stat cards in one row
-                            statCard(title: "Total Cost", value: settings.formatCost(totalCost), color: theme.accent)
-                                .statPop(index: 0)
-                            statCard(title: "Services", value: settings.formatCost(totalServiceCost), color: .catEngine)
-                                .statPop(index: 1)
-                            statCard(title: "Fuel", value: settings.formatCost(totalFuelCost), color: .catFuel)
-                                .statPop(index: 2)
-                        } else {
-                            statCard(title: "Total Cost", value: settings.formatCost(totalCost), color: theme.accent)
-                                .statPop(index: 0)
-                            statCard(title: "Services", value: settings.formatCost(totalServiceCost), color: .catEngine)
-                                .statPop(index: 1)
-                            statCard(title: "Fuel", value: settings.formatCost(totalFuelCost), color: .catFuel)
-                                .statPop(index: 2)
-                        }
+                        statCard(title: "Total Cost", value: settings.formatCost(totalCost), color: theme.accent)
+                        statCard(title: "Services", value: settings.formatCost(totalServiceCost), color: .catEngine)
+                        statCard(title: "Fuel", value: settings.formatCost(totalFuelCost), color: .catFuel)
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Total cost \(settings.formatCost(totalCost)), services \(settings.formatCost(totalServiceCost)), fuel \(settings.formatCost(totalFuelCost))")
@@ -329,7 +316,6 @@ struct CostAnalyticsView: View {
                     }
                     .frame(height: sizeClass == .regular ? 220 : 180)
                     .scaleEffect(donutScale)
-                    .chartReveal()
 
                     ForEach(costSplit, id: \.label) { item in
                         HStack(spacing: 10) {

@@ -230,7 +230,10 @@ struct FuelEfficiencyChartView: View {
                             RuleMark(y: .value("Average", avg * chartAnimationProgress))
                                 .foregroundStyle(.secondary.opacity(0.4))
                                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
-                                .annotation(position: .top, alignment: .trailing) {
+                                .annotation(
+                                    position: .top, alignment: .trailing,
+                                    overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))
+                                ) {
                                     Text("Avg: \(String(format: "%.1f", avg))")
                                         .font(.system(.caption2, design: .rounded, weight: .medium))
                                         .foregroundStyle(.secondary)

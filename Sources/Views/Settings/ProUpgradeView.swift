@@ -272,21 +272,18 @@ struct ProUpgradeView: View {
         .padding(.top, 24)
     }
 
-    // MARK: - Social Proof
+    // MARK: - Trust Badge
 
+    /// Honest trust signal — real product facts, never fabricated star ratings.
     private var socialProofSection: some View {
-        HStack(spacing: 6) {
-            HStack(spacing: 4) {
-                ForEach(0 ..< 5, id: \.self) { _ in
-                    Image(systemName: "star.fill")
-                        .font(.caption)
-                        .foregroundStyle(.yellow)
-                        .symbolEffect(.bounce, value: starsAnimated)
-                }
-            }
-            .accessibilityHidden(true)
+        HStack(spacing: 8) {
+            Image(systemName: "lock.shield.fill")
+                .font(.caption)
+                .foregroundStyle(Color.Status.success.shade400)
+                .symbolEffect(.bounce, value: starsAnimated)
+                .accessibilityHidden(true)
 
-            Text("Trusted by car enthusiasts worldwide")
+            Text("No ads · No accounts · Private by design")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.white.opacity(0.6))
         }
@@ -301,7 +298,7 @@ struct ProUpgradeView: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("5 stars. Trusted by car enthusiasts worldwide")
+        .accessibilityLabel("No ads, no accounts, private by design")
     }
 
     // MARK: - Feature Showcase (Horizontal Cards)
@@ -310,7 +307,7 @@ struct ProUpgradeView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 14) {
                 featureCard(icon: "chart.bar.fill", title: "Analytics", description: "Cost breakdowns & spending trends", color: .catEngine, index: 0)
-                featureCard(icon: "gauge.open.with.needle.33percent", title: "Fuel Trends", description: "MPG tracking & efficiency insights", color: .catFuel, index: 1)
+                featureCard(icon: "fuelpump.fill", title: "Fuel Trends", description: "MPG tracking & efficiency insights", color: .catFuel, index: 1)
                 featureCard(icon: "doc.richtext", title: "PDF Reports", description: "Professional service history exports", color: .catElectrical, index: 2)
                 featureCard(icon: "car.2.fill", title: "Unlimited", description: "Manage your entire fleet", color: .catTires, index: 3)
                 featureCard(icon: "paintpalette.fill", title: "Themes", description: "5 premium color palettes", color: .catFilters, index: 4)

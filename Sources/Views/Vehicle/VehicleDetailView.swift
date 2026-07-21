@@ -803,7 +803,7 @@ struct VehicleDetailView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.shield.fill")
                             .font(.subheadline)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Color.Status.successAdaptive)
                         Text("No open recalls")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -1378,7 +1378,7 @@ struct VehicleDetailView: View {
                             .frame(width: 32, height: 32)
                         Image(systemName: "tag.fill")
                             .font(.system(.caption, weight: .semibold))
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Color.Status.errorAdaptive)
                     }
                     Text("Mark as Sold")
                         .font(.subheadline.weight(.medium))
@@ -1551,7 +1551,7 @@ struct VehicleDetailView: View {
             Text("Service record deleted").font(.subheadline.weight(.medium)).foregroundStyle(.white)
             Spacer()
             Button { undoDeleteService() } label: {
-                Text("Undo").font(.subheadline.weight(.bold)).foregroundStyle(.yellow)
+                Text("Undo").font(.subheadline.weight(.bold)).foregroundStyle(Color.Status.warning.shade400)
             }
             .accessibilityLabel("Undo delete")
             .accessibilityHint("Restores the deleted service record")

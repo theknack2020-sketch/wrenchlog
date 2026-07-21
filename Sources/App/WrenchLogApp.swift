@@ -72,8 +72,15 @@ struct WrenchLogApp: App {
             }
         #endif
 
-        // Initialize TipKit for feature discovery
-        try? Tips.configure()
+        // Initialize TipKit for feature discovery.
+        // Skipped during a screenshot tour so tip popovers never photobomb captures.
+        #if DEBUG
+            if ScreenshotTour.state == nil {
+                try? Tips.configure()
+            }
+        #else
+            try? Tips.configure()
+        #endif
 
         // Register Home Screen Quick Actions
         Self.registerQuickActions()
@@ -99,7 +106,7 @@ struct WrenchLogApp: App {
             .tint(themeManager.current.accent)
             .onAppear {
                 // Show What's New sheet if version changed (and onboarding is done)
-                if !showOnboarding, WhatsNewSheet.shouldShow {
+                if !showOnboarding, WhatsNewSheet.shouldShow, !Self.isScreenshotTourActive {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         showWhatsNew = true
                     }
@@ -145,6 +152,15 @@ struct WrenchLogApp: App {
             }
         }
         .modelContainer(modelContainer)
+    }
+
+    /// Whether a store-shots screenshot tour is driving this launch (DEBUG only).
+    private static var isScreenshotTourActive: Bool {
+        #if DEBUG
+            ScreenshotTour.state != nil
+        #else
+            false
+        #endif
     }
 
     // MARK: - Container Fallback

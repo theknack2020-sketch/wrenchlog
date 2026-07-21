@@ -99,12 +99,12 @@ struct AddFuelLogView: View {
                         if let err = mileageError {
                             Text(err)
                                 .font(.caption2)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Color.Status.errorAdaptive)
                         }
                     }
                     .listRowBackground(
                         mileageError != nil
-                            ? Color.red.opacity(0.06)
+                            ? Color.Status.errorAdaptive.opacity(0.06)
                             : Color(.secondarySystemGroupedBackground)
                     )
 
@@ -132,12 +132,12 @@ struct AddFuelLogView: View {
                         if let err = volumeError {
                             Text(err)
                                 .font(.caption2)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Color.Status.errorAdaptive)
                         }
                     }
                     .listRowBackground(
                         volumeError != nil
-                            ? Color.red.opacity(0.06)
+                            ? Color.Status.errorAdaptive.opacity(0.06)
                             : Color(.secondarySystemGroupedBackground)
                     )
 
@@ -147,7 +147,7 @@ struct AddFuelLogView: View {
                     if !isFullTank {
                         HStack {
                             Image(systemName: "info.circle")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Color.Status.warningAdaptive)
                                 .accessibilityHidden(true)
                             Text("Partial fills can't calculate efficiency accurately")
                                 .font(.caption)
@@ -161,7 +161,7 @@ struct AddFuelLogView: View {
                 } footer: {
                     if let error = validationError {
                         Text(error)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Color.Status.errorAdaptive)
                             .font(.caption)
                     }
                 }
@@ -189,12 +189,12 @@ struct AddFuelLogView: View {
                         if let err = costError {
                             Text(err)
                                 .font(.caption2)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(Color.Status.errorAdaptive)
                         }
                     }
                     .listRowBackground(
                         costError != nil
-                            ? Color.red.opacity(0.06)
+                            ? Color.Status.errorAdaptive.opacity(0.06)
                             : Color(.secondarySystemGroupedBackground)
                     )
 

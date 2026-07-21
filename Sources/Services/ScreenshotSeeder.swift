@@ -7,8 +7,11 @@
     /// Triggered by launching with `-wl_seed_screenshots` launch argument.
     enum ScreenshotSeeder {
         /// Should seed mock data on this launch?
+        /// `-demoData` is the store-shots pipeline contract; `-wl_seed_screenshots`
+        /// is the legacy alias kept for UITests.
         static var shouldSeed: Bool {
             CommandLine.arguments.contains("-wl_seed_screenshots")
+                || CommandLine.arguments.contains("-demoData")
         }
 
         /// Populate the context with 3 vehicles, services, fuel logs.
@@ -36,6 +39,9 @@
 
             // Unlock Pro features for screenshot capture (all views unlocked)
             StoreManager.shared.setProForScreenshots(true)
+
+            // Hide one-time coach marks so they never photobomb captures
+            UserDefaults.standard.set(true, forKey: "wl_quickstart_dismissed")
 
             // MARK: - Vehicle 1: Toyota Camry 2022 (main hero vehicle)
 

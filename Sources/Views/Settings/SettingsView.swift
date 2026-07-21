@@ -179,7 +179,7 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(Color.Status.warningAdaptive)
                             Text("Open Settings to enable notifications")
                                 .font(.subheadline)
                         }
@@ -236,7 +236,7 @@ struct SettingsView: View {
                         } label: {
                             HStack {
                                 Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(Color.Status.warningAdaptive)
                                 Text("Open Settings to enable Calendar access")
                                     .font(.subheadline)
                             }
@@ -268,18 +268,18 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "cloud.fill")
                         .font(.title3)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.Status.successAdaptive)
                         .frame(width: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("iCloud Sync")
                             .font(.subheadline.weight(.medium))
                         Text("Enabled")
                             .font(.caption)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Color.Status.successAdaptive)
                     }
                     Spacer()
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.Status.successAdaptive)
                 }
 
                 Text("Your data syncs automatically across all your devices via iCloud.")
@@ -606,7 +606,7 @@ struct SettingsView: View {
                         .frame(width: 28, height: 28)
                         .background(.red, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                     Text("Reset All Data")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.Status.errorAdaptive)
                 }
             }
             .pressable()
@@ -673,7 +673,7 @@ struct SettingsView: View {
                                 .scaleEffect(isSelected ? 1.05 : 1.0)
                                 .animation(.spring(response: 0.3, dampingFraction: 0.65), value: isSelected)
 
-                                Text(appTheme.rawValue)
+                                Text(appTheme.displayName)
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(isSelected ? AnyShapeStyle(appTheme.accent) : isLocked ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.secondary))
                                     .lineLimit(1)
