@@ -545,7 +545,7 @@ struct ProUpgradeView: View {
 
     private var legalSection: some View {
         VStack(spacing: 8) {
-            Text("Your data stays on your device. We don't sell your vehicle information to anyone.")
+            Text("Your data stays private — on your device and in your own iCloud. We don't sell your vehicle information to anyone.")
                 .font(.caption2)
                 .foregroundStyle(.white.opacity(0.4))
                 .multilineTextAlignment(.center)
