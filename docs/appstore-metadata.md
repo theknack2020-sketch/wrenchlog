@@ -35,7 +35,7 @@ WrenchLog is the private, ad-free vehicle maintenance tracker that keeps your ca
 No account. No ads. No tracking. Your data stays private — on your device and in your own iCloud.
 
 ▸ TRACK EVERY SERVICE
-Log oil changes, tire rotations, brake work, battery replacements, and 30+ preset service types across 6 categories. Record date, mileage, cost, notes, and attach receipt photos to every entry.
+Log oil changes, tire rotations, brake work, battery replacements, and 30+ preset service types across 6 categories. Record date, mileage, cost, and notes on every entry — attach receipt photos with Pro.
 
 ▸ FUEL TRACKING & EFFICIENCY
 Log every fill-up with fuel type, volume, cost, and station name. WrenchLog automatically calculates your MPG (or L/100km), cost per mile, and tracks efficiency trends over time with interactive charts. Supports Regular, Mid-Grade, Premium, Diesel, E85, and Electric vehicles.

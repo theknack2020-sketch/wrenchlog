@@ -1547,6 +1547,10 @@ struct VehicleDetailView: View {
             cost: record.cost,
             notes: record.notes,
             photoFileNames: record.photoFileNames,
+            partsUsed: record.partsUsed,
+            oilType: record.oilType,
+            shopName: record.shopName,
+            calendarEventId: record.calendarEventId,
             deletedAt: .now
         )
         DeletionUndoManager.shared.storeDeletedService(snapshot)
@@ -1598,6 +1602,10 @@ struct VehicleDetailView: View {
             ServiceRecord(customType: snapshot.serviceTypeRaw, category: ServiceCategory(rawValue: snapshot.categoryRaw) ?? .custom, date: snapshot.date, mileage: snapshot.mileage, cost: snapshot.cost, notes: snapshot.notes)
         }
         record.photoFileNames = snapshot.photoFileNames
+        record.partsUsed = snapshot.partsUsed
+        record.oilType = snapshot.oilType
+        record.shopName = snapshot.shopName
+        record.calendarEventId = snapshot.calendarEventId
         record.vehicle = vehicle
         context.insert(record)
         do {

@@ -74,12 +74,12 @@ struct OnboardingView: View {
                 skipBar
 
                 TabView(selection: $currentPage) {
-                    welcomePage.tag(0)
-                    vehicleCountPage.tag(1)
-                    interestsPage.tag(2)
-                    previewPage.tag(3)
-                    notificationsPage.tag(4)
-                    paywallPage.tag(5)
+                    scrollablePage { welcomePage }.tag(0)
+                    scrollablePage { vehicleCountPage }.tag(1)
+                    scrollablePage { interestsPage }.tag(2)
+                    scrollablePage { previewPage }.tag(3)
+                    scrollablePage { notificationsPage }.tag(4)
+                    paywallPage.tag(5) // already hosts its own ScrollView
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.spring(response: 0.5, dampingFraction: 0.85), value: currentPage)
@@ -208,6 +208,18 @@ struct OnboardingView: View {
     }
 
     // MARK: - Page 0: Welcome Hero
+
+    /// Hosts a fixed-layout onboarding page in a ScrollView that only scrolls
+    /// when the content outgrows the container (large Dynamic Type sizes) —
+    /// at standard sizes the minHeight keeps Spacer-driven layouts intact.
+    private func scrollablePage(@ViewBuilder content: () -> some View) -> some View {
+        let page = content()
+        return GeometryReader { geo in
+            ScrollView(showsIndicators: false) {
+                page.frame(minHeight: geo.size.height)
+            }
+        }
+    }
 
     private var welcomePage: some View {
         VStack(spacing: 0) {

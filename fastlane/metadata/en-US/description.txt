@@ -9,10 +9,10 @@ Enter your 17-digit VIN and WrenchLog auto-fills make, model, and year from the 
 WrenchLog checks your vehicle against the NHTSA recall database and alerts you to any open safety recalls. Stay safe without lifting a finger.
 
 ▸ TRACK EVERY SERVICE
-Log oil changes, tire rotations, brake work, battery replacements, and 20+ preset service types across 6 categories. Record date, mileage, cost, notes, and attach receipt photos to every entry.
+Log oil changes, tire rotations, brake work, battery replacements, and 20+ preset service types across 6 categories. Record date, mileage, cost, and notes on every entry — attach receipt photos with Pro.
 
 ▸ FUEL TRACKING & EFFICIENCY
-Log every fill-up with fuel type, volume, cost, and station name. WrenchLog calculates your MPG (or L/100km), cost per mile, and tracks efficiency trends over time with interactive charts. Supports Regular, Mid-Grade, Premium, Diesel, E85, and Electric vehicles.
+Log every fill-up with fuel type, volume, cost, and station name. WrenchLog calculates your MPG (or L/100km) and cost per mile; Pro unlocks efficiency-trend charts. Supports Regular, Mid-Grade, Premium, Diesel, E85, and Electric vehicles.
 
 ▸ SMART REMINDERS
 Never miss another oil change. WrenchLog sends intelligent reminders based on time intervals, mileage thresholds, and your actual driving pace. Each reminder learns how fast you drive and notifies you at the right moment — not too early, not too late.

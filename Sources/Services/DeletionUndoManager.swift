@@ -11,6 +11,10 @@ struct DeletedServiceRecordSnapshot {
     let cost: Double
     let notes: String
     let photoFileNames: [String]
+    let partsUsed: [String]
+    let oilType: String
+    let shopName: String
+    let calendarEventId: String
     let deletedAt: Date
 
     /// How long the undo window lasts (seconds).
@@ -68,10 +72,10 @@ final class DeletionUndoManager {
     func clearFuelLog() { lastDeletedFuelLog = nil }
 
     /// Reconstruct and return a new ServiceRecord from the stored snapshot. Returns nil if expired.
-    func reconstructService() -> (serviceTypeRaw: String, categoryRaw: String, date: Date, mileage: Int, cost: Double, notes: String, photoFileNames: [String])? {
+    func reconstructService() -> (serviceTypeRaw: String, categoryRaw: String, date: Date, mileage: Int, cost: Double, notes: String, photoFileNames: [String], partsUsed: [String], oilType: String, shopName: String, calendarEventId: String)? {
         guard canUndoService, let s = lastDeletedService else { return nil }
         lastDeletedService = nil
-        return (s.serviceTypeRaw, s.categoryRaw, s.date, s.mileage, s.cost, s.notes, s.photoFileNames)
+        return (s.serviceTypeRaw, s.categoryRaw, s.date, s.mileage, s.cost, s.notes, s.photoFileNames, s.partsUsed, s.oilType, s.shopName, s.calendarEventId)
     }
 
     func reconstructFuelLog() -> (date: Date, mileage: Int, volume: Double, totalCost: Double, pricePerUnit: Double, fuelTypeRaw: String, station: String, isFullTank: Bool, notes: String, volumeUnitRaw: String)? {
