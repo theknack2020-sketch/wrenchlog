@@ -156,7 +156,6 @@ struct SoftPaywallSheet: View {
             ProUpgradeView()
         }
         .onAppear {
-            TelemetryService.paywallShown(source: "soft_paywall")
             withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                 appeared = true
             }

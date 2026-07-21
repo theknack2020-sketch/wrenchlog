@@ -99,7 +99,6 @@ struct GarageOverviewView: View {
                     Button {
                         haptic.light()
                         if !store.isPro, activeVehicles.count >= 2 {
-                            TelemetryService.paywallShown(source: "garage_add_limit")
                             showProPrompt = true
                         } else {
                             showAddVehicle = true
@@ -352,7 +351,6 @@ struct GarageOverviewView: View {
                 if !store.isPro, activeVehicles.count >= 2 {
                     Button {
                         haptic.buttonTap()
-                        TelemetryService.paywallShown(source: "garage_inline_upsell")
                         showProPrompt = true
                     } label: {
                         HStack {

@@ -27,7 +27,6 @@ struct SettingsView: View {
     @State private var errorAlertMessage = ""
     @AppStorage("wl_onboarding_complete") private var onboardingComplete = true
     @Environment(\.modelContext) private var context
-    @Environment(\.requestReview) private var requestReview
     @Environment(\.appTheme) private var theme
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let store = StoreManager.shared
@@ -333,7 +332,6 @@ struct SettingsView: View {
                     }
                 } else {
                     Button {
-                        TelemetryService.paywallShown(source: "settings_upgrade_button")
                         showPro = true
                     } label: {
                         HStack(spacing: 10) {
@@ -388,7 +386,7 @@ struct SettingsView: View {
             Section {
                 // Share App
                 ShareLink(
-                    item: URL(string: "https://apps.apple.com/app/wrenchlog/id6743597962")!,
+                    item: URL(string: "https://apps.apple.com/app/wrenchlog/id6760980170")!,
                     subject: Text("Check out WrenchLog"),
                     message: Text("I use WrenchLog to track my vehicle maintenance. Keeps everything organized — no account needed.")
                 ) {
@@ -396,13 +394,12 @@ struct SettingsView: View {
                 }
                 .accessibilityLabel("Share WrenchLog with friends")
 
-                // Rate Us
-                Button {
-                    requestReview()
-                } label: {
+                // Rate Us — deep link to the App Store review sheet. An explicit
+                // tap deserves a guaranteed outcome; requestReview() can silently
+                // no-op under Apple's 3-per-year cap.
+                Link(destination: URL(string: "https://apps.apple.com/app/id6760980170?action=write-review")!) {
                     Label("Rate on App Store", systemImage: "star.fill")
                 }
-                .pressable()
                 .accessibilityLabel("Rate WrenchLog on the App Store")
             } header: {
                 HStack(spacing: 6) {
@@ -560,7 +557,6 @@ struct SettingsView: View {
                 if store.isPro {
                     exportData()
                 } else {
-                    TelemetryService.paywallShown(source: "settings_feature_locked")
                     showPro = true
                 }
             } label: {
@@ -636,14 +632,12 @@ struct SettingsView: View {
                         let isSelected = selectedTheme == appTheme
                         Button {
                             if isLocked {
-                                TelemetryService.paywallShown(source: "settings_theme_locked")
                                 showPro = true
                             } else {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                                     selectedTheme = appTheme
                                     ThemeManager.shared.current = appTheme
                                 }
-                                TelemetryService.themeChanged(theme: appTheme.rawValue)
                                 HapticManager.shared.selection()
                             }
                         } label: {

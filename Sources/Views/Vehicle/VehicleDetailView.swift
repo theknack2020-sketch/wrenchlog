@@ -827,7 +827,9 @@ struct VehicleDetailView: View {
                                     recallDetailRow(label: "Remedy", value: recall.remedy)
                                 }
                                 if !recall.reportReceivedDate.isEmpty {
-                                    recallDetailRow(label: "Reported", value: recall.reportReceivedDate)
+                                    // NHTSA sends day-first "25/03/2021" — reformat so US
+                                    // readers don't misread it as month-first.
+                                    recallDetailRow(label: "Reported", value: formattedRecallDate(recall.reportReceivedDate))
                                 }
                             }
                             .padding(.vertical, 4)
@@ -899,6 +901,14 @@ struct VehicleDetailView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
+    }
+
+    /// Reformats NHTSA's day-first date string into the reader's locale style,
+    /// falling back to the raw string if parsing fails.
+    private func formattedRecallDate(_ raw: String) -> String {
+        let parsed = NHTSAService.parseNHTSADate(raw)
+        guard parsed != .distantPast else { return raw }
+        return parsed.formatted(date: .abbreviated, time: .omitted)
     }
 
     // MARK: - Documents
@@ -1258,7 +1268,6 @@ struct VehicleDetailView: View {
                 if store.isPro {
                     showCostAnalytics = true
                 } else {
-                    TelemetryService.paywallShown(source: "vehicle_detail_cost_analytics")
                     showProPrompt = true
                 }
             } label: {
@@ -1297,7 +1306,6 @@ struct VehicleDetailView: View {
                 if store.isPro {
                     exportPDF()
                 } else {
-                    TelemetryService.paywallShown(source: "vehicle_detail_pdf_export")
                     showProPrompt = true
                 }
             } label: {

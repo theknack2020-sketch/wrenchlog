@@ -338,7 +338,6 @@ struct FuelEfficiencyChartView: View {
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Button {
-                                TelemetryService.paywallShown(source: "fuel_chart_pro_button")
                                 showProPrompt = true
                             } label: {
                                 Text("Unlock")
@@ -523,7 +522,6 @@ struct FuelEfficiencyChartView: View {
         .padding(.vertical, 10)
         .background(color.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
         .onTapGesture {
-            TelemetryService.paywallShown(source: "fuel_chart_locked_card")
             showProPrompt = true
         }
     }

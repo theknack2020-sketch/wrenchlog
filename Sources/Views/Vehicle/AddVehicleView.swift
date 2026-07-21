@@ -291,7 +291,6 @@ struct AddVehicleView: View {
                         HapticManager.shared.buttonTap()
                         // Vehicle limit check: free = 2
                         if !store.isPro, activeVehicles.count >= 2 {
-                            TelemetryService.paywallShown(source: "add_vehicle_limit")
                             showProPrompt = true
                             return
                         }
@@ -405,7 +404,6 @@ struct AddVehicleView: View {
         do {
             try DataManager.save(context)
             LogServiceTip.vehicleAdded = true
-            TelemetryService.vehicleAdded()
             HapticManager.shared.saveSuccess()
             SoundManager.playSaveSuccess()
             SoftPaywallTracker.shared.recordAction()

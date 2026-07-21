@@ -451,7 +451,6 @@ struct InsightsView: View {
                 proTeaser(title: "Cost of Ownership", icon: "dollarsign.circle.fill", description: "Total ownership costs")
 
                 Button {
-                    TelemetryService.paywallShown(source: "insights_pro_button")
                     showProPrompt = true
                 } label: {
                     HStack(spacing: 6) {
@@ -507,7 +506,6 @@ struct InsightsView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            TelemetryService.paywallShown(source: "insights_locked_card")
             showProPrompt = true
         }
     }

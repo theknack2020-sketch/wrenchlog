@@ -80,7 +80,6 @@ final class StoreManager {
             guard case let .verified(transaction) = verification else { return false }
             await transaction.finish()
             await checkEntitlements()
-            TelemetryService.purchaseCompleted(product: product.id)
             return true
         case .pending, .userCancelled:
             return false

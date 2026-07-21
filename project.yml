@@ -22,11 +22,6 @@ settings:
     ENABLE_PREVIEWS: YES
     SWIFT_EMIT_LOC_STRINGS: YES
 
-packages:
-  TelemetryDeck:
-    url: https://github.com/TelemetryDeck/SwiftSDK
-    from: "2.0.0"
-
 targets:
   WrenchLog:
     type: application
@@ -47,8 +42,6 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE: NO
-    dependencies:
-      - package: TelemetryDeck
     postBuildScripts:
       - script: |
           if which swiftlint > /dev/null; then

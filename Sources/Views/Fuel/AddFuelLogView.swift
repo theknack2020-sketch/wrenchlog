@@ -5,6 +5,7 @@ struct AddFuelLogView: View {
     let vehicle: Vehicle
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(ReviewPromptManager.self) private var reviewPrompt
     @Environment(\.appTheme) private var theme
     @Environment(\.horizontalSizeClass) private var sizeClass
 
@@ -391,7 +392,9 @@ struct AddFuelLogView: View {
             HapticManager.shared.saveSuccess()
             SoundManager.playSaveSuccess()
             SoftPaywallTracker.shared.recordAction()
-            TelemetryService.fuelLogged()
+            // A saved fill-up is a genuine success moment — feed the honest
+            // review cadence (gated by ReviewPromptManager's timing contract).
+            reviewPrompt.trackPositiveAction()
             dismiss()
         } catch {
             saveError = error.errorDescription

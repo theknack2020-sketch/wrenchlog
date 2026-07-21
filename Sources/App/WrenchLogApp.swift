@@ -1,7 +1,6 @@
 import OSLog
 import SwiftData
 import SwiftUI
-import TelemetryDeck
 import TipKit
 
 @main
@@ -9,6 +8,7 @@ struct WrenchLogApp: App {
     @State private var showOnboarding: Bool
     @State private var showWhatsNew = false
     @State private var themeManager = ThemeManager.shared
+    @State private var reviewPrompt = ReviewPromptManager()
     @Environment(\.scenePhase) private var scenePhase
 
     /// Tracks the quick action type launched from a Home Screen shortcut.
@@ -72,10 +72,6 @@ struct WrenchLogApp: App {
             }
         #endif
 
-        // Initialize TelemetryDeck analytics
-        TelemetryService.initialize()
-        TelemetryService.appLaunched()
-
         // Initialize TipKit for feature discovery
         try? Tips.configure()
 
@@ -98,6 +94,7 @@ struct WrenchLogApp: App {
                 }
             }
             .environment(\.appTheme, themeManager.current)
+            .environment(reviewPrompt)
             .preferredColorScheme(themeManager.current.preferredColorScheme)
             .tint(themeManager.current.accent)
             .onAppear {
@@ -110,6 +107,17 @@ struct WrenchLogApp: App {
             }
             .sheet(isPresented: $showWhatsNew) {
                 WhatsNewSheet()
+            }
+            // Honest review pre-prompt: "I love it" → Apple's native prompt;
+            // "Could be better" → private feedback (never a review-gating star UI).
+            .sheet(isPresented: Binding(
+                get: { reviewPrompt.pendingPrePrompt },
+                set: { reviewPrompt.pendingPrePrompt = $0 }
+            )) {
+                ReviewPrePromptView(
+                    onLove: { reviewPrompt.lovedIt() },
+                    onFeedback: { reviewPrompt.notForMe() }
+                )
             }
             .onOpenURL { url in
                 // wrenchlog://vehicle/{id}
@@ -127,6 +135,7 @@ struct WrenchLogApp: App {
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
+                    reviewPrompt.trackSessionStart()
                     // Check for quick action when returning from background
                     if let shortcut = QuickActionService.pendingAction {
                         pendingQuickAction = shortcut

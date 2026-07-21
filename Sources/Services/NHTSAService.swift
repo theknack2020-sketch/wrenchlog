@@ -234,9 +234,9 @@ final class NHTSAService: Sendable {
             )
         }
 
-        // Sort by date descending (format: "DD/MM/YYYY" from NHTSA)
+        // Sort by date descending (format: "dd/MM/yyyy" from NHTSA)
         return recalls.sorted { lhs, rhs in
-            parseNHTSADate(lhs.reportReceivedDate) > parseNHTSADate(rhs.reportReceivedDate)
+            Self.parseNHTSADate(lhs.reportReceivedDate) > Self.parseNHTSADate(rhs.reportReceivedDate)
         }
     }
 
@@ -268,8 +268,10 @@ final class NHTSAService: Sendable {
         return city
     }
 
-    /// Parses NHTSA date strings ("DD/MM/YYYY") into a comparable Date.
-    private func parseNHTSADate(_ string: String) -> Date {
+    /// Parses NHTSA date strings (day-first "dd/MM/yyyy", verified against the
+    /// live `recallsByVehicle` API) into a comparable Date. Static and
+    /// side-effect-free so the format assumption stays pinned in unit tests.
+    nonisolated static func parseNHTSADate(_ string: String) -> Date {
         let formatter = DateFormatter()
         formatter.dateFormat = "dd/MM/yyyy"
         formatter.locale = Locale(identifier: "en_US_POSIX")

@@ -8,7 +8,7 @@ struct AddServiceView: View {
     let vehicle: Vehicle
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.requestReview) private var requestReview
+    @Environment(ReviewPromptManager.self) private var reviewPrompt
     @Environment(\.appTheme) private var theme
     @Environment(\.horizontalSizeClass) private var sizeClass
 
@@ -399,7 +399,6 @@ struct AddServiceView: View {
                             }
                         } else {
                             Button {
-                                TelemetryService.paywallShown(source: "add_service_photos")
                                 showProPrompt = true
                             } label: {
                                 HStack {
@@ -529,7 +528,6 @@ struct AddServiceView: View {
                 .accessibilityHint("Enable to enter a custom service type")
         } else {
             Button {
-                TelemetryService.paywallShown(source: "add_service_custom_type")
                 showProPrompt = true
             } label: {
                 HStack {
@@ -679,14 +677,10 @@ struct AddServiceView: View {
 
         // Track action for soft paywall
         SoftPaywallTracker.shared.recordAction()
-        TelemetryService.serviceLogged()
 
-        let allServiceCount = (try? context.fetch(FetchDescriptor<ServiceRecord>()))?.count ?? 0
-        if allServiceCount == 5 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                requestReview()
-            }
-        }
+        // A saved service is a genuine success moment — feed the honest
+        // review cadence (gated by ReviewPromptManager's timing contract).
+        reviewPrompt.trackPositiveAction()
     }
 }
 
