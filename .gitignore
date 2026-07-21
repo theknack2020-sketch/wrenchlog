@@ -25,3 +25,8 @@ build_sim/
 build_sim26/
 build_output/
 *.xcarchive
+
+# store-shots pipeline artifacts
+.asc/shots/raw/
+.asc/shots/final/
+.asc/shots/upload/

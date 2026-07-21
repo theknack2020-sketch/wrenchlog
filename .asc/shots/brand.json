@@ -1,0 +1,15 @@
+{
+  "bg": "linear-gradient(168deg, #FFE9C4 0%, #F2B04A 55%, #FFF4DF 100%)",
+  "ink": "#3A2812",
+  "captionFont": "ui-serif, Georgia, 'Times New Roman', serif",
+  "subFont": "-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif",
+  "headlineWeight": 700,
+  "grainOpacity": 0.045,
+  "blankPeakThreshold": 0.80,
+  "panelPalette": [
+    { "name": "amber",    "bg": "linear-gradient(168deg, #FFE9C4 0%, #F2B04A 55%, #FFF4DF 100%)", "ink": "#3A2812" },
+    { "name": "graphite", "bg": "linear-gradient(168deg, #2B241B 0%, #1E1913 55%, #3A2F1F 100%)", "ink": "#FFE9C4" },
+    { "name": "cream",    "bg": "linear-gradient(168deg, #FFF7EA 0%, #FFE4B8 60%, #FBF0DC 100%)", "ink": "#3A2812" },
+    { "name": "forest",   "bg": "linear-gradient(168deg, #DFF2E4 0%, #9CCFAB 55%, #EFF8F0 100%)", "ink": "#1E3325" }
+  ]
+}

@@ -909,7 +909,7 @@ struct GarageOverviewView: View {
             switch state {
             case .garage:
                 break
-            case .vehicleDetail:
+            case .vehicleDetail, .recalls:
                 selectedVehicle = tourHeroVehicle
             case .addService:
                 quickServiceVehicle = tourHeroVehicle

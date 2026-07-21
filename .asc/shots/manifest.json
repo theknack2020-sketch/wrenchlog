@@ -1,0 +1,10 @@
+{
+  "panels": [
+    { "id": "01-garage",   "caption": "Every service, logged in seconds", "sub": "Your whole garage at a glance",            "uiState": "garage",         "heroIndex": null, "bgVariant": "amber",    "settle": 6 },
+    { "id": "02-recalls",  "caption": "Safety recalls, auto-checked",     "sub": "Live from the official NHTSA database",    "uiState": "recalls",        "heroIndex": 2,    "bgVariant": "graphite", "settle": 10 },
+    { "id": "03-costs",    "caption": "Know what your car really costs",  "sub": "Cost per mile, trends & yearly totals",    "uiState": "cost-analytics", "heroIndex": 2,    "bgVariant": "cream",    "settle": 7 },
+    { "id": "04-fuel",     "caption": "MPG trends, tracked for you",      "sub": "Fuel efficiency from every fill-up",       "uiState": "fuel-chart",     "heroIndex": 2,    "bgVariant": "forest",   "settle": 7 },
+    { "id": "05-health",   "caption": "A health score for every car",     "sub": "0-100, weighted by what matters",          "uiState": "vehicle-detail", "heroIndex": 0,    "bgVariant": "amber",    "settle": 7 },
+    { "id": "06-log",      "caption": "20+ service types, receipt photos","sub": "Oil change to brake pads in two taps",     "uiState": "add-service",    "heroIndex": 1,    "bgVariant": "graphite", "settle": 7 }
+  ]
+}

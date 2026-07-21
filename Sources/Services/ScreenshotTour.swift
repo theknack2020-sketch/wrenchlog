@@ -15,6 +15,8 @@
         enum State: String, Identifiable, Hashable {
             case garage
             case vehicleDetail = "vehicle-detail"
+            /// Vehicle detail auto-scrolled to the NHTSA recalls section.
+            case recalls
             case addService = "add-service"
             case addFuel = "add-fuel"
             case fuelChart = "fuel-chart"

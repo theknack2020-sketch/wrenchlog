@@ -46,6 +46,7 @@ struct VehicleDetailView: View {
     // Recalls
     @State private var recalls: [RecallInfo] = []
     @State private var isLoadingRecalls = false
+    @State private var expandedRecallIDs: Set<String> = []
     @State private var recallError: String?
 
     // Search & Filter & Sort
@@ -167,6 +168,7 @@ struct VehicleDetailView: View {
     // MARK: - Body
 
     var body: some View {
+        ScrollViewReader { scrollProxy in
         List {
             if showQuickStart {
                 Section {
@@ -179,6 +181,7 @@ struct VehicleDetailView: View {
             miniStatCardsSection
             vehicleInfoSection
             recallsSection
+                .id("recallsAnchor")
             documentsSection
             toolsSection
             remindersSection
@@ -186,6 +189,20 @@ struct VehicleDetailView: View {
             serviceHistorySection
             actionsSection
         }
+        #if DEBUG
+        // store-shots: land the recalls panel with the NHTSA section framed and
+        // the first recall expanded so risk/remedy details are visible.
+        .task {
+            guard ScreenshotTour.state == .recalls else { return }
+            try? await Task.sleep(for: .seconds(3))
+            withTransaction(Transaction(animation: nil)) {
+                if let first = recalls.first {
+                    expandedRecallIDs.insert(first.id)
+                }
+                scrollProxy.scrollTo("recallsAnchor", anchor: UnitPoint(x: 0.5, y: 0.12))
+            }
+        }
+        #endif
         .navigationTitle("Vehicle")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { detailToolbar }
@@ -238,6 +255,7 @@ struct VehicleDetailView: View {
                     .padding(.bottom, 16)
                     .padding(.horizontal, 16)
             }
+        }
         }
     }
 
@@ -812,7 +830,16 @@ struct VehicleDetailView: View {
                     .accessibilityLabel("No open safety recalls found")
                 } else {
                     ForEach(recalls) { recall in
-                        DisclosureGroup {
+                        DisclosureGroup(isExpanded: Binding(
+                            get: { expandedRecallIDs.contains(recall.id) },
+                            set: { expanded in
+                                if expanded {
+                                    expandedRecallIDs.insert(recall.id)
+                                } else {
+                                    expandedRecallIDs.remove(recall.id)
+                                }
+                            }
+                        )) {
                             VStack(alignment: .leading, spacing: 10) {
                                 if !recall.component.isEmpty {
                                     recallDetailRow(label: "Component", value: recall.component)
