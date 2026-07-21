@@ -16,7 +16,9 @@ struct WrenchLogApp: App {
 
     private let modelContainer: ModelContainer
 
-    @State private var showDataError = false
+    /// Non-nil when store recovery lost or endangered user data — shown as a
+    /// launch alert so data loss is never silent.
+    @State private var dataErrorMessage: String?
 
     init() {
         // Initialize onboarding state first; will be re-evaluated after seeder (if DEBUG)
@@ -24,7 +26,10 @@ struct WrenchLogApp: App {
 
         let schema = Schema(versionedSchema: WrenchLogSchemaV4.self)
 
-        // Crash-safe container initialization with migration plan
+        // Crash-safe container initialization with migration plan. Any recovery
+        // path that loses or endangers data records a notice for a launch alert
+        // — data loss must never be silent.
+        var storeRecoveryNotice: String?
         do {
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
             modelContainer = try ModelContainer(
@@ -47,18 +52,17 @@ struct WrenchLogApp: App {
                     migrationPlan: WrenchLogMigrationPlan.self,
                     configurations: [config]
                 )
+                storeRecoveryNotice = "Your saved data couldn't be read after the update, so WrenchLog had to start with an empty library. If iCloud sync is on, your vehicles will download again shortly."
             } catch {
                 // Last resort: in-memory container to avoid crash loop
                 Logger.app.fault("Cannot create persistent store: \(error). Using in-memory fallback.")
                 let memConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
                 // In-memory ModelContainer creation is safe — schema is already validated
                 modelContainer = Self.makeInMemoryContainer(schema: schema, config: memConfig)
-                // Flag to show user alert about data loss
-                DispatchQueue.main.async { [self] in
-                    showDataError = true
-                }
+                storeRecoveryNotice = "Your data couldn't be loaded. You can keep using WrenchLog, but changes made in this session won't be saved. Please contact support: theknack2020@gmail.com"
             }
         }
+        _dataErrorMessage = State(initialValue: storeRecoveryNotice)
 
         // Enable autosave for crash safety
         modelContainer.mainContext.autosaveEnabled = true
@@ -114,6 +118,18 @@ struct WrenchLogApp: App {
             }
             .sheet(isPresented: $showWhatsNew) {
                 WhatsNewSheet()
+            }
+            // Data-loss recovery is never silent — tell the user what happened.
+            .alert(
+                "There Was a Data Problem",
+                isPresented: Binding(
+                    get: { dataErrorMessage != nil },
+                    set: { if !$0 { dataErrorMessage = nil } }
+                )
+            ) {
+                Button("OK") { dataErrorMessage = nil }
+            } message: {
+                Text(dataErrorMessage ?? "")
             }
             // Honest review pre-prompt: "I love it" → Apple's native prompt;
             // "Could be better" → private feedback (never a review-gating star UI).

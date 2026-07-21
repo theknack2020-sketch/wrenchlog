@@ -97,7 +97,8 @@ struct SoftPaywallSheet: View {
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .foregroundStyle(.white)
+                    // Dark ink on the amber gradient — white fails WCAG-AA here.
+                    .foregroundStyle(Color.amberInk)
                     .background(
                         ZStack {
                             RoundedRectangle(cornerRadius: 14)

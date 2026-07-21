@@ -32,7 +32,7 @@ oil change,mpg,vehicle history,mileage,reminder,auto care,vin decoder,recall,fle
 ```
 WrenchLog is the private, ad-free vehicle maintenance tracker that keeps your cars healthy and your wallet informed.
 
-No account. No ads. No tracking. Your data stays on your device — period.
+No account. No ads. No tracking. Your data stays private — on your device and in your own iCloud.
 
 ▸ TRACK EVERY SERVICE
 Log oil changes, tire rotations, brake work, battery replacements, and 30+ preset service types across 6 categories. Record date, mileage, cost, notes, and attach receipt photos to every entry.
@@ -77,7 +77,7 @@ Miles or kilometers. Gallons or liters. MPG or L/100km. USD, EUR, GBP, or TRY. W
 Default Amber, Ocean Blue, or Dark Mono. Pick what looks right to you.
 
 ▸ PRIVACY FIRST
-WrenchLog collects zero personal data. No account signup. No analytics SDKs. No third-party tracking. No ads — ever. Your vehicle data never leaves your device. We don't sell your information to data brokers, insurance companies, or anyone else.
+WrenchLog collects zero personal data. No account signup. No analytics SDKs. No third-party tracking. No ads — ever. Your vehicle data lives on your device and syncs only to your personal iCloud — never to our servers. We don't sell your information to data brokers, insurance companies, or anyone else.
 
 ▸ BUILT FOR CAR PEOPLE
 Whether you're a weekend wrench-turner who does their own oil changes, a family managing two cars, or someone who just wants proof of maintenance when selling — WrenchLog gives you a complete ownership record without the bloat.

@@ -602,7 +602,6 @@ private extension ProUpgradeView {
                         Spacer()
                         Text("RECOMMENDED")
                             .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
                             .background(Color.amber.shade500.opacity(0.4), in: Capsule())
@@ -616,20 +615,20 @@ private extension ProUpgradeView {
                                 .font(.system(.headline, design: .rounded, weight: .bold))
                             Text("Start 7-Day Free Trial")
                                 .font(.system(.subheadline, design: .rounded))
-                                .opacity(0.85)
+                                .opacity(0.9)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
                             if purchasing {
                                 ProgressView()
                                     .controlSize(.small)
-                                    .tint(.white)
+                                    .tint(Color.amberInk)
                             } else {
                                 Text(product.displayPrice)
                                     .font(.system(.title3, design: .rounded, weight: .bold))
                                 Text("/year")
                                     .font(.caption2)
-                                    .opacity(0.7)
+                                    .opacity(0.9)
                             }
                         }
                     }
@@ -637,7 +636,8 @@ private extension ProUpgradeView {
                     .padding(.vertical, 14)
                     .padding(.bottom, 4)
                 }
-                .foregroundStyle(.white)
+                // Dark ink on the amber gradient — white fails WCAG-AA here.
+                .foregroundStyle(Color.amberInk)
                 .padding(3)
                 .background(
                     RoundedRectangle(cornerRadius: 17)

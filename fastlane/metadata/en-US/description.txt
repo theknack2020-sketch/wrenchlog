@@ -1,6 +1,6 @@
 WrenchLog is the private, ad-free vehicle maintenance tracker that keeps your cars healthy and your wallet informed.
 
-No account. No ads. No tracking. Your data stays on your device — period.
+No account. No ads. No tracking. Your data stays private — on your device and in your own iCloud.
 
 ▸ VIN DECODER
 Enter your 17-digit VIN and WrenchLog auto-fills make, model, and year from the official NHTSA database. No manual entry needed.
@@ -51,7 +51,7 @@ Miles or kilometers. Gallons or liters. MPG or L/100km. WrenchLog speaks your la
 Amber, Ocean, Mono, Forest, or Rose. Pick what looks right to you.
 
 ▸ PRIVACY FIRST
-WrenchLog collects zero personal data. No account signup. No analytics SDKs. No third-party tracking. No ads — ever. Your vehicle data never leaves your device. We don't sell your information to data brokers, insurance companies, or anyone else.
+WrenchLog collects zero personal data. No account signup. No analytics SDKs. No third-party tracking. No ads — ever. Your vehicle data lives on your device and syncs only to your personal iCloud — never to our servers. We don't sell your information to data brokers, insurance companies, or anyone else.
 
 ▸ BUILT FOR CAR PEOPLE
 Weekend wrenchers, families with multiple cars, or sellers needing proof of maintenance — WrenchLog gives you a complete ownership record without the bloat.

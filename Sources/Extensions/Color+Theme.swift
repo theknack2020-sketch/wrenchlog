@@ -67,6 +67,10 @@ extension Color {
 // MARK: - Brand Accent Palettes (per theme)
 
 extension Color {
+    /// Dark ink for text ON amber CTA surfaces — white on the amber gradient
+    /// fails WCAG-AA (2.2–2.9:1); this ink measures 5.7–7.3:1 on shades 400–600.
+    static let amberInk = Color(red: 0.165, green: 0.114, blue: 0.031)
+
     /// Amber palette — WrenchLog brand primary
     static let amber = TonalScale.generate(hue: 38, saturation: 90, brightness: 92)
 

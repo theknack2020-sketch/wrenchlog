@@ -120,8 +120,10 @@ final class NHTSAService: Sendable {
                 throw NHTSAError.networkError(underlying: "Server returned an error. Try again.")
             }
             data = responseData
-        } catch is NHTSAError {
-            throw NHTSAError.timeout
+        } catch let error as NHTSAError {
+            // Preserve the specific error (e.g. server non-2xx) — do not
+            // collapse everything into a misleading timeout message.
+            throw error
         } catch let urlError as URLError where urlError.code == .timedOut {
             throw NHTSAError.timeout
         } catch let urlError as URLError {
@@ -160,8 +162,10 @@ final class NHTSAService: Sendable {
                 throw NHTSAError.networkError(underlying: "Server returned an error. Try again.")
             }
             data = responseData
-        } catch is NHTSAError {
-            throw NHTSAError.timeout
+        } catch let error as NHTSAError {
+            // Preserve the specific error (e.g. server non-2xx) — do not
+            // collapse everything into a misleading timeout message.
+            throw error
         } catch let urlError as URLError where urlError.code == .timedOut {
             throw NHTSAError.timeout
         } catch let urlError as URLError {
