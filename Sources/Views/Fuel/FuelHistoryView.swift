@@ -12,6 +12,7 @@ struct FuelHistoryView: View {
     @State private var fuelLogForEdit: FuelLog?
     @Environment(\.modelContext) private var context
     @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private let settings = UserSettings.shared
@@ -137,7 +138,7 @@ struct FuelHistoryView: View {
                     Image(systemName: "fuelpump.circle.fill")
                         .font(.largeTitle)
                         .foregroundStyle(theme.accent)
-                        .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
+                        .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5), isActive: !reduceMotion)
                 }
                 .accessibilityHidden(true)
                 VStack(spacing: 8) {

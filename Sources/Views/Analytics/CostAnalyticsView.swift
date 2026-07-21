@@ -7,6 +7,7 @@ struct CostAnalyticsView: View {
     private let store = StoreManager.shared
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var chartAnimationProgress: Double = 0
     @State private var donutScale: CGFloat = 0.4
@@ -152,7 +153,7 @@ struct CostAnalyticsView: View {
                 Image(systemName: "chart.bar.xaxis.ascending")
                     .font(.largeTitle)
                     .foregroundStyle(theme.accent)
-                    .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
+                    .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5), isActive: !reduceMotion)
             }
             .accessibilityHidden(true)
 

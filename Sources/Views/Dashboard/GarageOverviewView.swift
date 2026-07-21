@@ -32,6 +32,7 @@ struct GarageOverviewView: View {
     #endif
     @Environment(\.modelContext) private var context
     @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.pendingQuickAction) private var pendingQuickAction
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Namespace private var heroNamespace
@@ -249,7 +250,7 @@ struct GarageOverviewView: View {
                 Image(systemName: "car.side.fill")
                     .font(.system(.largeTitle, design: .rounded, weight: .medium))
                     .foregroundStyle(theme.accent)
-                    .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
+                    .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5), isActive: !reduceMotion)
             }
             .accessibilityHidden(true)
 

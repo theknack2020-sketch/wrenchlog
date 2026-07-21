@@ -10,6 +10,7 @@ struct InsightsView: View {
     private var vehicles: [Vehicle]
 
     @Environment(\.appTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var sizeClass
     private let settings = UserSettings.shared
     private let store = StoreManager.shared
@@ -341,7 +342,7 @@ struct InsightsView: View {
                 Image(systemName: "chart.bar.xaxis.ascending")
                     .font(.system(.largeTitle, design: .rounded))
                     .foregroundStyle(theme.accent)
-                    .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5))
+                    .symbolEffect(.pulse.wholeSymbol, options: .repeating.speed(0.5), isActive: !reduceMotion)
             }
             .accessibilityHidden(true)
             VStack(spacing: 8) {

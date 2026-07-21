@@ -14,6 +14,11 @@ final class StoreManager {
     private(set) var isLoading = true
     private(set) var loadError: String?
 
+    /// Whether the yearly subscription's intro offer (7-day free trial) is
+    /// still available to THIS user. A user who already consumed the trial
+    /// must see the plain price CTA, never a trial promise.
+    private(set) var yearlyIntroEligible = false
+
     private init() {
         Task { await loadProducts() }
         Task { await checkEntitlements() }
@@ -39,6 +44,9 @@ final class StoreManager {
             products = try await Product.products(for: [Self.yearlyID, Self.lifetimeID])
             if products.isEmpty {
                 loadError = "No products available"
+            }
+            if let subscription = yearlyProduct?.subscription {
+                yearlyIntroEligible = await subscription.isEligibleForIntroOffer
             }
         } catch {
             loadError = "Failed to load products. Check your connection."

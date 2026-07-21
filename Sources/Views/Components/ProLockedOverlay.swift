@@ -34,7 +34,8 @@ struct ProLockedOverlay: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .foregroundStyle(.white)
+                    // Dark ink on the accent — white fails WCAG-AA on all themes.
+                    .foregroundStyle(theme.onAccent)
                     .background(
                         LinearGradient(
                             colors: [theme.accent, theme.accent.opacity(0.75)],

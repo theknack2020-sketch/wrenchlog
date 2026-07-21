@@ -54,7 +54,8 @@ struct ReviewPrePromptView: View {
                 } label: {
                     Text("I love it")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(.white)
+                        // Dark ink on the accent — white fails WCAG-AA on all themes.
+                        .foregroundStyle(theme.onAccent)
                         .frame(maxWidth: .infinity, minHeight: 50)
                         .background(theme.accent, in: .rect(cornerRadius: 14, style: .continuous))
                 }

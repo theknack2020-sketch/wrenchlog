@@ -92,7 +92,9 @@ struct SoftPaywallSheet: View {
                     HStack(spacing: 8) {
                         Image(systemName: "crown.fill")
                             .font(.subheadline)
-                        Text("Start 7-Day Free Trial")
+                        // Trial copy only while the intro offer is still available
+                        // to this user.
+                        Text(store.yearlyIntroEligible ? "Start 7-Day Free Trial" : "See Pro Plans")
                             .font(.system(.headline, design: .rounded, weight: .bold))
                     }
                     .frame(maxWidth: .infinity)

@@ -563,7 +563,7 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.onAccent)
                         .frame(width: 28, height: 28)
                         .background(theme.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                     Text("Export Data (CSV)")
@@ -586,7 +586,7 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "square.and.arrow.down")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(theme.onAccent)
                         .frame(width: 28, height: 28)
                         .background(theme.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                     Text("Import Data (CSV)")

@@ -614,7 +614,9 @@ private extension ProUpgradeView {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Yearly")
                                 .font(.system(.headline, design: .rounded, weight: .bold))
-                            Text("Start 7-Day Free Trial")
+                            // Trial copy only when StoreKit says THIS user is
+                            // still eligible for the intro offer.
+                            Text(store.yearlyIntroEligible ? "Start 7-Day Free Trial" : "Full access, billed yearly")
                                 .font(.system(.subheadline, design: .rounded))
                                 .opacity(0.9)
                         }
@@ -671,8 +673,12 @@ private extension ProUpgradeView {
         .disabled(purchasing)
         .pressable()
         .glowPulse(color: Color.amber.shade500)
-        .accessibilityLabel("Yearly plan, \(product.displayPrice) per year, Start 7-day free trial")
-        .accessibilityHint("Recommended option with free trial")
+        .accessibilityLabel(
+            store.yearlyIntroEligible
+                ? "Yearly plan, \(product.displayPrice) per year, Start 7-day free trial"
+                : "Yearly plan, \(product.displayPrice) per year"
+        )
+        .accessibilityHint(store.yearlyIntroEligible ? "Recommended option with free trial" : "Recommended option")
     }
 
     func lifetimeProductCard(product: Product) -> some View {
