@@ -6,6 +6,7 @@ import SwiftUI
 struct StaggeredAppearModifier: ViewModifier {
     let index: Int
     @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
@@ -13,6 +14,7 @@ struct StaggeredAppearModifier: ViewModifier {
             .offset(y: appeared ? 0 : 12)
             .scaleEffect(appeared ? 1 : 0.97)
             .onAppear {
+                guard !reduceMotion else { appeared = true; return }
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.78).delay(Double(index) * 0.06)) {
                     appeared = true
                 }
@@ -33,12 +35,15 @@ struct SpringStaggeredAppearModifier: ViewModifier {
         self.offsetY = offsetY
     }
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : offsetY)
             .scaleEffect(appeared ? 1 : 0.94)
             .onAppear {
+                guard !reduceMotion else { appeared = true; return }
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.72, blendDuration: 0.1).delay(Double(index) * 0.08)) {
                     appeared = true
                 }
@@ -69,6 +74,7 @@ struct ScalePressModifier: ViewModifier {
 /// Wraps content with a smooth slide-up + spring transition for sheet usage.
 struct SmoothSheetModifier: ViewModifier {
     @State private var sheetAppeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
@@ -76,6 +82,7 @@ struct SmoothSheetModifier: ViewModifier {
             .offset(y: sheetAppeared ? 0 : 30)
             .scaleEffect(sheetAppeared ? 1 : 0.97)
             .onAppear {
+                guard !reduceMotion else { sheetAppeared = true; return }
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                     sheetAppeared = true
                 }
@@ -88,12 +95,14 @@ struct SmoothSheetModifier: ViewModifier {
 /// Fade + scale entrance for charts — smooth spring with slight overshoot.
 struct ChartRevealModifier: ViewModifier {
     @State private var revealed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
             .opacity(revealed ? 1 : 0)
             .scaleEffect(revealed ? 1 : 0.92, anchor: .bottom)
             .onAppear {
+                guard !reduceMotion else { revealed = true; return }
                 withAnimation(.spring(response: 0.55, dampingFraction: 0.75).delay(0.15)) {
                     revealed = true
                 }
@@ -126,11 +135,14 @@ struct FloatInModifier: ViewModifier {
         self.delay = delay
     }
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 24)
             .onAppear {
+                guard !reduceMotion else { appeared = true; return }
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.76).delay(delay)) {
                     appeared = true
                 }
@@ -144,12 +156,14 @@ struct FloatInModifier: ViewModifier {
 struct StatPopModifier: ViewModifier {
     let index: Int
     @State private var popped = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
             .scaleEffect(popped ? 1 : 0.85)
             .opacity(popped ? 1 : 0)
             .onAppear {
+                guard !reduceMotion else { popped = true; return }
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.65).delay(Double(index) * 0.07 + 0.1)) {
                     popped = true
                 }
@@ -166,6 +180,7 @@ struct ProgressRing: View {
     let color: Color
 
     @State private var animatedProgress: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -181,11 +196,13 @@ struct ProgressRing: View {
                 .rotationEffect(.degrees(-90))
         }
         .onAppear {
+            guard !reduceMotion else { animatedProgress = progress; return }
             withAnimation(.easeOut(duration: 1.0).delay(0.2)) {
                 animatedProgress = progress
             }
         }
         .onChange(of: progress) { _, newVal in
+            guard !reduceMotion else { animatedProgress = newVal; return }
             withAnimation(.easeOut(duration: 0.6)) {
                 animatedProgress = newVal
             }
@@ -383,6 +400,7 @@ struct AnimatedMileageText: View {
     let color: Color
 
     @State private var displayedValue: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Text("\(Int(displayedValue).formatted()) \(unit)")
@@ -390,11 +408,13 @@ struct AnimatedMileageText: View {
             .foregroundStyle(color)
             .contentTransition(.numericText(value: displayedValue))
             .onAppear {
+                guard !reduceMotion else { displayedValue = Double(value); return }
                 withAnimation(.easeOut(duration: 0.5)) {
                     displayedValue = Double(value)
                 }
             }
             .onChange(of: value) { _, newVal in
+                guard !reduceMotion else { displayedValue = Double(newVal); return }
                 withAnimation(.easeOut(duration: 0.6)) {
                     displayedValue = Double(newVal)
                 }

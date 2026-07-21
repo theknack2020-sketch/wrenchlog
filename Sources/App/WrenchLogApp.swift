@@ -44,9 +44,13 @@ struct WrenchLogApp: App {
             do {
                 let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
                 let storeURL = config.url
+                // SQLite WAL-mode sidecars are named "<store>-wal"/"<store>-shm"
+                // (hyphen suffix), NOT "<store>.wal" — remove the real files so
+                // WAL-resident corruption can't re-taint the fresh store.
+                let sidecarDir = storeURL.deletingLastPathComponent()
                 try? FileManager.default.removeItem(at: storeURL)
-                try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("wal"))
-                try? FileManager.default.removeItem(at: storeURL.appendingPathExtension("shm"))
+                try? FileManager.default.removeItem(at: sidecarDir.appendingPathComponent(storeURL.lastPathComponent + "-wal"))
+                try? FileManager.default.removeItem(at: sidecarDir.appendingPathComponent(storeURL.lastPathComponent + "-shm"))
                 modelContainer = try ModelContainer(
                     for: schema,
                     migrationPlan: WrenchLogMigrationPlan.self,
