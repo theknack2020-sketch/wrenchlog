@@ -554,7 +554,8 @@ struct ProUpgradeView: View {
             VStack(spacing: 4) {
                 Text("Subscriptions auto-renew unless cancelled at least 24 hours before the end of the current period. Payment is charged to your Apple ID account. You can manage or cancel subscriptions anytime in Settings → Apple ID → Subscriptions.")
                     .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.25))
+                    // 3.1.2: required subscription terms must be legible.
+                    .foregroundStyle(.white.opacity(0.65))
                     .multilineTextAlignment(.center)
 
                 HStack(spacing: 16) {
