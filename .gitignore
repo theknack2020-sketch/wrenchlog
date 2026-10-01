@@ -30,3 +30,7 @@ build_output/
 .asc/shots/raw/
 .asc/shots/final/
 .asc/shots/upload/
+
+# Secret patterns (TheKnack global law §2): never commit keys, certificates or env files
+*.pem
+*.secret
